@@ -1,1 +1,13 @@
 project_id = "ufdcvxmizlzlnyyqpfck"
+
+[functions.orbit-gemini-analysis]
+verify_jwt = true
+
+[functions.process-image-batch]
+verify_jwt = true
+
+[functions.create-payment-intent]
+verify_jwt = true
+
+[functions.stripe-webhook]
+verify_jwt = false

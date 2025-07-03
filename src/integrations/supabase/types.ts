@@ -179,12 +179,14 @@ export type Database = {
       images: {
         Row: {
           ai_analysis: Json | null
+          analysis_type: string | null
           batch_id: string | null
           created_at: string | null
           error_message: string | null
           extracted_metadata: Json | null
           file_hash: string | null
           file_size: number | null
+          gemini_analysis_raw: string | null
           id: string
           mime_type: string | null
           order_id: string | null
@@ -203,12 +205,14 @@ export type Database = {
         }
         Insert: {
           ai_analysis?: Json | null
+          analysis_type?: string | null
           batch_id?: string | null
           created_at?: string | null
           error_message?: string | null
           extracted_metadata?: Json | null
           file_hash?: string | null
           file_size?: number | null
+          gemini_analysis_raw?: string | null
           id?: string
           mime_type?: string | null
           order_id?: string | null
@@ -227,12 +231,14 @@ export type Database = {
         }
         Update: {
           ai_analysis?: Json | null
+          analysis_type?: string | null
           batch_id?: string | null
           created_at?: string | null
           error_message?: string | null
           extracted_metadata?: Json | null
           file_hash?: string | null
           file_size?: number | null
+          gemini_analysis_raw?: string | null
           id?: string
           mime_type?: string | null
           order_id?: string | null
@@ -273,6 +279,59 @@ export type Database = {
           },
           {
             foreignKeyName: "images_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "orbit_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mcp_audit_log: {
+        Row: {
+          created_at: string
+          error_message: string | null
+          execution_time_ms: number | null
+          id: string
+          ip_address: string | null
+          request_data: Json | null
+          response_data: Json | null
+          risk_score: number | null
+          session_id: string
+          success: boolean
+          tool_name: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          error_message?: string | null
+          execution_time_ms?: number | null
+          id?: string
+          ip_address?: string | null
+          request_data?: Json | null
+          response_data?: Json | null
+          risk_score?: number | null
+          session_id: string
+          success?: boolean
+          tool_name: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          error_message?: string | null
+          execution_time_ms?: number | null
+          id?: string
+          ip_address?: string | null
+          request_data?: Json | null
+          response_data?: Json | null
+          risk_score?: number | null
+          session_id?: string
+          success?: boolean
+          tool_name?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mcp_audit_log_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "orbit_users"

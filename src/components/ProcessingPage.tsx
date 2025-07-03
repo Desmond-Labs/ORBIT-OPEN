@@ -24,6 +24,9 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
   const [showAuthPage, setShowAuthPage] = useState(false);
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [orderId, setOrderId] = useState<string | null>(null);
+  const [analysisType, setAnalysisType] = useState<'product' | 'lifestyle'>('product');
+  const [processingResults, setProcessingResults] = useState<any>(null);
+  const [uploadingFiles, setUploadingFiles] = useState(false);
   
   const { toast } = useToast();
 
@@ -145,7 +148,7 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
 
       // If we get here, payment was successful
       setCurrentStep('processing');
-      simulateProcessing();
+      await startRealProcessing(data.order_id);
     } catch (error: any) {
       console.error('Payment error:', error);
       toast({
@@ -158,17 +161,135 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
     }
   };
 
-  const simulateProcessing = () => {
-    let progress = 0;
-    const interval = setInterval(() => {
-      progress += Math.random() * 10;
-      if (progress >= 100) {
-        progress = 100;
-        setCurrentStep('complete');
-        clearInterval(interval);
+  const startRealProcessing = async (orderIdParam: string) => {
+    try {
+      setUploadingFiles(true);
+      
+      // 1. Upload files to Supabase Storage
+      const uploadedPaths = await uploadFilesToStorage(orderIdParam);
+      
+      // 2. Create image records in database
+      await createImageRecords(orderIdParam, uploadedPaths);
+      
+      setUploadingFiles(false);
+      
+      // 3. Start batch processing
+      const { data, error } = await supabase.functions.invoke('process-image-batch', {
+        body: {
+          orderId: orderIdParam,
+          analysisType: analysisType
+        }
+      });
+
+      if (error) {
+        throw error;
       }
+
+      setProcessingResults(data);
+      setCurrentStep('complete');
+      
+      toast({
+        title: "Processing Complete!",
+        description: `Successfully processed ${data.results.success_count} images`,
+        variant: "default"
+      });
+
+    } catch (error: any) {
+      console.error('Processing error:', error);
+      toast({
+        title: "Processing Failed",
+        description: error.message || "There was an error processing your images.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const uploadFilesToStorage = async (orderIdParam: string): Promise<string[]> => {
+    const uploadedPaths: string[] = [];
+    const batchId = crypto.randomUUID();
+    
+    for (let i = 0; i < uploadedFiles.length; i++) {
+      const file = uploadedFiles[i];
+      const fileName = `${Date.now()}_${file.name}`;
+      const filePath = `${user.id}/${batchId}/${fileName}`;
+      
+      // Convert file to base64 for upload
+      const base64 = await fileToBase64(file);
+      
+      const { data, error } = await supabase.storage
+        .from('orbit-uploads')
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
+
+      if (error) {
+        throw new Error(`Failed to upload ${file.name}: ${error.message}`);
+      }
+
+      uploadedPaths.push(data.path);
+      
+      // Update progress
+      const progress = ((i + 1) / uploadedFiles.length) * 50; // Upload is 50% of progress
       setProcessingProgress(progress);
-    }, 500);
+    }
+    
+    return uploadedPaths;
+  };
+
+  const createImageRecords = async (orderIdParam: string, uploadedPaths: string[]) => {
+    const batchId = crypto.randomUUID();
+    
+    // Create batch record
+    const { data: batch, error: batchError } = await supabase
+      .from('batches')
+      .insert({
+        user_id: user.id,
+        order_id: orderIdParam,
+        name: `Batch ${new Date().toISOString()}`,
+        status: 'pending',
+        image_count: uploadedFiles.length
+      })
+      .select()
+      .single();
+
+    if (batchError) {
+      throw new Error(`Failed to create batch: ${batchError.message}`);
+    }
+
+    // Create image records
+    const imageRecords = uploadedFiles.map((file, index) => ({
+      user_id: user.id,
+      batch_id: batch.id,
+      order_id: orderIdParam,
+      original_filename: file.name,
+      storage_path_original: uploadedPaths[index],
+      file_size: file.size,
+      mime_type: file.type,
+      processing_status: 'pending',
+      analysis_type: analysisType
+    }));
+
+    const { error: imagesError } = await supabase
+      .from('images')
+      .insert(imageRecords);
+
+    if (imagesError) {
+      throw new Error(`Failed to create image records: ${imagesError.message}`);
+    }
+  };
+
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => {
+        const result = reader.result as string;
+        const base64 = result.split(',')[1];
+        resolve(base64);
+      };
+      reader.onerror = error => reject(error);
+    });
   };
 
   const stepConfig = {
@@ -294,11 +415,36 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
 
             {currentStep === 'upload' && (
               <div className="text-center">
+                {/* Analysis Type Selection */}
+                <div className="mb-6">
+                  <h3 className="text-lg font-semibold mb-4">Choose Analysis Type</h3>
+                  <div className="flex gap-4 justify-center">
+                    <Button
+                      variant={analysisType === 'product' ? 'cosmic' : 'outline'}
+                      onClick={() => setAnalysisType('product')}
+                    >
+                      Product Analysis
+                    </Button>
+                    <Button
+                      variant={analysisType === 'lifestyle' ? 'cosmic' : 'outline'}
+                      onClick={() => setAnalysisType('lifestyle')}
+                    >
+                      Lifestyle Analysis
+                    </Button>
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-2">
+                    {analysisType === 'product' 
+                      ? 'Analyze product features, materials, and market positioning'
+                      : 'Analyze lifestyle context, demographics, and social dynamics'
+                    }
+                  </p>
+                </div>
+
                 <div className="border-2 border-dashed border-accent/50 rounded-xl p-12 mb-6 hover:border-accent transition-colors">
                   <Upload className="w-16 h-16 text-accent mx-auto mb-4" />
                   <h3 className="text-xl font-semibold mb-2">Upload Your Images</h3>
                   <p className="text-muted-foreground mb-6">
-                    Drag and drop your product images or click to browse
+                    Drag and drop your images or click to browse
                   </p>
                   <input
                     type="file"
@@ -353,31 +499,63 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
                 <Loader2 className="w-16 h-16 text-accent mx-auto mb-4 animate-spin" />
                 <h3 className="text-xl font-semibold mb-2">AI Analysis in Progress</h3>
                 <p className="text-muted-foreground mb-6">
-                  ORBIT is extracting metadata and embedding intelligence into your images
+                  {uploadingFiles 
+                    ? 'Uploading images to secure storage...'
+                    : `ORBIT is performing ${analysisType} analysis on your images`
+                  }
                 </p>
                 <Progress value={processingProgress} className="mb-4" />
                 <p className="text-sm text-muted-foreground">
-                  {Math.round(processingProgress)}% complete • Processing {uploadedFiles.length} images
+                  {uploadingFiles 
+                    ? `Uploading ${uploadedFiles.length} images...`
+                    : `${Math.round(processingProgress)}% complete • Processing ${uploadedFiles.length} images`
+                  }
                 </p>
               </div>
             )}
 
             {currentStep === 'complete' && (
               <div className="text-center">
-                <Download className="w-16 h-16 text-success mx-auto mb-4" />
+                <CheckCircle className="w-16 h-16 text-success mx-auto mb-4" />
                 <h3 className="text-xl font-semibold mb-2">Processing Complete!</h3>
                 <p className="text-muted-foreground mb-6">
-                  Your images have been enhanced with AI-extracted metadata
+                  Your images have been analyzed with AI-powered {analysisType} analysis
                 </p>
+                
+                {/* Results Summary */}
+                {processingResults && (
+                  <div className="bg-secondary/50 rounded-lg p-4 mb-6">
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <span className="font-semibold">Total Images:</span>
+                        <span className="ml-2">{processingResults.results?.total_images || uploadedFiles.length}</span>
+                      </div>
+                      <div>
+                        <span className="font-semibold">Successful:</span>
+                        <span className="ml-2 text-success">{processingResults.results?.success_count || 0}</span>
+                      </div>
+                      <div>
+                        <span className="font-semibold">Analysis Type:</span>
+                        <span className="ml-2 capitalize">{analysisType}</span>
+                      </div>
+                      <div>
+                        <span className="font-semibold">Errors:</span>
+                        <span className="ml-2 text-destructive">{processingResults.results?.error_count || 0}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <div className="space-y-4">
                   <Button variant="success" size="lg" className="w-full">
-                    Download Enhanced Images
+                    Download Analysis Results
                   </Button>
                   <Button variant="outline" size="lg" className="w-full" onClick={() => {
                     setCurrentStep('upload');
                     setUploadedFiles([]);
                     setTotalCost(0);
                     setProcessingProgress(0);
+                    setProcessingResults(null);
                   }}>
                     Process More Images
                   </Button>
