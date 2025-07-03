@@ -11,56 +11,164 @@ export type Database = {
     Tables: {
       batches: {
         Row: {
+          actual_cost: number | null
           completed_at: string | null
           created_at: string | null
           download_urls: Json | null
           error_count: number | null
+          estimated_cost: number | null
           id: string
           image_count: number | null
+          max_retries: number | null
           metadata: Json | null
           name: string
+          order_id: string | null
           processed_count: number | null
           processing_end_time: string | null
           processing_results: Json | null
           processing_start_time: string | null
+          quality_level: string | null
+          retry_count: number | null
           status: string | null
+          tier_pricing_applied: Json | null
           user_id: string | null
         }
         Insert: {
+          actual_cost?: number | null
           completed_at?: string | null
           created_at?: string | null
           download_urls?: Json | null
           error_count?: number | null
+          estimated_cost?: number | null
           id?: string
           image_count?: number | null
+          max_retries?: number | null
           metadata?: Json | null
           name: string
+          order_id?: string | null
           processed_count?: number | null
           processing_end_time?: string | null
           processing_results?: Json | null
           processing_start_time?: string | null
+          quality_level?: string | null
+          retry_count?: number | null
           status?: string | null
+          tier_pricing_applied?: Json | null
           user_id?: string | null
         }
         Update: {
+          actual_cost?: number | null
           completed_at?: string | null
           created_at?: string | null
           download_urls?: Json | null
           error_count?: number | null
+          estimated_cost?: number | null
           id?: string
           image_count?: number | null
+          max_retries?: number | null
           metadata?: Json | null
           name?: string
+          order_id?: string | null
           processed_count?: number | null
           processing_end_time?: string | null
           processing_results?: Json | null
           processing_start_time?: string | null
+          quality_level?: string | null
+          retry_count?: number | null
           status?: string | null
+          tier_pricing_applied?: Json | null
           user_id?: string | null
         }
         Relationships: [
           {
+            foreignKeyName: "batches_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "batches_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "orbit_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      file_downloads: {
+        Row: {
+          access_token: string | null
+          batch_id: string | null
+          created_at: string
+          download_count: number | null
+          download_url: string | null
+          expires_at: string
+          file_paths: string[]
+          id: string
+          is_active: boolean | null
+          last_accessed_at: string | null
+          max_downloads: number | null
+          metadata: Json | null
+          order_id: string | null
+          user_id: string
+        }
+        Insert: {
+          access_token?: string | null
+          batch_id?: string | null
+          created_at?: string
+          download_count?: number | null
+          download_url?: string | null
+          expires_at: string
+          file_paths: string[]
+          id?: string
+          is_active?: boolean | null
+          last_accessed_at?: string | null
+          max_downloads?: number | null
+          metadata?: Json | null
+          order_id?: string | null
+          user_id: string
+        }
+        Update: {
+          access_token?: string | null
+          batch_id?: string | null
+          created_at?: string
+          download_count?: number | null
+          download_url?: string | null
+          expires_at?: string
+          file_paths?: string[]
+          id?: string
+          is_active?: boolean | null
+          last_accessed_at?: string | null
+          max_downloads?: number | null
+          metadata?: Json | null
+          order_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "file_downloads_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "batch_processing_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "file_downloads_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "file_downloads_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "file_downloads_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "orbit_users"
@@ -75,14 +183,22 @@ export type Database = {
           created_at: string | null
           error_message: string | null
           extracted_metadata: Json | null
+          file_hash: string | null
           file_size: number | null
           id: string
           mime_type: string | null
+          order_id: string | null
           original_filename: string
           processed_at: string | null
+          processing_cost: number | null
+          processing_duration_ms: number | null
           processing_status: string | null
+          quality_settings: Json | null
+          retry_count: number | null
           storage_path_original: string | null
           storage_path_processed: string | null
+          thumbnail_path: string | null
+          tier_price_applied: number | null
           user_id: string | null
         }
         Insert: {
@@ -91,14 +207,22 @@ export type Database = {
           created_at?: string | null
           error_message?: string | null
           extracted_metadata?: Json | null
+          file_hash?: string | null
           file_size?: number | null
           id?: string
           mime_type?: string | null
+          order_id?: string | null
           original_filename: string
           processed_at?: string | null
+          processing_cost?: number | null
+          processing_duration_ms?: number | null
           processing_status?: string | null
+          quality_settings?: Json | null
+          retry_count?: number | null
           storage_path_original?: string | null
           storage_path_processed?: string | null
+          thumbnail_path?: string | null
+          tier_price_applied?: number | null
           user_id?: string | null
         }
         Update: {
@@ -107,14 +231,22 @@ export type Database = {
           created_at?: string | null
           error_message?: string | null
           extracted_metadata?: Json | null
+          file_hash?: string | null
           file_size?: number | null
           id?: string
           mime_type?: string | null
+          order_id?: string | null
           original_filename?: string
           processed_at?: string | null
+          processing_cost?: number | null
+          processing_duration_ms?: number | null
           processing_status?: string | null
+          quality_settings?: Json | null
+          retry_count?: number | null
           storage_path_original?: string | null
           storage_path_processed?: string | null
+          thumbnail_path?: string | null
+          tier_price_applied?: number | null
           user_id?: string | null
         }
         Relationships: [
@@ -133,6 +265,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "images_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "images_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
@@ -144,41 +283,216 @@ export type Database = {
       orbit_users: {
         Row: {
           batch_size_limit: number | null
+          billing_period_end: string | null
+          billing_period_start: string | null
           created_at: string | null
           email: string
           id: string
           images_processed_this_month: number | null
           monthly_image_limit: number | null
+          monthly_spend_current: number | null
+          preferred_payment_method_id: string | null
           stripe_customer_id: string | null
           subscription_plan: string | null
           subscription_status: string | null
+          tier_discount_eligible: boolean | null
+          total_lifetime_spend: number | null
           updated_at: string | null
         }
         Insert: {
           batch_size_limit?: number | null
+          billing_period_end?: string | null
+          billing_period_start?: string | null
           created_at?: string | null
           email: string
           id: string
           images_processed_this_month?: number | null
           monthly_image_limit?: number | null
+          monthly_spend_current?: number | null
+          preferred_payment_method_id?: string | null
           stripe_customer_id?: string | null
           subscription_plan?: string | null
           subscription_status?: string | null
+          tier_discount_eligible?: boolean | null
+          total_lifetime_spend?: number | null
           updated_at?: string | null
         }
         Update: {
           batch_size_limit?: number | null
+          billing_period_end?: string | null
+          billing_period_start?: string | null
           created_at?: string | null
           email?: string
           id?: string
           images_processed_this_month?: number | null
           monthly_image_limit?: number | null
+          monthly_spend_current?: number | null
+          preferred_payment_method_id?: string | null
           stripe_customer_id?: string | null
           subscription_plan?: string | null
           subscription_status?: string | null
+          tier_discount_eligible?: boolean | null
+          total_lifetime_spend?: number | null
           updated_at?: string | null
         }
         Relationships: []
+      }
+      orders: {
+        Row: {
+          base_cost: number
+          batch_id: string | null
+          completed_at: string | null
+          cost_breakdown: Json | null
+          created_at: string
+          estimated_completion_time: string | null
+          id: string
+          image_count: number
+          metadata: Json | null
+          order_number: string
+          order_status: string | null
+          payment_status: string | null
+          stripe_customer_id: string | null
+          stripe_payment_intent_id: string | null
+          tier_discount: number | null
+          total_cost: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          base_cost?: number
+          batch_id?: string | null
+          completed_at?: string | null
+          cost_breakdown?: Json | null
+          created_at?: string
+          estimated_completion_time?: string | null
+          id?: string
+          image_count?: number
+          metadata?: Json | null
+          order_number: string
+          order_status?: string | null
+          payment_status?: string | null
+          stripe_customer_id?: string | null
+          stripe_payment_intent_id?: string | null
+          tier_discount?: number | null
+          total_cost?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          base_cost?: number
+          batch_id?: string | null
+          completed_at?: string | null
+          cost_breakdown?: Json | null
+          created_at?: string
+          estimated_completion_time?: string | null
+          id?: string
+          image_count?: number
+          metadata?: Json | null
+          order_number?: string
+          order_status?: string | null
+          payment_status?: string | null
+          stripe_customer_id?: string | null
+          stripe_payment_intent_id?: string | null
+          tier_discount?: number | null
+          total_cost?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "orders_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "batch_processing_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "orbit_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payments: {
+        Row: {
+          amount: number
+          created_at: string
+          currency: string | null
+          failure_reason: string | null
+          id: string
+          metadata: Json | null
+          order_id: string
+          payment_method: string | null
+          payment_status: string | null
+          processed_at: string | null
+          refund_amount: number | null
+          stripe_charge_id: string | null
+          stripe_payment_intent_id: string
+          stripe_webhook_events: Json | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          currency?: string | null
+          failure_reason?: string | null
+          id?: string
+          metadata?: Json | null
+          order_id: string
+          payment_method?: string | null
+          payment_status?: string | null
+          processed_at?: string | null
+          refund_amount?: number | null
+          stripe_charge_id?: string | null
+          stripe_payment_intent_id: string
+          stripe_webhook_events?: Json | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          currency?: string | null
+          failure_reason?: string | null
+          id?: string
+          metadata?: Json | null
+          order_id?: string
+          payment_method?: string | null
+          payment_status?: string | null
+          processed_at?: string | null
+          refund_amount?: number | null
+          stripe_charge_id?: string | null
+          stripe_payment_intent_id?: string
+          stripe_webhook_events?: Json | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payments_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "orbit_users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       processing_steps: {
         Row: {
@@ -288,6 +602,56 @@ export type Database = {
           },
           {
             foreignKeyName: "service_logs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "orbit_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      storage_buckets: {
+        Row: {
+          bucket_name: string
+          bucket_type: string
+          cleanup_enabled: boolean | null
+          created_at: string
+          file_count: number | null
+          id: string
+          last_cleanup_at: string | null
+          metadata: Json | null
+          retention_days: number | null
+          storage_size_bytes: number | null
+          user_id: string
+        }
+        Insert: {
+          bucket_name: string
+          bucket_type: string
+          cleanup_enabled?: boolean | null
+          created_at?: string
+          file_count?: number | null
+          id?: string
+          last_cleanup_at?: string | null
+          metadata?: Json | null
+          retention_days?: number | null
+          storage_size_bytes?: number | null
+          user_id: string
+        }
+        Update: {
+          bucket_name?: string
+          bucket_type?: string
+          cleanup_enabled?: boolean | null
+          created_at?: string
+          file_count?: number | null
+          id?: string
+          last_cleanup_at?: string | null
+          metadata?: Json | null
+          retention_days?: number | null
+          storage_size_bytes?: number | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "storage_buckets_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "orbit_users"
@@ -433,6 +797,14 @@ export type Database = {
       }
     }
     Functions: {
+      calculate_tier_pricing: {
+        Args: {
+          user_id_param: string
+          image_count_param: number
+          billing_period_start_param?: string
+        }
+        Returns: Json
+      }
       emit_workflow_event: {
         Args: {
           p_event_type: string
@@ -441,6 +813,10 @@ export type Database = {
           p_step_type?: string
           p_event_data?: Json
         }
+        Returns: string
+      }
+      generate_order_number: {
+        Args: Record<PropertyKey, never>
         Returns: string
       }
       get_user_processing_stats: {
@@ -474,6 +850,10 @@ export type Database = {
       }
       setup_user_buckets: {
         Args: { user_id: string }
+        Returns: undefined
+      }
+      setup_user_storage_buckets: {
+        Args: { user_id_param: string }
         Returns: undefined
       }
     }
