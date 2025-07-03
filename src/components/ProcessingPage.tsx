@@ -1,20 +1,63 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { Upload, CreditCard, Download, CheckCircle, Loader2, ArrowLeft } from 'lucide-react';
+import { Upload, CreditCard, Download, CheckCircle, Loader2, ArrowLeft, User } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
+import { AuthPage } from './AuthPage';
+import { loadStripe } from '@stripe/stripe-js';
 
 interface ProcessingPageProps {
   onBack: () => void;
 }
 
-type ProcessingStep = 'upload' | 'auth' | 'payment' | 'processing' | 'complete';
+type ProcessingStep = 'auth' | 'upload' | 'payment' | 'processing' | 'complete';
 
 export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
-  const [currentStep, setCurrentStep] = useState<ProcessingStep>('upload');
+  const [currentStep, setCurrentStep] = useState<ProcessingStep>('auth');
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const [totalCost, setTotalCost] = useState(0);
   const [processingProgress, setProcessingProgress] = useState(0);
+  const [user, setUser] = useState<any>(null);
+  const [isAuthenticating, setIsAuthenticating] = useState(true);
+  const [showAuthPage, setShowAuthPage] = useState(false);
+  const [paymentLoading, setPaymentLoading] = useState(false);
+  const [orderId, setOrderId] = useState<string | null>(null);
+  
+  const { toast } = useToast();
+
+  // Check authentication status on component mount
+  useEffect(() => {
+    const checkUser = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        setUser(session.user);
+        setCurrentStep('upload');
+      } else {
+        setCurrentStep('auth');
+      }
+      setIsAuthenticating(false);
+    };
+
+    checkUser();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        if (session?.user) {
+          setUser(session.user);
+          if (currentStep === 'auth') {
+            setCurrentStep('upload');
+          }
+        } else {
+          setUser(null);
+          setCurrentStep('auth');
+        }
+      }
+    );
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   const calculateCost = (imageCount: number) => {
     let cost = 0;
@@ -54,20 +97,65 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
     setUploadedFiles(files);
     setTotalCost(calculateCost(files.length));
     if (files.length > 0) {
-      setCurrentStep('auth');
+      setCurrentStep('payment');
     }
   };
 
-  const handleAuth = () => {
-    // TODO: Implement authentication
-    setCurrentStep('payment');
+  const handleAuthSuccess = () => {
+    setShowAuthPage(false);
+    setCurrentStep('upload');
   };
 
-  const handlePayment = () => {
-    // TODO: Implement Stripe payment
-    setCurrentStep('processing');
-    // Simulate processing
-    simulateProcessing();
+  const handlePayment = async () => {
+    if (!user || uploadedFiles.length === 0) return;
+
+    setPaymentLoading(true);
+    try {
+      // Create payment intent
+      const { data, error } = await supabase.functions.invoke('create-payment-intent', {
+        body: {
+          imageCount: uploadedFiles.length,
+          batchName: `Batch ${new Date().toISOString()}`
+        }
+      });
+
+      if (error) throw error;
+
+      setOrderId(data.order_id);
+
+      // Initialize Stripe
+      const stripe = await loadStripe(process.env.NODE_ENV === 'production' 
+        ? 'pk_live_...' // Replace with your live publishable key
+        : 'pk_test_...' // Replace with your test publishable key
+      );
+
+      if (!stripe) throw new Error('Stripe failed to initialize');
+
+      // Confirm payment
+      const { error: stripeError } = await stripe.confirmPayment({
+        clientSecret: data.client_secret,
+        confirmParams: {
+          return_url: `${window.location.origin}/payment-success`,
+        },
+      });
+
+      if (stripeError) {
+        throw stripeError;
+      }
+
+      // If we get here, payment was successful
+      setCurrentStep('processing');
+      simulateProcessing();
+    } catch (error: any) {
+      console.error('Payment error:', error);
+      toast({
+        title: "Payment Failed",
+        description: error.message || "There was an error processing your payment. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setPaymentLoading(false);
+    }
   };
 
   const simulateProcessing = () => {
@@ -84,15 +172,30 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
   };
 
   const stepConfig = {
+    auth: { title: 'Sign In', icon: User },
     upload: { title: 'Upload Images', icon: Upload },
-    auth: { title: 'Sign In', icon: CheckCircle },
     payment: { title: 'Payment', icon: CreditCard },
     processing: { title: 'AI Processing', icon: Loader2 },
     complete: { title: 'Download Ready', icon: Download },
   };
 
-  const steps: ProcessingStep[] = ['upload', 'auth', 'payment', 'processing', 'complete'];
+  const steps: ProcessingStep[] = ['auth', 'upload', 'payment', 'processing', 'complete'];
   const currentStepIndex = steps.indexOf(currentStep);
+
+  if (showAuthPage) {
+    return <AuthPage onBack={() => setShowAuthPage(false)} onAuthenticated={handleAuthSuccess} />;
+  }
+
+  if (isAuthenticating) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="star-field absolute inset-0" />
+        <div className="relative z-10">
+          <Loader2 className="w-8 h-8 animate-spin text-accent" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen relative overflow-hidden">
@@ -160,8 +263,8 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
             <div className="text-center">
               <h2 className="text-2xl font-bold mb-2">{stepConfig[currentStep].title}</h2>
               <p className="text-muted-foreground">
+                {currentStep === 'auth' && 'Sign in to access ORBIT image processing'}
                 {currentStep === 'upload' && 'Select your product images to begin analysis'}
-                {currentStep === 'auth' && 'Sign in to continue with processing'}
                 {currentStep === 'payment' && 'Complete payment to start AI analysis'}
                 {currentStep === 'processing' && 'ORBIT is analyzing your images...'}
                 {currentStep === 'complete' && 'Your enhanced images are ready for download'}
@@ -171,6 +274,24 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
 
           {/* Step Content */}
           <Card className="bg-card/50 backdrop-blur-sm border-accent/20 p-8">
+            {currentStep === 'auth' && (
+              <div className="max-w-md mx-auto text-center">
+                <User className="w-16 h-16 text-accent mx-auto mb-4" />
+                <h3 className="text-xl font-semibold mb-2">Sign In Required</h3>
+                <p className="text-muted-foreground mb-6">
+                  You need to sign in before uploading images to ORBIT
+                </p>
+                <Button 
+                  variant="cosmic" 
+                  size="lg" 
+                  onClick={() => setShowAuthPage(true)} 
+                  className="w-full"
+                >
+                  Sign In / Sign Up
+                </Button>
+              </div>
+            )}
+
             {currentStep === 'upload' && (
               <div className="text-center">
                 <div className="border-2 border-dashed border-accent/50 rounded-xl p-12 mb-6 hover:border-accent transition-colors">
@@ -199,24 +320,6 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
               </div>
             )}
 
-            {currentStep === 'auth' && (
-              <div className="max-w-md mx-auto text-center">
-                <CheckCircle className="w-16 h-16 text-accent mx-auto mb-4" />
-                <h3 className="text-xl font-semibold mb-2">Sign In to Continue</h3>
-                <p className="text-muted-foreground mb-6">
-                  {uploadedFiles.length} images selected • Total cost: ${totalCost}
-                </p>
-                <div className="space-y-4">
-                  <Button variant="cosmic" size="lg" onClick={handleAuth} className="w-full">
-                    Sign In with Email
-                  </Button>
-                  <Button variant="outline" size="lg" className="w-full">
-                    Continue as Guest
-                  </Button>
-                </div>
-              </div>
-            )}
-
             {currentStep === 'payment' && (
               <div className="max-w-md mx-auto">
                 <div className="text-center mb-6">
@@ -233,8 +336,14 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
                     </div>
                   </div>
                 </div>
-                <Button variant="cosmic" size="lg" onClick={handlePayment} className="w-full">
-                  Pay with Stripe
+                <Button 
+                  variant="cosmic" 
+                  size="lg" 
+                  onClick={handlePayment} 
+                  className="w-full"
+                  disabled={paymentLoading}
+                >
+                  {paymentLoading ? 'Processing...' : 'Pay with Stripe'}
                 </Button>
               </div>
             )}
