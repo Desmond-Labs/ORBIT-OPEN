@@ -2,39 +2,79 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
+/* ORBIT Design System - A Desmond Labs Product
+Cosmic theme with deep space aesthetics and AI-powered visual intelligence
 All colors MUST be HSL.
 */
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    /* ORBIT Cosmic Theme - Light Mode Fallback */
+    --background: 218 54% 12%; /* Deep Navy */
+    --foreground: 0 0% 100%; /* White */
 
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card: 218 54% 12%; /* Deep Navy */
+    --card-foreground: 0 0% 100%; /* White */
+    --card-gradient: linear-gradient(145deg, hsl(218 54% 12%), hsl(218 54% 15%));
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover: 218 54% 12%; /* Deep Navy */
+    --popover-foreground: 0 0% 100%; /* White */
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 213 53% 53%; /* Orbit Blue */
+    --primary-foreground: 0 0% 100%; /* White */
+    --primary-glow: 213 53% 60%; /* Lighter Orbit Blue */
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 218 54% 20%; /* Lighter Deep Navy */
+    --secondary-foreground: 0 0% 100%; /* White */
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: 218 54% 20%; /* Lighter Deep Navy */
+    --muted-foreground: 217 12% 70%; /* Light Gray */
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --accent: 168 59% 53%; /* Orbit Teal */
+    --accent-foreground: 0 0% 100%; /* White */
+    --accent-glow: 168 59% 60%; /* Lighter Orbit Teal */
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 7 83% 72%; /* Orbit Coral */
+    --destructive-foreground: 0 0% 100%; /* White */
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --success: 46 78% 67%; /* Orbit Gold */
+    --success-foreground: 218 54% 12%; /* Deep Navy */
+
+    --cosmic-purple: 249 34% 57%; /* Orbit Purple */
+    --cosmic-purple-foreground: 0 0% 100%; /* White */
+
+    --border: 217 20% 30%; /* Subtle borders */
+    --input: 218 54% 20%; /* Input backgrounds */
+    --ring: 168 59% 53%; /* Orbit Teal focus rings */
+
+    --radius: 0.5rem;
+
+    /* ORBIT Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(213 53% 53%), hsl(168 59% 53%));
+    --gradient-cosmic: linear-gradient(135deg, hsl(213 53% 53%), hsl(249 34% 57%));
+    --gradient-orbital: linear-gradient(180deg, hsl(218 54% 12%), hsl(218 54% 8%));
+    --gradient-glow: linear-gradient(145deg, hsl(213 53% 53% / 0.1), hsl(168 59% 53% / 0.1));
+
+    /* ORBIT Shadows & Effects */
+    --shadow-cosmic: 0 10px 30px -10px hsl(213 53% 53% / 0.3);
+    --shadow-orbital: 0 0 40px hsl(168 59% 53% / 0.2);
+    --shadow-glow: 0 0 20px hsl(168 59% 53% / 0.4);
+
+    /* ORBIT Animations */
+    --transition-cosmic: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-orbital: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+
+    /* Neutral Colors */
+    --gray-50: 217 12% 96%;
+    --gray-100: 217 12% 90%;
+    --gray-200: 217 12% 80%;
+    --gray-300: 217 12% 70%;
+    --gray-400: 217 12% 60%;
+    --gray-500: 217 12% 50%;
+    --gray-600: 217 12% 40%;
+    --gray-700: 217 12% 30%;
+    --gray-800: 217 12% 20%;
+    --gray-900: 218 54% 12%;
 
     --radius: 0.5rem;
 
@@ -100,6 +140,88 @@ All colors MUST be HSL.
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground antialiased;
+    background: var(--gradient-orbital);
+    min-height: 100vh;
+  }
+
+  /* ORBIT Cosmic Effects */
+  .cosmic-glow {
+    box-shadow: var(--shadow-glow);
+  }
+
+  .orbital-shadow {
+    box-shadow: var(--shadow-orbital);
+  }
+
+  .cosmic-transition {
+    transition: var(--transition-cosmic);
+  }
+
+  .orbital-transform {
+    transition: var(--transition-orbital);
+  }
+
+  /* Star Field Background */
+  .star-field::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-image: 
+      radial-gradient(2px 2px at 20px 30px, hsl(168 59% 53% / 0.8), transparent),
+      radial-gradient(2px 2px at 40px 70px, hsl(213 53% 53% / 0.6), transparent),
+      radial-gradient(1px 1px at 90px 40px, hsl(46 78% 67% / 0.9), transparent),
+      radial-gradient(1px 1px at 130px 80px, hsl(168 59% 53% / 0.7), transparent),
+      radial-gradient(2px 2px at 160px 30px, hsl(249 34% 57% / 0.5), transparent);
+    background-repeat: repeat;
+    background-size: 200px 100px;
+    animation: twinkle 4s ease-in-out infinite alternate;
+    pointer-events: none;
+  }
+
+  @keyframes twinkle {
+    0% { opacity: 0.3; }
+    100% { opacity: 0.8; }
+  }
+
+  /* Orbital Animation */
+  .orbital-ring {
+    border: 1px solid hsl(168 59% 53% / 0.3);
+    border-radius: 50%;
+    animation: orbit 20s linear infinite;
+  }
+
+  @keyframes orbit {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+
+  /* Gradient Text */
+  .gradient-text {
+    background: var(--gradient-primary);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* Custom Scrollbar */
+  ::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: hsl(218 54% 12%);
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: hsl(168 59% 53% / 0.5);
+    border-radius: 4px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(168 59% 53% / 0.8);
   }
 }
