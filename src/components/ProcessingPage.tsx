@@ -308,11 +308,11 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
                     className="hidden"
                     id="file-upload"
                   />
-                  <label htmlFor="file-upload">
-                    <Button variant="cosmic" size="lg" className="cursor-pointer">
+                  <Button variant="cosmic" size="lg" className="cursor-pointer" asChild>
+                    <label htmlFor="file-upload">
                       Choose Images
-                    </Button>
-                  </label>
+                    </label>
+                  </Button>
                 </div>
                 <p className="text-sm text-muted-foreground">
                   Supported formats: JPG, PNG, WebP • Max 50MB per image
