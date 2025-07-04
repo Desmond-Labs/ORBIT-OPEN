@@ -216,6 +216,11 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
           {/* Progress Steps */}
           <ProcessingSteps currentStep={currentStep} processingStage={processingStage} />
 
+          {/* Debug info */}
+          <div className="mb-4 p-2 bg-secondary/20 rounded text-xs">
+            Current step: {currentStep} | Files: {uploadedFiles.length} | Cost: ${totalCost}
+          </div>
+
           {/* Step Content */}
           <Card className="bg-card/50 backdrop-blur-sm border-accent/20 p-8">
             {currentStep === 'auth' && (
