@@ -97,6 +97,11 @@ serve(async (req) => {
         .eq("id", user.id);
     }
 
+    // Determine frontend URL dynamically
+    const frontendUrl = Deno.env.get("FRONTEND_URL") || 
+                       req.headers.get("origin") || 
+                       "http://localhost:5173";
+
     // Create checkout session
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
@@ -114,8 +119,8 @@ serve(async (req) => {
         },
       ],
       mode: "payment",
-      success_url: `${Deno.env.get("FRONTEND_URL") || "http://localhost:5173"}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${Deno.env.get("FRONTEND_URL") || "http://localhost:5173"}/`,
+      success_url: `${frontendUrl}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${frontendUrl}/`,
       metadata: {
         user_id: user.id,
         image_count: imageCount.toString(),
