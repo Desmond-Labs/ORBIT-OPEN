@@ -123,6 +123,11 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
     if (files.length > 0) {
       console.log('Setting step to payment');
       setCurrentStep('payment');
+      console.log('Current step after setting:', 'payment');
+      // Force a re-render by logging the state
+      setTimeout(() => {
+        console.log('Current step in timeout:', currentStep);
+      }, 100);
     }
   };
 
