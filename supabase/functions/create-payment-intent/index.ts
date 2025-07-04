@@ -97,10 +97,42 @@ serve(async (req) => {
         .eq("id", user.id);
     }
 
-    // Determine frontend URL dynamically
-    const frontendUrl = Deno.env.get("FRONTEND_URL") || 
-                       req.headers.get("origin") || 
-                       "http://localhost:5173";
+    // Determine frontend URL dynamically with intelligent fallback
+    const getSmartFrontendUrl = () => {
+      // Priority 1: Environment variable (production setting)
+      const envUrl = Deno.env.get("FRONTEND_URL");
+      if (envUrl) {
+        return envUrl.startsWith('http') ? envUrl : `https://${envUrl}`;
+      }
+      
+      // Priority 2: Request origin header (current domain)
+      const origin = req.headers.get("origin");
+      if (origin) {
+        // Ensure production URLs use HTTPS
+        if (origin.includes('lovable.app') && origin.startsWith('http:')) {
+          return origin.replace('http:', 'https:');
+        }
+        return origin;
+      }
+      
+      // Priority 3: Intelligent fallback based on environment detection
+      const host = req.headers.get("host");
+      if (host) {
+        if (host.includes('localhost') || host.includes('127.0.0.1')) {
+          return "http://localhost:5173";
+        }
+        if (host.includes('lovable.app')) {
+          return `https://${host}`;
+        }
+        // Default to HTTPS for unknown production domains
+        return `https://${host}`;
+      }
+      
+      // Final fallback for development
+      return "http://localhost:5173";
+    };
+
+    const frontendUrl = getSmartFrontendUrl();
 
     // Create checkout session
     const session = await stripe.checkout.sessions.create({
