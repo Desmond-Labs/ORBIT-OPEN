@@ -126,22 +126,14 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
 
       setOrderId(data.order_id);
 
-      // Open Stripe Checkout in a new tab (required for iframe environments)
+      // Redirect to Stripe Checkout
       if (data.checkout_url) {
-        window.open(data.checkout_url, '_blank');
-        
-        // Show a message to the user
-        toast({
-          title: "Payment Page Opened",
-          description: "Please complete your payment in the new tab that just opened.",
-          variant: "default"
-        });
+        window.location.href = data.checkout_url;
       } else {
         throw new Error('No checkout URL received');
       }
 
-      // Reset loading state since we're staying on this page
-      setPaymentLoading(false);
+      // This code won't be reached because we redirect away
     } catch (error: any) {
       console.error('Payment error:', error);
       toast({
