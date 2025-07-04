@@ -8,7 +8,7 @@ import { AuthPage } from './AuthPage';
 import { ProcessingSteps } from './processing/ProcessingSteps';
 import { AuthStep } from './processing/AuthStep';
 import { UploadStep } from './processing/UploadStep';
-import { PaymentStep } from './processing/PaymentStep';
+
 import { ProcessingStep } from './processing/ProcessingStep';
 import { CompleteStep } from './processing/CompleteStep';
 import { useProcessingState } from '@/hooks/useProcessingState';
@@ -117,18 +117,12 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || []);
     console.log('Files uploaded:', files.length, files.map(f => f.name));
-    setUploadedFiles(files);
-    setTotalCost(calculateCost(files.length));
-    console.log('Total cost calculated:', calculateCost(files.length));
-    if (files.length > 0) {
-      console.log('Setting step to payment');
-      setCurrentStep('payment');
-      console.log('Current step after setting:', 'payment');
-      // Force a re-render by logging the state
-      setTimeout(() => {
-        console.log('Current step in timeout:', currentStep);
-      }, 100);
-    }
+    
+    // Add new files to existing ones
+    const allFiles = [...uploadedFiles, ...files];
+    setUploadedFiles(allFiles);
+    setTotalCost(calculateCost(allFiles.length));
+    console.log('Total files:', allFiles.length, 'Total cost calculated:', calculateCost(allFiles.length));
   };
 
   const handleAuthSuccess = () => {
@@ -237,12 +231,6 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
                 analysisType={analysisType}
                 onAnalysisTypeChange={setAnalysisType}
                 onFileUpload={handleFileUpload}
-                uploadedFiles={uploadedFiles}
-              />
-            )}
-
-            {currentStep === 'payment' && (
-              <PaymentStep
                 uploadedFiles={uploadedFiles}
                 totalCost={totalCost}
                 paymentLoading={paymentLoading}
