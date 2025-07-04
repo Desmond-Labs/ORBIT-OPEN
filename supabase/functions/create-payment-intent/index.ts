@@ -114,8 +114,8 @@ serve(async (req) => {
         },
       ],
       mode: "payment",
-      success_url: `${Deno.env.get("FRONTEND_URL") || "http://localhost:3000"}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${Deno.env.get("FRONTEND_URL") || "http://localhost:3000"}/`,
+      success_url: `${Deno.env.get("FRONTEND_URL") || "http://localhost:5173"}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${Deno.env.get("FRONTEND_URL") || "http://localhost:5173"}/`,
       metadata: {
         user_id: user.id,
         image_count: imageCount.toString(),
