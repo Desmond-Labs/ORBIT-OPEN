@@ -1,0 +1,60 @@
+import React from 'react';
+import { Button } from '@/components/ui/button';
+import { CheckCircle } from 'lucide-react';
+
+interface CompleteStepProps {
+  analysisType: 'product' | 'lifestyle';
+  processingResults: any;
+  uploadedFiles: File[];
+  onProcessMore: () => void;
+}
+
+export const CompleteStep: React.FC<CompleteStepProps> = ({
+  analysisType,
+  processingResults,
+  uploadedFiles,
+  onProcessMore
+}) => {
+  return (
+    <div className="text-center">
+      <CheckCircle className="w-16 h-16 text-success mx-auto mb-4" />
+      <h3 className="text-xl font-semibold mb-2">Processing Complete!</h3>
+      <p className="text-muted-foreground mb-6">
+        Your images have been analyzed with AI-powered {analysisType} analysis
+      </p>
+      
+      {/* Results Summary */}
+      {processingResults && (
+        <div className="bg-secondary/50 rounded-lg p-4 mb-6">
+          <div className="grid grid-cols-2 gap-4 text-sm">
+            <div>
+              <span className="font-semibold">Total Images:</span>
+              <span className="ml-2">{processingResults.results?.total_images || uploadedFiles.length}</span>
+            </div>
+            <div>
+              <span className="font-semibold">Successful:</span>
+              <span className="ml-2 text-success">{processingResults.results?.success_count || 0}</span>
+            </div>
+            <div>
+              <span className="font-semibold">Analysis Type:</span>
+              <span className="ml-2 capitalize">{analysisType}</span>
+            </div>
+            <div>
+              <span className="font-semibold">Errors:</span>
+              <span className="ml-2 text-destructive">{processingResults.results?.error_count || 0}</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="space-y-4">
+        <Button variant="success" size="lg" className="w-full">
+          Download Analysis Results
+        </Button>
+        <Button variant="outline" size="lg" className="w-full" onClick={onProcessMore}>
+          Process More Images
+        </Button>
+      </div>
+    </div>
+  );
+};
