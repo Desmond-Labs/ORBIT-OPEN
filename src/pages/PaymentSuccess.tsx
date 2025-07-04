@@ -17,8 +17,81 @@ const PaymentSuccess: React.FC = () => {
 
   const sessionId = searchParams.get('session_id');
 
+  const handleImageUpload = async (order: any) => {
+    try {
+      const pendingUpload = sessionStorage.getItem('pendingUpload');
+      if (!pendingUpload) {
+        console.log('🔍 No pending upload found in session storage');
+        return;
+      }
+
+      const uploadData = JSON.parse(pendingUpload);
+      console.log('📤 Found pending upload data:', uploadData);
+
+      // Create batch first if it doesn't exist
+      let batchId = order.batch_id;
+      if (!batchId) {
+        const { data: batch, error: batchError } = await supabase
+          .from('batches')
+          .insert({
+            user_id: order.user_id,
+            order_id: order.id,
+            name: `Batch for Order ${order.order_number}`,
+            status: 'uploading',
+            image_count: uploadData.files.length,
+            quality_level: 'standard'
+          })
+          .select()
+          .single();
+
+        if (batchError) {
+          throw new Error(`Failed to create batch: ${batchError.message}`);
+        }
+        batchId = batch.id;
+
+        // Update order with batch_id
+        await supabase
+          .from('orders')
+          .update({ batch_id: batchId })
+          .eq('id', order.id);
+      }
+
+      // Upload images using the edge function
+      const { data: uploadResult, error: uploadError } = await supabase.functions.invoke('upload-images', {
+        body: {
+          orderId: order.id,
+          batchId: batchId,
+          files: uploadData.files
+        }
+      });
+
+      if (uploadError) {
+        throw new Error(`Upload failed: ${uploadError.message}`);
+      }
+
+      console.log('✅ Images uploaded successfully:', uploadResult);
+      
+      // Clear session storage
+      sessionStorage.removeItem('pendingUpload');
+      
+      toast({
+        title: "Images Uploaded!",
+        description: `Successfully uploaded ${uploadResult.count} images`,
+        variant: "default"
+      });
+
+    } catch (error: any) {
+      console.error('❌ Image upload error:', error);
+      toast({
+        title: "Upload Failed",
+        description: error.message || "Failed to upload images. You can retry processing.",
+        variant: "destructive"
+      });
+    }
+  };
+
   useEffect(() => {
-    const verifyPayment = async () => {
+    const verifyPaymentAndUploadImages = async () => {
       if (!sessionId) {
         setStatus('not_found');
         return;
@@ -42,6 +115,21 @@ const PaymentSuccess: React.FC = () => {
 
         // Check if payment is already marked as completed
         if (order.payment_status === 'completed') {
+          console.log('✅ Payment already completed, checking for images');
+          
+          // Check if images have been uploaded
+          const { data: images } = await supabase
+            .from('images')
+            .select('*')
+            .eq('order_id', order.id);
+
+          if (!images || images.length === 0) {
+            console.log('📤 No images found, attempting to upload from session storage');
+            await handleImageUpload(order);
+          } else {
+            console.log('✅ Images already uploaded:', images.length);
+          }
+
           setStatus('success');
           // Auto-redirect to processing after 3 seconds
           setTimeout(() => {
@@ -65,6 +153,9 @@ const PaymentSuccess: React.FC = () => {
           setStatus('failed');
           return;
         }
+
+        // Handle image upload after successful payment
+        await handleImageUpload(order);
 
         setStatus('success');
         
@@ -90,7 +181,7 @@ const PaymentSuccess: React.FC = () => {
       }
     };
 
-    verifyPayment();
+    verifyPaymentAndUploadImages();
   }, [sessionId, navigate, toast]);
 
   const handleBackToHome = () => {
