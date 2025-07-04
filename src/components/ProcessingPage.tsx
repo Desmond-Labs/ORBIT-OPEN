@@ -129,7 +129,7 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
       // Initialize Stripe
       const stripe = await loadStripe(process.env.NODE_ENV === 'production' 
         ? 'pk_live_...' // Replace with your live publishable key
-        : 'pk_test_...' // Replace with your test publishable key
+        : 'pk_test_51REhJ5IBIdBhr5ybMgEVoaLRzzXDWSr7NNPZgw6n5w5bRlo69cOd4wmaEbj8p9CFBnRy0MPbgGG7xCTpzmjCHnkj00TnghPAYl' // Replace with your test publishable key
       );
 
       if (!stripe) throw new Error('Stripe failed to initialize');
