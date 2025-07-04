@@ -101,38 +101,56 @@ serve(async (req) => {
     const getSmartFrontendUrl = () => {
       // Priority 1: Environment variable (production setting)
       const envUrl = Deno.env.get("FRONTEND_URL");
+      console.log("🔍 DEBUG - FRONTEND_URL env var:", envUrl);
+      
       if (envUrl) {
-        return envUrl.startsWith('http') ? envUrl : `https://${envUrl}`;
+        const finalEnvUrl = envUrl.startsWith('http') ? envUrl : `https://${envUrl}`;
+        console.log("✅ Using FRONTEND_URL:", finalEnvUrl);
+        return finalEnvUrl;
       }
       
       // Priority 2: Request origin header (current domain)
       const origin = req.headers.get("origin");
+      console.log("🔍 DEBUG - Origin header:", origin);
+      
       if (origin) {
         // Ensure production URLs use HTTPS
         if (origin.includes('lovable.app') && origin.startsWith('http:')) {
-          return origin.replace('http:', 'https:');
+          const httpsOrigin = origin.replace('http:', 'https:');
+          console.log("✅ Using origin (converted to HTTPS):", httpsOrigin);
+          return httpsOrigin;
         }
+        console.log("✅ Using origin:", origin);
         return origin;
       }
       
       // Priority 3: Intelligent fallback based on environment detection
       const host = req.headers.get("host");
+      console.log("🔍 DEBUG - Host header:", host);
+      
       if (host) {
         if (host.includes('localhost') || host.includes('127.0.0.1')) {
+          console.log("✅ Using localhost fallback");
           return "http://localhost:5173";
         }
         if (host.includes('lovable.app')) {
-          return `https://${host}`;
+          const hostUrl = `https://${host}`;
+          console.log("✅ Using host-based URL:", hostUrl);
+          return hostUrl;
         }
         // Default to HTTPS for unknown production domains
-        return `https://${host}`;
+        const httpsHost = `https://${host}`;
+        console.log("✅ Using HTTPS host fallback:", httpsHost);
+        return httpsHost;
       }
       
       // Final fallback for development
+      console.log("⚠️ Using final fallback: localhost");
       return "http://localhost:5173";
     };
 
     const frontendUrl = getSmartFrontendUrl();
+    console.log("🎯 FINAL frontendUrl being used:", frontendUrl);
 
     // Create checkout session
     const session = await stripe.checkout.sessions.create({
