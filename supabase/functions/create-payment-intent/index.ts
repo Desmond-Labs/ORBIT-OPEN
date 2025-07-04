@@ -97,18 +97,29 @@ serve(async (req) => {
         .eq("id", user.id);
     }
 
-    // Create payment intent
-    const paymentIntent = await stripe.paymentIntents.create({
-      amount: amountInCents,
-      currency: "usd",
+    // Create checkout session
+    const session = await stripe.checkout.sessions.create({
       customer: customerId,
+      line_items: [
+        {
+          price_data: {
+            currency: "usd",
+            product_data: {
+              name: `ORBIT Image Analysis - ${imageCount} images`,
+              description: `AI-powered analysis for ${imageCount} product images`,
+            },
+            unit_amount: amountInCents,
+          },
+          quantity: 1,
+        },
+      ],
+      mode: "payment",
+      success_url: `${Deno.env.get("FRONTEND_URL") || "http://localhost:3000"}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${Deno.env.get("FRONTEND_URL") || "http://localhost:3000"}/`,
       metadata: {
         user_id: user.id,
         image_count: imageCount.toString(),
         batch_name: batchName || `Batch ${new Date().toISOString()}`
-      },
-      automatic_payment_methods: {
-        enabled: true,
       },
     });
 
@@ -131,7 +142,7 @@ serve(async (req) => {
         base_cost: totalCost,
         total_cost: totalCost,
         cost_breakdown: pricingData,
-        stripe_payment_intent_id: paymentIntent.id,
+        stripe_payment_intent_id: session.id,
         stripe_customer_id: customerId,
         payment_status: "pending",
         order_status: "payment_pending"
@@ -153,7 +164,7 @@ serve(async (req) => {
       .insert({
         order_id: order.id,
         user_id: user.id,
-        stripe_payment_intent_id: paymentIntent.id,
+        stripe_payment_intent_id: session.id,
         amount: totalCost,
         payment_status: "pending"
       });
@@ -167,7 +178,8 @@ serve(async (req) => {
     }
 
     return new Response(JSON.stringify({
-      client_secret: paymentIntent.client_secret,
+      checkout_url: session.url,
+      session_id: session.id,
       order_id: order.id,
       amount: totalCost,
       tier_breakdown: pricingData

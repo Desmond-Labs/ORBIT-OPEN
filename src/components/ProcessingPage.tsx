@@ -110,11 +110,11 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
   };
 
   const handlePayment = async () => {
-    if (!user || uploadedFiles.length === 0) return;
+    if (!user || uploadedFiles.length === 0 || paymentLoading) return;
 
     setPaymentLoading(true);
     try {
-      // Create payment intent
+      // Create checkout session
       const { data, error } = await supabase.functions.invoke('create-payment-intent', {
         body: {
           imageCount: uploadedFiles.length,
@@ -126,29 +126,14 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
 
       setOrderId(data.order_id);
 
-      // Initialize Stripe
-      const stripe = await loadStripe(process.env.NODE_ENV === 'production' 
-        ? 'pk_live_...' // Replace with your live publishable key
-        : 'pk_test_51REhJ5IBIdBhr5ybMgEVoaLRzzXDWSr7NNPZgw6n5w5bRlo69cOd4wmaEbj8p9CFBnRy0MPbgGG7xCTpzmjCHnkj00TnghPAYl' // Replace with your test publishable key
-      );
-
-      if (!stripe) throw new Error('Stripe failed to initialize');
-
-      // Confirm payment
-      const { error: stripeError } = await stripe.confirmPayment({
-        clientSecret: data.client_secret,
-        confirmParams: {
-          return_url: `${window.location.origin}/payment-success`,
-        },
-      });
-
-      if (stripeError) {
-        throw stripeError;
+      // Redirect to Stripe Checkout
+      if (data.checkout_url) {
+        window.location.href = data.checkout_url;
+      } else {
+        throw new Error('No checkout URL received');
       }
 
-      // If we get here, payment was successful
-      setCurrentStep('processing');
-      await startRealProcessing(data.order_id);
+      // This code won't be reached because we redirect away
     } catch (error: any) {
       console.error('Payment error:', error);
       toast({
@@ -156,7 +141,6 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
         description: error.message || "There was an error processing your payment. Please try again.",
         variant: "destructive"
       });
-    } finally {
       setPaymentLoading(false);
     }
   };
