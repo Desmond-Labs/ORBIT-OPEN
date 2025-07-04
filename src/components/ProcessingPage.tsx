@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -15,6 +16,7 @@ interface ProcessingPageProps {
 type ProcessingStep = 'auth' | 'upload' | 'payment' | 'processing' | 'complete';
 
 export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
+  const [searchParams] = useSearchParams();
   const [currentStep, setCurrentStep] = useState<ProcessingStep>('auth');
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const [totalCost, setTotalCost] = useState(0);
@@ -34,9 +36,22 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
   useEffect(() => {
     const checkUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
+      const orderIdFromUrl = searchParams.get('order');
+      
       if (session?.user) {
         setUser(session.user);
-        setCurrentStep('upload');
+        
+        // If coming from payment success, start processing immediately
+        if (orderIdFromUrl) {
+          setOrderId(orderIdFromUrl);
+          setCurrentStep('processing');
+          // Load order data and start processing
+          setTimeout(() => {
+            loadOrderAndStartProcessing(orderIdFromUrl);
+          }, 1000);
+        } else {
+          setCurrentStep('upload');
+        }
       } else {
         setCurrentStep('auth');
       }
@@ -60,7 +75,54 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
     );
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [searchParams]);
+
+  const loadOrderAndStartProcessing = async (orderIdParam: string) => {
+    try {
+      // Load order details
+      const { data: order, error: orderError } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('id', orderIdParam)
+        .single();
+
+      if (orderError || !order) {
+        throw new Error('Order not found');
+      }
+
+      // Set total cost and image count from order
+      setTotalCost(order.total_cost);
+      
+      // Start processing directly - images are already uploaded during payment
+      const { data, error } = await supabase.functions.invoke('process-image-batch', {
+        body: {
+          orderId: orderIdParam,
+          analysisType: analysisType
+        }
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      setProcessingResults(data);
+      setCurrentStep('complete');
+      
+      toast({
+        title: "Processing Complete!",
+        description: `Successfully processed ${data.results?.success_count || order.image_count} images`,
+        variant: "default"
+      });
+
+    } catch (error: any) {
+      console.error('Order processing error:', error);
+      toast({
+        title: "Processing Failed", 
+        description: error.message || "There was an error processing your order.",
+        variant: "destructive"
+      });
+    }
+  };
 
   const calculateCost = (imageCount: number) => {
     let cost = 0;
