@@ -59,7 +59,7 @@ export const useProcessingState = () => {
     );
 
     return () => subscription.unsubscribe();
-  }, [searchParams, currentStep]);
+  }, [searchParams]);
 
   return {
     currentStep,
