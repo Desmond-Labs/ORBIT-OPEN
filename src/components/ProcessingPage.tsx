@@ -116,9 +116,12 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || []);
+    console.log('Files uploaded:', files.length, files.map(f => f.name));
     setUploadedFiles(files);
     setTotalCost(calculateCost(files.length));
+    console.log('Total cost calculated:', calculateCost(files.length));
     if (files.length > 0) {
+      console.log('Setting step to payment');
       setCurrentStep('payment');
     }
   };
