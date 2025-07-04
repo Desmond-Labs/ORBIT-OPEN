@@ -46,8 +46,29 @@ serve(async (req) => {
     switch (event.type) {
       case "payment_intent.succeeded":
         const paymentIntent = event.data.object as Stripe.PaymentIntent;
+        console.log(`Processing payment intent: ${paymentIntent.id}`);
         
-        // Update payment status in database
+        // Get the checkout session associated with this payment intent
+        let checkoutSessionId = null;
+        try {
+          const sessions = await stripe.checkout.sessions.list({
+            payment_intent: paymentIntent.id,
+            limit: 1
+          });
+          
+          if (sessions.data.length > 0) {
+            checkoutSessionId = sessions.data[0].id;
+            console.log(`Found checkout session: ${checkoutSessionId}`);
+          } else {
+            console.log(`No checkout session found for payment intent: ${paymentIntent.id}`);
+            return new Response("No checkout session found", { status: 404 });
+          }
+        } catch (sessionError) {
+          console.error("Error retrieving checkout session:", sessionError);
+          return new Response("Error retrieving session", { status: 500 });
+        }
+
+        // Update payment status in database using checkout session ID
         const { error: paymentError } = await supabaseClient
           .from("payments")
           .update({
@@ -58,29 +79,63 @@ serve(async (req) => {
               new_element: event
             })
           })
-          .eq("stripe_payment_intent_id", paymentIntent.id);
+          .eq("stripe_payment_intent_id", checkoutSessionId);
 
         if (paymentError) {
           console.error("Error updating payment:", paymentError);
-          return new Response("Error updating payment", { status: 500 });
         }
 
-        // Update order status
-        const { error: orderError } = await supabaseClient
+        // Update order status using checkout session ID
+        const { data: orderData, error: orderError } = await supabaseClient
           .from("orders")
           .update({
             payment_status: "completed",
-            order_status: "paid",
+            order_status: "processing",
             updated_at: new Date().toISOString()
           })
-          .eq("stripe_payment_intent_id", paymentIntent.id);
+          .eq("stripe_payment_intent_id", checkoutSessionId)
+          .select()
+          .single();
 
-        if (orderError) {
+        if (orderError || !orderData) {
           console.error("Error updating order:", orderError);
           return new Response("Error updating order", { status: 500 });
         }
 
-        console.log(`Payment succeeded for intent: ${paymentIntent.id}`);
+        console.log(`Order updated for session: ${checkoutSessionId}, Order ID: ${orderData.id}`);
+
+        // Trigger AI image processing
+        try {
+          console.log(`Starting image processing for order: ${orderData.id}`);
+          
+          const processingResponse = await fetch(
+            `${Deno.env.get('SUPABASE_URL')}/functions/v1/process-image-batch`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+              },
+              body: JSON.stringify({
+                orderId: orderData.id,
+                analysisType: 'product' // Default analysis type
+              })
+            }
+          );
+
+          if (!processingResponse.ok) {
+            const errorText = await processingResponse.text();
+            console.error(`Image processing failed: ${errorText}`);
+          } else {
+            const processingResult = await processingResponse.json();
+            console.log(`Image processing started successfully:`, processingResult);
+          }
+        } catch (processingError) {
+          console.error("Error starting image processing:", processingError);
+          // Don't fail the webhook, just log the error
+        }
+
+        console.log(`Payment succeeded and processing started for intent: ${paymentIntent.id}`);
         break;
 
       case "payment_intent.payment_failed":
