@@ -6,12 +6,14 @@ interface UploadStepProps {
   analysisType: 'product' | 'lifestyle';
   onAnalysisTypeChange: (type: 'product' | 'lifestyle') => void;
   onFileUpload: (event: React.ChangeEvent<HTMLInputElement>) => void;
+  uploadedFiles: File[];
 }
 
 export const UploadStep: React.FC<UploadStepProps> = ({
   analysisType,
   onAnalysisTypeChange,
-  onFileUpload
+  onFileUpload,
+  uploadedFiles
 }) => {
   return (
     <div className="text-center">
@@ -60,6 +62,29 @@ export const UploadStep: React.FC<UploadStepProps> = ({
           </label>
         </Button>
       </div>
+      
+      {/* Selected Files Preview */}
+      {uploadedFiles.length > 0 && (
+        <div className="mt-6 p-4 bg-secondary/20 rounded-lg">
+          <h4 className="text-sm font-medium mb-3">Selected Images ({uploadedFiles.length})</h4>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {uploadedFiles.map((file, index) => (
+              <div key={index} className="flex flex-col items-center p-2 bg-background/50 rounded-md">
+                <div className="w-16 h-16 bg-accent/20 rounded-md flex items-center justify-center mb-2">
+                  <Upload className="w-6 h-6 text-accent" />
+                </div>
+                <span className="text-xs text-center text-muted-foreground truncate w-full">
+                  {file.name}
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  {(file.size / (1024 * 1024)).toFixed(1)}MB
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <p className="text-sm text-muted-foreground">
         Supported formats: JPG, PNG, WebP • Max 50MB per image
       </p>

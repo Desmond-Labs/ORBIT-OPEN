@@ -224,6 +224,7 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
                 analysisType={analysisType}
                 onAnalysisTypeChange={setAnalysisType}
                 onFileUpload={handleFileUpload}
+                uploadedFiles={uploadedFiles}
               />
             )}
 
