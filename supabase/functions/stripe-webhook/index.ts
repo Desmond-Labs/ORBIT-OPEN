@@ -74,6 +74,7 @@ serve(async (req) => {
           .update({
             payment_status: "succeeded",
             processed_at: new Date().toISOString(),
+            stripe_payment_intent_id_actual: paymentIntent.id,
             stripe_webhook_events: supabaseClient.rpc('array_append', {
               array_field: 'stripe_webhook_events',
               new_element: event
@@ -91,6 +92,14 @@ serve(async (req) => {
           .update({
             payment_status: "completed",
             order_status: "processing",
+            stripe_payment_intent_id_actual: paymentIntent.id,
+            processing_stage: "initializing",
+            processing_started_at: new Date().toISOString(),
+            processing_completion_percentage: 10,
+            webhook_events: supabaseClient.rpc('array_append', {
+              array_field: 'webhook_events',
+              new_element: event
+            }),
             updated_at: new Date().toISOString()
           })
           .eq("stripe_payment_intent_id", checkoutSessionId)

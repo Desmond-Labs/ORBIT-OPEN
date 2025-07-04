@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { Upload, CreditCard, Download, CheckCircle, Loader2, ArrowLeft, User } from 'lucide-react';
+import { Upload, CreditCard, Download, CheckCircle, Loader2, ArrowLeft, User, Clock, Zap } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { AuthPage } from './AuthPage';
@@ -29,8 +29,39 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
   const [analysisType, setAnalysisType] = useState<'product' | 'lifestyle'>('product');
   const [processingResults, setProcessingResults] = useState<any>(null);
   const [uploadingFiles, setUploadingFiles] = useState(false);
+  const [realTimeOrderData, setRealTimeOrderData] = useState<any>(null);
+  const [processingStage, setProcessingStage] = useState<string>('pending');
   
   const { toast } = useToast();
+
+  // Real-time order status monitoring
+  const setupRealTimeSubscription = useCallback((orderIdParam: string) => {
+    const channel = supabase
+      .channel('order-status')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'orders',
+          filter: `id=eq.${orderIdParam}`
+        },
+        (payload) => {
+          console.log('Order status update:', payload);
+          const newOrder = payload.new;
+          setRealTimeOrderData(newOrder);
+          setProcessingStage(newOrder.processing_stage || 'pending');
+          setProcessingProgress(newOrder.processing_completion_percentage || 0);
+          
+          if (newOrder.order_status === 'completed') {
+            setCurrentStep('complete');
+          }
+        }
+      )
+      .subscribe();
+
+    return () => supabase.removeChannel(channel);
+  }, []);
 
   // Check authentication status on component mount
   useEffect(() => {
@@ -45,10 +76,13 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
         if (orderIdFromUrl) {
           setOrderId(orderIdFromUrl);
           setCurrentStep('processing');
+          // Setup real-time subscription
+          const cleanup = setupRealTimeSubscription(orderIdFromUrl);
           // Load order data and start processing
           setTimeout(() => {
             loadOrderAndStartProcessing(orderIdFromUrl);
           }, 1000);
+          return cleanup;
         } else {
           setCurrentStep('upload');
         }
@@ -75,7 +109,7 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
     );
 
     return () => subscription.unsubscribe();
-  }, [searchParams]);
+  }, [searchParams, setupRealTimeSubscription]);
 
   const loadOrderAndStartProcessing = async (orderIdParam: string) => {
     try {
@@ -542,20 +576,38 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
 
             {currentStep === 'processing' && (
               <div className="text-center">
-                <Loader2 className="w-16 h-16 text-accent mx-auto mb-4 animate-spin" />
+                <div className="flex items-center justify-center mb-4">
+                  {processingStage === 'initializing' && <Clock className="w-16 h-16 text-accent animate-pulse" />}
+                  {processingStage === 'uploading' && <Upload className="w-16 h-16 text-accent animate-bounce" />}
+                  {processingStage === 'analyzing' && <Zap className="w-16 h-16 text-accent animate-spin" />}
+                  {(processingStage === 'pending' || !processingStage) && <Loader2 className="w-16 h-16 text-accent animate-spin" />}
+                </div>
                 <h3 className="text-xl font-semibold mb-2">AI Analysis in Progress</h3>
-                <p className="text-muted-foreground mb-6">
-                  {uploadingFiles 
-                    ? 'Uploading images to secure storage...'
-                    : `ORBIT is performing ${analysisType} analysis on your images`
-                  }
+                <p className="text-muted-foreground mb-2">
+                  {processingStage === 'initializing' && 'Preparing your images for analysis...'}
+                  {processingStage === 'uploading' && 'Uploading images to secure storage...'}
+                  {processingStage === 'analyzing' && `ORBIT is performing ${analysisType} analysis on your images`}
+                  {(processingStage === 'pending' || !processingStage) && 'Getting ready to process your images...'}
                 </p>
+                
+                {realTimeOrderData && (
+                  <div className="bg-secondary/50 rounded-lg p-3 mb-4 text-sm">
+                    <div className="flex justify-between items-center">
+                      <span>Processing Stage:</span>
+                      <span className="font-semibold capitalize">{processingStage}</span>
+                    </div>
+                    {realTimeOrderData.processing_started_at && (
+                      <div className="flex justify-between items-center mt-1">
+                        <span>Started:</span>
+                        <span className="text-xs">{new Date(realTimeOrderData.processing_started_at).toLocaleTimeString()}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+                
                 <Progress value={processingProgress} className="mb-4" />
                 <p className="text-sm text-muted-foreground">
-                  {uploadingFiles 
-                    ? `Uploading ${uploadedFiles.length} images...`
-                    : `${Math.round(processingProgress)}% complete • Processing ${uploadedFiles.length} images`
-                  }
+                  {Math.round(processingProgress)}% complete • Processing {realTimeOrderData?.image_count || uploadedFiles.length} images
                 </p>
               </div>
             )}

@@ -24,14 +24,17 @@ export type Database = {
           name: string
           order_id: string | null
           processed_count: number | null
+          processing_completion_percentage: number | null
           processing_end_time: string | null
           processing_results: Json | null
+          processing_stage: string | null
           processing_start_time: string | null
           quality_level: string | null
           retry_count: number | null
           status: string | null
           tier_pricing_applied: Json | null
           user_id: string | null
+          webhook_triggered: boolean | null
         }
         Insert: {
           actual_cost?: number | null
@@ -47,14 +50,17 @@ export type Database = {
           name: string
           order_id?: string | null
           processed_count?: number | null
+          processing_completion_percentage?: number | null
           processing_end_time?: string | null
           processing_results?: Json | null
+          processing_stage?: string | null
           processing_start_time?: string | null
           quality_level?: string | null
           retry_count?: number | null
           status?: string | null
           tier_pricing_applied?: Json | null
           user_id?: string | null
+          webhook_triggered?: boolean | null
         }
         Update: {
           actual_cost?: number | null
@@ -70,14 +76,17 @@ export type Database = {
           name?: string
           order_id?: string | null
           processed_count?: number | null
+          processing_completion_percentage?: number | null
           processing_end_time?: string | null
           processing_results?: Json | null
+          processing_stage?: string | null
           processing_start_time?: string | null
           quality_level?: string | null
           retry_count?: number | null
           status?: string | null
           tier_pricing_applied?: Json | null
           user_id?: string | null
+          webhook_triggered?: boolean | null
         }
         Relationships: [
           {
@@ -410,12 +419,17 @@ export type Database = {
           order_number: string
           order_status: string | null
           payment_status: string | null
+          processing_completion_percentage: number | null
+          processing_stage: string | null
+          processing_started_at: string | null
           stripe_customer_id: string | null
           stripe_payment_intent_id: string | null
+          stripe_payment_intent_id_actual: string | null
           tier_discount: number | null
           total_cost: number
           updated_at: string
           user_id: string
+          webhook_events: Json | null
         }
         Insert: {
           base_cost?: number
@@ -430,12 +444,17 @@ export type Database = {
           order_number: string
           order_status?: string | null
           payment_status?: string | null
+          processing_completion_percentage?: number | null
+          processing_stage?: string | null
+          processing_started_at?: string | null
           stripe_customer_id?: string | null
           stripe_payment_intent_id?: string | null
+          stripe_payment_intent_id_actual?: string | null
           tier_discount?: number | null
           total_cost?: number
           updated_at?: string
           user_id: string
+          webhook_events?: Json | null
         }
         Update: {
           base_cost?: number
@@ -450,12 +469,17 @@ export type Database = {
           order_number?: string
           order_status?: string | null
           payment_status?: string | null
+          processing_completion_percentage?: number | null
+          processing_stage?: string | null
+          processing_started_at?: string | null
           stripe_customer_id?: string | null
           stripe_payment_intent_id?: string | null
+          stripe_payment_intent_id_actual?: string | null
           tier_discount?: number | null
           total_cost?: number
           updated_at?: string
           user_id?: string
+          webhook_events?: Json | null
         }
         Relationships: [
           {
@@ -496,6 +520,7 @@ export type Database = {
           refund_amount: number | null
           stripe_charge_id: string | null
           stripe_payment_intent_id: string
+          stripe_payment_intent_id_actual: string | null
           stripe_webhook_events: Json | null
           updated_at: string
           user_id: string
@@ -514,6 +539,7 @@ export type Database = {
           refund_amount?: number | null
           stripe_charge_id?: string | null
           stripe_payment_intent_id: string
+          stripe_payment_intent_id_actual?: string | null
           stripe_webhook_events?: Json | null
           updated_at?: string
           user_id: string
@@ -532,6 +558,7 @@ export type Database = {
           refund_amount?: number | null
           stripe_charge_id?: string | null
           stripe_payment_intent_id?: string
+          stripe_payment_intent_id_actual?: string | null
           stripe_webhook_events?: Json | null
           updated_at?: string
           user_id?: string
