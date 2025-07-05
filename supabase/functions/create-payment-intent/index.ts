@@ -85,7 +85,25 @@ serve(async (req) => {
       .from("orbit_users")
       .select("stripe_customer_id, email")
       .eq("id", user.id)
-      .single();
+      .maybeSingle();
+
+    // If user doesn't exist in orbit_users, create the record
+    if (!userData) {
+      const { error: createUserError } = await supabaseClient
+        .from("orbit_users")
+        .insert({
+          id: user.id,
+          email: user.email
+        });
+      
+      if (createUserError) {
+        console.error("Error creating orbit_users record:", createUserError);
+        return new Response(JSON.stringify({ error: "Error creating user record" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 500,
+        });
+      }
+    }
 
     let customerId = userData?.stripe_customer_id;
 
