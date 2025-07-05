@@ -24,40 +24,62 @@ serve(async (req) => {
   }
 
   try {
+    console.log("🚀 Starting create-payment-intent function");
+    
     const supabaseClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_ANON_KEY") ?? ""
     );
+    console.log("✅ Supabase client initialized");
 
     // Get authenticated user
     const authHeader = req.headers.get("Authorization") || req.headers.get("authorization");
     if (!authHeader) {
+      console.log("❌ Missing authorization header");
       return new Response(JSON.stringify({ error: "Missing authorization header" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 401,
       });
     }
+    console.log("✅ Authorization header found");
+    
     const token = authHeader.replace("Bearer ", "");
-    const { data } = await supabaseClient.auth.getUser(token);
+    console.log("🔍 Getting user from token");
+    const { data, error: userError } = await supabaseClient.auth.getUser(token);
+    if (userError) {
+      console.log("❌ Error getting user:", userError);
+      return new Response(JSON.stringify({ error: "Authentication failed" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 401,
+      });
+    }
     const user = data.user;
+    console.log("✅ User authenticated:", user?.id);
 
     if (!user) {
+      console.log("❌ User object is null");
       return new Response(JSON.stringify({ error: "User not authenticated" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 401,
       });
     }
 
-    const { imageCount, batchName }: PaymentRequest = await req.json();
+    console.log("🔍 Parsing request body");
+    const requestBody = await req.json();
+    console.log("📝 Request body:", requestBody);
+    const { imageCount, batchName }: PaymentRequest = requestBody;
 
     if (!imageCount || imageCount <= 0) {
+      console.log("❌ Invalid image count:", imageCount);
       return new Response(JSON.stringify({ error: "Invalid image count" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 400,
       });
     }
+    console.log("✅ Valid image count:", imageCount);
 
     // Calculate tier pricing using the database function
+    console.log("🔍 Calculating tier pricing");
     const { data: pricingData, error: pricingError } = await supabaseClient
       .rpc('calculate_tier_pricing', {
         user_id_param: user.id,
@@ -65,30 +87,45 @@ serve(async (req) => {
       });
 
     if (pricingError) {
-      console.error("Error calculating pricing:", pricingError);
+      console.error("❌ Error calculating pricing:", pricingError);
       return new Response(JSON.stringify({ error: "Error calculating pricing" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 500,
       });
     }
+    console.log("✅ Pricing calculated:", pricingData);
 
     const totalCost = pricingData.total_cost;
     const amountInCents = Math.round(totalCost * 100);
+    console.log("💰 Total cost:", totalCost, "Amount in cents:", amountInCents);
 
     // Initialize Stripe
+    console.log("🔍 Initializing Stripe");
     const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
       apiVersion: "2023-10-16",
     });
+    console.log("✅ Stripe initialized");
 
     // Get or create Stripe customer
-    const { data: userData } = await supabaseClient
+    console.log("🔍 Getting user data from orbit_users");
+    const { data: userData, error: userDataError } = await supabaseClient
       .from("orbit_users")
       .select("stripe_customer_id, email")
       .eq("id", user.id)
       .maybeSingle();
 
+    if (userDataError) {
+      console.error("❌ Error getting user data:", userDataError);
+      return new Response(JSON.stringify({ error: "Error fetching user data" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 500,
+      });
+    }
+    console.log("✅ User data retrieved:", userData);
+
     // If user doesn't exist in orbit_users, create the record
     if (!userData) {
+      console.log("🔍 Creating new orbit_users record");
       const { error: createUserError } = await supabaseClient
         .from("orbit_users")
         .insert({
@@ -97,28 +134,39 @@ serve(async (req) => {
         });
       
       if (createUserError) {
-        console.error("Error creating orbit_users record:", createUserError);
+        console.error("❌ Error creating orbit_users record:", createUserError);
         return new Response(JSON.stringify({ error: "Error creating user record" }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
           status: 500,
         });
       }
+      console.log("✅ Created new orbit_users record");
     }
 
     let customerId = userData?.stripe_customer_id;
+    console.log("🔍 Current customer ID:", customerId);
 
     if (!customerId) {
+      console.log("🔍 Creating new Stripe customer");
       const customer = await stripe.customers.create({
         email: userData?.email || user.email,
         metadata: { user_id: user.id }
       });
       customerId = customer.id;
+      console.log("✅ Created Stripe customer:", customerId);
 
       // Update user with Stripe customer ID
-      await supabaseClient
+      console.log("🔍 Updating user with Stripe customer ID");
+      const { error: updateError } = await supabaseClient
         .from("orbit_users")
         .update({ stripe_customer_id: customerId })
         .eq("id", user.id);
+        
+      if (updateError) {
+        console.error("❌ Error updating user with customer ID:", updateError);
+      } else {
+        console.log("✅ Updated user with Stripe customer ID");
+      }
     }
 
     // Determine frontend URL dynamically with intelligent fallback
