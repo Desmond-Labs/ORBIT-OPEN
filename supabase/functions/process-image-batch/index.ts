@@ -49,64 +49,24 @@ serve(async (req) => {
       throw new Error('Order ID is required');
     }
 
-    console.log(`🚀 Starting batch processing for order: ${orderId}`);
+    console.log(`Starting batch processing for order: ${orderId}`);
 
     // 1. Get the order and verify ownership
-    console.log(`📋 Fetching order: ${orderId} for user: ${user.id}`);
     const { data: order, error: orderError } = await supabase
       .from('orders')
-      .select('*')
+      .select('*, batches(*)')
       .eq('id', orderId)
       .eq('user_id', user.id)
       .single();
 
-    if (orderError) {
-      console.error('❌ Order query error:', orderError);
-      throw new Error(`Order query failed: ${orderError.message}`);
-    }
-
-    if (!order) {
-      console.error('❌ Order not found for user');
+    if (orderError || !order) {
       throw new Error('Order not found or access denied');
     }
 
-    console.log(`✅ Order found:`, {
-      id: order.id,
-      image_count: order.image_count,
-      batch_id: order.batch_id,
-      order_status: order.order_status
-    });
-
-    // 2. Get or create the batch associated with this order
-    let batch;
-    if (order.batch_id) {
-      console.log(`🔍 Fetching existing batch: ${order.batch_id}`);
-      const { data: existingBatch, error: batchFetchError } = await supabase
-        .from('batches')
-        .select('*')
-        .eq('id', order.batch_id)
-        .single();
-
-      if (batchFetchError) {
-        console.error('❌ Batch fetch error:', batchFetchError);
-        throw new Error(`Failed to fetch batch: ${batchFetchError.message}`);
-      }
-      batch = existingBatch;
-      console.log(`✅ Found existing batch:`, batch);
-    } else {
-      console.log(`📦 No batch linked to order, checking for batches by order_id`);
-      const { data: batchByOrderId } = await supabase
-        .from('batches')
-        .select('*')
-        .eq('order_id', orderId)
-        .maybeSingle();
-
-      batch = batchByOrderId;
-    }
-
+    // 2. Get the batch associated with this order
+    let batch = order.batches;
     if (!batch) {
       // Create a new batch if none exists
-      console.log(`📦 Creating new batch for order: ${orderId}`);
       const { data: newBatch, error: batchError } = await supabase
         .from('batches')
         .insert({
@@ -128,7 +88,6 @@ serve(async (req) => {
     }
 
     // 3. Get all images for this batch
-    console.log(`🖼️ Searching for images with batch_id: ${batch.id}`);
     const { data: images, error: imagesError } = await supabase
       .from('images')
       .select('*')
@@ -136,35 +95,11 @@ serve(async (req) => {
       .eq('processing_status', 'pending');
 
     if (imagesError) {
-      console.error('❌ Images query error:', imagesError);
-      throw new Error(`Failed to get images for processing: ${imagesError.message}`);
-    }
-
-    console.log(`🔍 Found ${images?.length || 0} images for processing`);
-    
-    // Also check if there are any images for this order (regardless of batch)
-    const { data: orderImages, error: orderImagesError } = await supabase
-      .from('images')
-      .select('*')
-      .eq('order_id', orderId);
-      
-    console.log(`📊 Total images for order ${orderId}: ${orderImages?.length || 0}`);
-    
-    if (orderImages?.length) {
-      console.log('📋 Images found for order:', orderImages.map(img => ({
-        id: img.id,
-        filename: img.original_filename,
-        batch_id: img.batch_id,
-        status: img.processing_status
-      })));
+      throw new Error('Failed to get images for processing');
     }
 
     if (!images || images.length === 0) {
-      const errorMsg = orderImages?.length > 0 
-        ? `No pending images found for batch ${batch.id}. Found ${orderImages.length} images for order but they may already be processed or have different status.`
-        : `No images found for processing. Order ${orderId} has no associated images. Images must be uploaded before processing can begin.`;
-      console.error('❌ ' + errorMsg);
-      throw new Error(errorMsg);
+      throw new Error('No images found for processing');
     }
 
     console.log(`Processing ${images.length} images for batch ${batch.id}`);

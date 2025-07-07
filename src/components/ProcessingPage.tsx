@@ -8,9 +8,9 @@ import { AuthPage } from './AuthPage';
 import { ProcessingSteps } from './processing/ProcessingSteps';
 import { AuthStep } from './processing/AuthStep';
 import { UploadStep } from './processing/UploadStep';
+
 import { ProcessingStep } from './processing/ProcessingStep';
 import { CompleteStep } from './processing/CompleteStep';
-import { ErrorStep } from './processing/ErrorStep';
 import { useProcessingState } from '@/hooks/useProcessingState';
 import { useRealTimeOrderUpdates } from '@/hooks/useRealTimeOrderUpdates';
 import { calculateCost } from '@/utils/processingUtils';
@@ -45,8 +45,6 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
     setRealTimeOrderData,
     processingStage,
     setProcessingStage,
-    processingError,
-    setProcessingError,
   } = useProcessingState();
 
   const { setupRealTimeSubscription } = useRealTimeOrderUpdates(
@@ -108,9 +106,6 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
 
     } catch (error: any) {
       console.error('Order processing error:', error);
-      setProcessingError(error.message || "There was an error processing your order.");
-      setCurrentStep('error');
-      
       toast({
         title: "Processing Failed", 
         description: error.message || "There was an error processing your order.",
@@ -140,9 +135,7 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
 
     setPaymentLoading(true);
     try {
-      console.log('🚀 Starting payment process with', uploadedFiles.length, 'files');
-
-      // Step 1: Create checkout session
+      // Create checkout session
       const { data, error } = await supabase.functions.invoke('create-payment-intent', {
         body: {
           imageCount: uploadedFiles.length,
@@ -150,50 +143,12 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
         }
       });
 
-      if (error) {
-        console.error('❌ Payment intent creation failed:', error);
-        throw error;
-      }
+      if (error) throw error;
 
-      console.log('✅ Payment intent created:', data.order_id);
       setOrderId(data.order_id);
-
-      // Step 2: Convert files to base64 for upload
-      const filesToUpload = await Promise.all(
-        uploadedFiles.map(async (file) => {
-          return new Promise<{name: string; size: number; type: string; data: string}>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => {
-              const base64Data = reader.result as string;
-              // Remove data:image/jpeg;base64, prefix
-              const cleanBase64 = base64Data.split(',')[1];
-              resolve({
-                name: file.name,
-                size: file.size,
-                type: file.type,
-                data: cleanBase64
-              });
-            };
-            reader.onerror = reject;
-            reader.readAsDataURL(file);
-          });
-        })
-      );
-
-      console.log('✅ Files converted to base64, uploading...');
-
-      // Step 3: Upload images (this will be done after payment)
-      // For now, we'll redirect to payment and handle upload in payment success
 
       // Redirect to Stripe Checkout
       if (data.checkout_url) {
-        // Store files in session storage for upload after payment
-        sessionStorage.setItem('pendingUpload', JSON.stringify({
-          orderId: data.order_id,
-          batchId: data.batch_id,
-          files: filesToUpload
-        }));
-        
         window.location.href = data.checkout_url;
       } else {
         throw new Error('No checkout URL received');
@@ -216,25 +171,6 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
     setTotalCost(0);
     setProcessingProgress(0);
     setProcessingResults(null);
-    setProcessingError(null);
-  };
-
-  const handleRetryProcessing = () => {
-    if (orderId) {
-      setProcessingError(null);
-      setCurrentStep('processing');
-      loadOrderAndStartProcessing(orderId);
-    }
-  };
-
-  const handleStartOver = () => {
-    setCurrentStep('upload');
-    setUploadedFiles([]);
-    setTotalCost(0);
-    setProcessingProgress(0);
-    setProcessingResults(null);
-    setProcessingError(null);
-    setOrderId(null);
   };
 
   if (showAuthPage) {
@@ -309,15 +245,6 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
                 realTimeOrderData={realTimeOrderData}
                 processingProgress={processingProgress}
                 uploadedFiles={uploadedFiles}
-              />
-            )}
-
-            {currentStep === 'error' && (
-              <ErrorStep
-                error={processingError || 'Unknown error occurred'}
-                orderId={orderId || undefined}
-                onRetry={handleRetryProcessing}
-                onBack={handleStartOver}
               />
             )}
 

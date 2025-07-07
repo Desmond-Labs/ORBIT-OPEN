@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 
-export type ProcessingStep = 'auth' | 'upload' | 'payment' | 'processing' | 'complete' | 'error';
+export type ProcessingStep = 'auth' | 'upload' | 'payment' | 'processing' | 'complete';
 
 export const useProcessingState = () => {
   const [searchParams] = useSearchParams();
@@ -20,7 +20,6 @@ export const useProcessingState = () => {
   const [uploadingFiles, setUploadingFiles] = useState(false);
   const [realTimeOrderData, setRealTimeOrderData] = useState<any>(null);
   const [processingStage, setProcessingStage] = useState<string>('pending');
-  const [processingError, setProcessingError] = useState<string | null>(null);
 
   // Check authentication status on component mount
   useEffect(() => {
@@ -91,7 +90,5 @@ export const useProcessingState = () => {
     setRealTimeOrderData,
     processingStage,
     setProcessingStage,
-    processingError,
-    setProcessingError,
   };
 };

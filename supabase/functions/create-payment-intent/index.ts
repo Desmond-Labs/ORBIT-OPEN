@@ -10,147 +10,242 @@ const corsHeaders = {
 interface PaymentRequest {
   imageCount: number;
   batchName?: string;
-  files?: {
-    name: string;
-    size: number;
-    type: string;
-    data: string; // base64 encoded file data
-  }[];
 }
 
 serve(async (req) => {
-  console.log("🚀 Function started, method:", req.method);
-  
   if (req.method === "OPTIONS") {
-    console.log("✅ OPTIONS request handled");
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    console.log("🔍 Processing POST request");
-    
-    // Test environment variables
-    const supabaseUrl = Deno.env.get("SUPABASE_URL");
-    const supabaseKey = Deno.env.get("SUPABASE_ANON_KEY");
-    const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
-    
-    console.log("🔍 Environment check:");
-    console.log("- SUPABASE_URL:", supabaseUrl ? "✅ Set" : "❌ Missing");
-    console.log("- SUPABASE_ANON_KEY:", supabaseKey ? "✅ Set" : "❌ Missing");
-    console.log("- STRIPE_SECRET_KEY:", stripeKey ? "✅ Set" : "❌ Missing");
-    
-    if (!supabaseUrl || !supabaseKey || !stripeKey) {
-      console.log("❌ Missing required environment variables");
-      return new Response(JSON.stringify({ 
-        error: "Missing environment variables",
-        details: {
-          supabaseUrl: !!supabaseUrl,
-          supabaseKey: !!supabaseKey,
-          stripeKey: !!stripeKey
-        }
-      }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 500,
-      });
-    }
-    
-    console.log("🔍 Creating Supabase client");
-    const supabaseClient = createClient(supabaseUrl, supabaseKey);
-    console.log("✅ Supabase client created");
+    const supabaseClient = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_ANON_KEY") ?? ""
+    );
 
     // Get authenticated user
     const authHeader = req.headers.get("Authorization") || req.headers.get("authorization");
     if (!authHeader) {
-      console.log("❌ Missing authorization header");
       return new Response(JSON.stringify({ error: "Missing authorization header" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 401,
       });
     }
-    console.log("✅ Authorization header found");
-    
     const token = authHeader.replace("Bearer ", "");
-    console.log("🔍 Getting user from token");
-    const { data, error: userError } = await supabaseClient.auth.getUser(token);
-    if (userError) {
-      console.log("❌ Error getting user:", userError);
-      return new Response(JSON.stringify({ error: "Authentication failed", details: userError }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 401,
-      });
-    }
+    const { data } = await supabaseClient.auth.getUser(token);
     const user = data.user;
-    console.log("✅ User authenticated:", user?.id);
 
     if (!user) {
-      console.log("❌ User object is null");
       return new Response(JSON.stringify({ error: "User not authenticated" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 401,
       });
     }
 
-    console.log("🔍 Parsing request body");
-    const requestText = await req.text();
-    console.log("📝 Raw request body:", requestText);
-    
-    let requestBody;
-    try {
-      requestBody = JSON.parse(requestText);
-      console.log("✅ Request body parsed:", requestBody);
-    } catch (parseError) {
-      console.log("❌ Error parsing request body:", parseError);
-      return new Response(JSON.stringify({ error: "Invalid JSON in request body" }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 400,
-      });
-    }
-    
-    const { imageCount, batchName }: PaymentRequest = requestBody;
+    const { imageCount, batchName }: PaymentRequest = await req.json();
 
     if (!imageCount || imageCount <= 0) {
-      console.log("❌ Invalid image count:", imageCount);
       return new Response(JSON.stringify({ error: "Invalid image count" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 400,
       });
     }
-    console.log("✅ Valid image count:", imageCount);
 
-    // Test Stripe initialization
-    console.log("🔍 Initializing Stripe");
-    try {
-      const stripe = new Stripe(stripeKey, {
-        apiVersion: "2023-10-16",
+    // Calculate tier pricing using the database function
+    const { data: pricingData, error: pricingError } = await supabaseClient
+      .rpc('calculate_tier_pricing', {
+        user_id_param: user.id,
+        image_count_param: imageCount
       });
-      console.log("✅ Stripe initialized successfully");
-    } catch (stripeError) {
-      console.log("❌ Error initializing Stripe:", stripeError);
-      return new Response(JSON.stringify({ error: "Stripe initialization failed", details: stripeError.message }), {
+
+    if (pricingError) {
+      console.error("Error calculating pricing:", pricingError);
+      return new Response(JSON.stringify({ error: "Error calculating pricing" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 500,
       });
     }
 
-    // For now, just return success to test if we get this far
-    console.log("🎉 Test completed successfully");
+    const totalCost = pricingData.total_cost;
+    const amountInCents = Math.round(totalCost * 100);
+
+    // Initialize Stripe
+    const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
+      apiVersion: "2023-10-16",
+    });
+
+    // Get or create Stripe customer
+    const { data: userData } = await supabaseClient
+      .from("orbit_users")
+      .select("stripe_customer_id, email")
+      .eq("id", user.id)
+      .single();
+
+    let customerId = userData?.stripe_customer_id;
+
+    if (!customerId) {
+      const customer = await stripe.customers.create({
+        email: userData?.email || user.email,
+        metadata: { user_id: user.id }
+      });
+      customerId = customer.id;
+
+      // Update user with Stripe customer ID
+      await supabaseClient
+        .from("orbit_users")
+        .update({ stripe_customer_id: customerId })
+        .eq("id", user.id);
+    }
+
+    // Determine frontend URL dynamically with intelligent fallback
+    const getSmartFrontendUrl = () => {
+      // Priority 1: Environment variable (production setting)
+      const envUrl = Deno.env.get("FRONTEND_URL");
+      console.log("🔍 DEBUG - FRONTEND_URL env var:", envUrl);
+      
+      if (envUrl) {
+        const finalEnvUrl = envUrl.startsWith('http') ? envUrl : `https://${envUrl}`;
+        console.log("✅ Using FRONTEND_URL:", finalEnvUrl);
+        return finalEnvUrl;
+      }
+      
+      // Priority 2: Request origin header (current domain)
+      const origin = req.headers.get("origin");
+      console.log("🔍 DEBUG - Origin header:", origin);
+      
+      if (origin) {
+        // Ensure production URLs use HTTPS
+        if (origin.includes('lovable.app') && origin.startsWith('http:')) {
+          const httpsOrigin = origin.replace('http:', 'https:');
+          console.log("✅ Using origin (converted to HTTPS):", httpsOrigin);
+          return httpsOrigin;
+        }
+        console.log("✅ Using origin:", origin);
+        return origin;
+      }
+      
+      // Priority 3: Intelligent fallback based on environment detection
+      const host = req.headers.get("host");
+      console.log("🔍 DEBUG - Host header:", host);
+      
+      if (host) {
+        if (host.includes('localhost') || host.includes('127.0.0.1')) {
+          console.log("✅ Using localhost fallback");
+          return "http://localhost:5173";
+        }
+        if (host.includes('lovable.app')) {
+          const hostUrl = `https://${host}`;
+          console.log("✅ Using host-based URL:", hostUrl);
+          return hostUrl;
+        }
+        // Default to HTTPS for unknown production domains
+        const httpsHost = `https://${host}`;
+        console.log("✅ Using HTTPS host fallback:", httpsHost);
+        return httpsHost;
+      }
+      
+      // Final fallback for development
+      console.log("⚠️ Using final fallback: localhost");
+      return "http://localhost:5173";
+    };
+
+    const frontendUrl = getSmartFrontendUrl();
+    console.log("🎯 FINAL frontendUrl being used:", frontendUrl);
+
+    // Create checkout session
+    const session = await stripe.checkout.sessions.create({
+      customer: customerId,
+      line_items: [
+        {
+          price_data: {
+            currency: "usd",
+            product_data: {
+              name: `ORBIT Image Analysis - ${imageCount} images`,
+              description: `AI-powered analysis for ${imageCount} product images`,
+            },
+            unit_amount: amountInCents,
+          },
+          quantity: 1,
+        },
+      ],
+      mode: "payment",
+      success_url: `${frontendUrl}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${frontendUrl}/`,
+      metadata: {
+        user_id: user.id,
+        image_count: imageCount.toString(),
+        batch_name: batchName || `Batch ${new Date().toISOString()}`
+      },
+    });
+
+    // Create order record using service role client
+    const supabaseService = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+      { auth: { persistSession: false } }
+    );
+
+    // Generate order number
+    const { data: orderNumber } = await supabaseService.rpc('generate_order_number');
+
+    const { data: order, error: orderError } = await supabaseService
+      .from("orders")
+      .insert({
+        user_id: user.id,
+        order_number: orderNumber,
+        image_count: imageCount,
+        base_cost: totalCost,
+        total_cost: totalCost,
+        cost_breakdown: pricingData,
+        stripe_payment_intent_id: session.id,
+        stripe_customer_id: customerId,
+        payment_status: "pending",
+        order_status: "payment_pending"
+      })
+      .select()
+      .single();
+
+    if (orderError) {
+      console.error("Error creating order:", orderError);
+      return new Response(JSON.stringify({ error: "Error creating order" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 500,
+      });
+    }
+
+    // Create payment record
+    const { error: paymentError } = await supabaseService
+      .from("payments")
+      .insert({
+        order_id: order.id,
+        user_id: user.id,
+        stripe_payment_intent_id: session.id,
+        amount: totalCost,
+        payment_status: "pending"
+      });
+
+    if (paymentError) {
+      console.error("Error creating payment record:", paymentError);
+      return new Response(JSON.stringify({ error: "Error creating payment record" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 500,
+      });
+    }
+
     return new Response(JSON.stringify({
-      success: true,
-      message: "Function is working",
-      userId: user.id,
-      imageCount: imageCount
+      checkout_url: session.url,
+      session_id: session.id,
+      order_id: order.id,
+      amount: totalCost,
+      tier_breakdown: pricingData
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
     });
 
   } catch (error) {
-    console.error("💥 Unexpected error:", error);
-    return new Response(JSON.stringify({ 
-      error: "Internal server error", 
-      details: error.message,
-      stack: error.stack 
-    }), {
+    console.error("Payment intent creation error:", error);
+    return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 500,
     });
