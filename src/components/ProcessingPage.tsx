@@ -135,6 +135,31 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
 
     setPaymentLoading(true);
     try {
+      console.log('🚀 Starting payment process with', uploadedFiles.length, 'files');
+      
+      // Store files in localStorage temporarily for after payment
+      const filesData = await Promise.all(
+        uploadedFiles.map(async (file) => {
+          return new Promise<any>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => {
+              resolve({
+                name: file.name,
+                size: file.size,
+                type: file.type,
+                data: reader.result, // Full data URL including prefix
+                lastModified: file.lastModified
+              });
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+          });
+        })
+      );
+      
+      localStorage.setItem('orbit_pending_files', JSON.stringify(filesData));
+      console.log('📁 Stored', filesData.length, 'files in localStorage');
+
       // Create checkout session
       const { data, error } = await supabase.functions.invoke('create-payment-intent', {
         body: {
@@ -146,6 +171,7 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
       if (error) throw error;
 
       setOrderId(data.order_id);
+      localStorage.setItem('orbit_pending_order_id', data.order_id);
 
       // Redirect to Stripe Checkout
       if (data.checkout_url) {
@@ -155,7 +181,7 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
       }
 
     } catch (error: any) {
-      console.error('Payment error:', error);
+      console.error('❌ Payment error:', error);
       toast({
         title: "Payment Failed",
         description: error.message || "There was an error processing your payment. Please try again.",
