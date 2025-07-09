@@ -103,13 +103,12 @@ const PaymentSuccess: React.FC = () => {
   const handleFileUploadAfterPayment = async (order: any) => {
     try {
       // Files are already uploaded during the payment process
-      // No need to handle file uploads here anymore
       console.log('✅ Files were already uploaded during payment process for order:', order.id);
       
       // Just clean up localStorage
       localStorage.removeItem('orbit_pending_order_id');
       
-      // No file upload needed - show success message
+      // Show success message
       toast({
         title: "Order Complete!",
         description: "Your images are ready for processing",
@@ -136,48 +135,6 @@ const PaymentSuccess: React.FC = () => {
     }
   };
 
-  const uploadFiles = async (files: Array<{ name: string; data: string; type: string }>) => {
-    if (!orderData || !files.length) {
-      console.log('⚠️ No order data or files provided');
-      return { successCount: 0, totalFiles: 0, uploadResults: [] };
-    }
-
-    try {
-      console.log(`🚀 Starting upload of ${files.length} files for order ${orderData.id}`);
-
-      const { data, error } = await supabase.functions.invoke('upload-order-images', {
-        body: {
-          orderId: orderData.id,
-          files: files
-        }
-      });
-
-      if (error) {
-        console.error('❌ Upload function error:', error);
-        throw error;
-      }
-
-      if (!data) {
-        console.error('❌ No data returned from upload function');
-        throw new Error('Upload function returned no data');
-      }
-
-      console.log('✅ Upload successful:', data);
-      return data;
-    } catch (error: any) {
-      console.error('💥 Upload failed:', error);
-      // Return a fallback response structure
-      return {
-        successCount: 0,
-        totalFiles: files.length,
-        uploadResults: files.map(f => ({
-          filename: f.name,
-          success: false,
-          error: error.message || 'Upload failed'
-        }))
-      };
-    }
-  };
 
   return (
     <div className="min-h-screen relative overflow-hidden">
