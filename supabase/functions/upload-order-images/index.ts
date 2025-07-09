@@ -15,6 +15,75 @@ interface UploadRequest {
   }[];
 }
 
+// Supported MIME types
+const SUPPORTED_MIME_TYPES = [
+  'image/jpeg',
+  'image/jpg', 
+  'image/png',
+  'image/webp',
+  'image/gif'
+];
+
+// File validation function
+function validateFile(file: { name: string; data: string; type: string }) {
+  // Validate filename
+  if (!file.name || typeof file.name !== 'string' || file.name.length === 0) {
+    return { valid: false, error: 'Invalid filename' };
+  }
+  
+  // Validate MIME type
+  if (!file.type || !SUPPORTED_MIME_TYPES.includes(file.type)) {
+    return { valid: false, error: `Unsupported file type: ${file.type}` };
+  }
+  
+  // Validate base64 data
+  if (!file.data || typeof file.data !== 'string') {
+    return { valid: false, error: 'Invalid file data' };
+  }
+  
+  // Decode and validate file size
+  try {
+    const fileData = Uint8Array.from(atob(file.data), c => c.charCodeAt(0));
+    const maxFileSize = 50 * 1024 * 1024; // 50MB
+    
+    if (fileData.length > maxFileSize) {
+      return { valid: false, error: `File size exceeds 50MB limit` };
+    }
+    
+    if (fileData.length === 0) {
+      return { valid: false, error: 'File is empty' };
+    }
+    
+    return { valid: true, fileData, size: fileData.length };
+  } catch (error) {
+    return { valid: false, error: 'Invalid base64 data' };
+  }
+}
+
+// Basic file signature validation
+function validateFileSignature(buffer: Uint8Array, mimeType: string): boolean {
+  if (buffer.length < 8) return false;
+  
+  const header = buffer.subarray(0, 8);
+  
+  switch (mimeType) {
+    case 'image/jpeg':
+    case 'image/jpg':
+      return header[0] === 0xFF && header[1] === 0xD8;
+    case 'image/png':
+      return header[0] === 0x89 && header[1] === 0x50 && header[2] === 0x4E && header[3] === 0x47;
+    case 'image/webp':
+      return buffer.length >= 12 && 
+             header.subarray(0, 4).every((byte, i) => byte === [0x52, 0x49, 0x46, 0x46][i]) &&
+             header.subarray(8, 12).every((byte, i) => byte === [0x57, 0x45, 0x42, 0x50][i]);
+    case 'image/gif':
+      const gifHeader = String.fromCharCode(...header.subarray(0, 6));
+      return gifHeader === 'GIF87a' || gifHeader === 'GIF89a';
+    default:
+      return false;
+  }
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -76,10 +145,21 @@ serve(async (req) => {
       });
     }
 
+    // Validate batch size
+    const maxBatchSize = 20;
+    if (files.length > maxBatchSize) {
+      return new Response(JSON.stringify({ 
+        error: `Batch size exceeds limit. Maximum ${maxBatchSize} files allowed.` 
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 400,
+      });
+    }
+
     // Create folder structure: {order_id}_{user_id}/original/
     const folderPath = `${orderId}_${user.id}/original`;
     
-    console.log(`Uploading ${files.length} files to folder: ${folderPath}`);
+    console.log(`✅ Starting upload of ${files.length} files to folder: ${folderPath}`);
 
     const uploadResults = [];
     const imageRecords = [];
@@ -88,26 +168,53 @@ serve(async (req) => {
       const file = files[i];
       
       try {
-        // Decode base64 file data
-        const fileData = Uint8Array.from(atob(file.data), c => c.charCodeAt(0));
+        console.log(`🔍 Processing file ${i + 1}/${files.length}: ${file.name}`);
         
-        // Create unique filename to avoid conflicts
+        // Validate file
+        const validation = validateFile(file);
+        if (!validation.valid) {
+          console.error(`❌ File validation failed for ${file.name}:`, validation.error);
+          uploadResults.push({
+            filename: file.name,
+            success: false,
+            error: validation.error
+          });
+          continue;
+        }
+
+        const fileData = validation.fileData;
+        const fileSize = validation.size;
+
+        // Validate file signature
+        if (!validateFileSignature(fileData, file.type)) {
+          console.error(`❌ Invalid file signature for ${file.name}`);
+          uploadResults.push({
+            filename: file.name,
+            success: false,
+            error: `Invalid file signature for ${file.type}`
+          });
+          continue;
+        }
+
+        // Sanitize filename
+        const sanitizedName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
         const timestamp = Date.now();
-        const fileName = `${timestamp}_${i}_${file.name}`;
+        const fileName = `${timestamp}_${i}_${sanitizedName}`;
         const filePath = `${folderPath}/${fileName}`;
         
-        console.log(`Uploading file: ${filePath}`);
+        console.log(`📤 Uploading file: ${filePath} (${fileSize} bytes)`);
 
         // Upload file to storage bucket
         const { data: uploadData, error: uploadError } = await supabaseService.storage
           .from("orbit-images")
           .upload(filePath, fileData, {
             contentType: file.type,
+            cacheControl: '3600',
             upsert: false
           });
 
         if (uploadError) {
-          console.error(`Error uploading file ${fileName}:`, uploadError);
+          console.error(`❌ Error uploading file ${fileName}:`, uploadError);
           uploadResults.push({
             filename: file.name,
             success: false,
@@ -116,7 +223,7 @@ serve(async (req) => {
           continue;
         }
 
-        console.log(`Successfully uploaded: ${filePath}`);
+        console.log(`✅ Successfully uploaded: ${filePath}`);
 
         // Create image record in database
         const { data: imageRecord, error: imageError } = await supabaseService
@@ -127,31 +234,32 @@ serve(async (req) => {
             original_filename: file.name,
             storage_path_original: filePath,
             mime_type: file.type,
-            file_size: fileData.length,
+            file_size: fileSize,
             processing_status: "pending"
           })
           .select()
           .single();
 
         if (imageError) {
-          console.error(`Error creating image record for ${fileName}:`, imageError);
+          console.error(`⚠️ Error creating image record for ${fileName}:`, imageError);
         } else {
           imageRecords.push(imageRecord);
+          console.log(`📝 Created image record for ${fileName}`);
         }
 
         uploadResults.push({
           filename: file.name,
           success: true,
           path: filePath,
-          size: fileData.length
+          size: fileSize
         });
 
       } catch (error) {
-        console.error(`Error processing file ${file.name}:`, error);
+        console.error(`💥 Error processing file ${file.name}:`, error);
         uploadResults.push({
           filename: file.name,
           success: false,
-          error: error.message
+          error: `Processing failed: ${error.message}`
         });
       }
     }

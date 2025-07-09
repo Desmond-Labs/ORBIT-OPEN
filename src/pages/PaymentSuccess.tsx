@@ -159,44 +159,46 @@ const PaymentSuccess: React.FC = () => {
     }
   };
 
-  const uploadFiles = async (files: File[]) => {
-    if (!orderData || !files.length) return;
+  const uploadFiles = async (files: Array<{ name: string; data: string; type: string }>) => {
+    if (!orderData || !files.length) {
+      console.log('⚠️ No order data or files provided');
+      return { successCount: 0, totalFiles: 0, uploadResults: [] };
+    }
 
     try {
-      // Convert files to base64 for upload
-      const filePromises = files.map(async (file) => {
-        return new Promise<{name: string, data: string, type: string}>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => {
-            const base64 = reader.result as string;
-            const data = base64.split(',')[1]; // Remove data:image/jpeg;base64, prefix
-            resolve({
-              name: file.name,
-              data,
-              type: file.type
-            });
-          };
-          reader.onerror = reject;
-          reader.readAsDataURL(file);
-        });
-      });
-
-      const processedFiles = await Promise.all(filePromises);
+      console.log(`🚀 Starting upload of ${files.length} files for order ${orderData.id}`);
 
       const { data, error } = await supabase.functions.invoke('upload-order-images', {
         body: {
           orderId: orderData.id,
-          files: processedFiles
+          files: files
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Upload function error:', error);
+        throw error;
+      }
 
-      console.log('Upload successful:', data);
+      if (!data) {
+        console.error('❌ No data returned from upload function');
+        throw new Error('Upload function returned no data');
+      }
+
+      console.log('✅ Upload successful:', data);
       return data;
-    } catch (error) {
-      console.error('Upload failed:', error);
-      throw error;
+    } catch (error: any) {
+      console.error('💥 Upload failed:', error);
+      // Return a fallback response structure
+      return {
+        successCount: 0,
+        totalFiles: files.length,
+        uploadResults: files.map(f => ({
+          filename: f.name,
+          success: false,
+          error: error.message || 'Upload failed'
+        }))
+      };
     }
   };
 

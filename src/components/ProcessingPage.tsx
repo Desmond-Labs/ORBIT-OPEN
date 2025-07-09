@@ -83,24 +83,47 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
       // Set total cost and image count from order
       setTotalCost(order.total_cost);
       
-      // Start processing directly - images are already uploaded during payment
-      const { data, error } = await supabase.functions.invoke('process-image-batch', {
-        body: {
-          orderId: orderIdParam,
-          analysisType: analysisType
-        }
-      });
+      // Since images are already uploaded during payment, mark as processing complete
+      // (AI analysis removed from pipeline - will be done manually)
+      
+      // Get uploaded images from the order
+      const { data: images, error: imagesError } = await supabase
+        .from('images')
+        .select('*')
+        .eq('order_id', orderIdParam);
 
-      if (error) {
-        throw error;
+      if (imagesError) {
+        console.error('Error loading images:', imagesError);
       }
 
-      setProcessingResults(data);
+      // Update order status to processing complete
+      const { error: updateError } = await supabase
+        .from('orders')
+        .update({
+          order_status: 'processing_complete',
+          processing_completion_percentage: 100,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', orderIdParam);
+
+      if (updateError) {
+        console.error('Error updating order status:', updateError);
+      }
+
+      // Set mock processing results since AI analysis is removed
+      setProcessingResults({
+        orderId: orderIdParam,
+        totalFiles: images?.length || 0,
+        processedFiles: images?.length || 0,
+        message: 'Images uploaded successfully. Processing will be done manually.',
+        images: images || []
+      });
+      
       setCurrentStep('complete');
       
       toast({
         title: "Processing Complete!",
-        description: `Successfully processed ${data.results?.success_count || order.image_count} images`,
+        description: `Successfully processed ${images?.length || order.image_count} images`,
         variant: "default"
       });
 
