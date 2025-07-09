@@ -97,61 +97,6 @@ serve(async (req) => {
         .eq("id", user.id);
     }
 
-    // Determine frontend URL dynamically with intelligent fallback
-    const getSmartFrontendUrl = () => {
-      // Priority 1: Environment variable (production setting)
-      const envUrl = Deno.env.get("FRONTEND_URL");
-      console.log("🔍 DEBUG - FRONTEND_URL env var:", envUrl);
-      
-      if (envUrl) {
-        const finalEnvUrl = envUrl.startsWith('http') ? envUrl : `https://${envUrl}`;
-        console.log("✅ Using FRONTEND_URL:", finalEnvUrl);
-        return finalEnvUrl;
-      }
-      
-      // Priority 2: Request origin header (current domain)
-      const origin = req.headers.get("origin");
-      console.log("🔍 DEBUG - Origin header:", origin);
-      
-      if (origin) {
-        // Ensure production URLs use HTTPS
-        if (origin.includes('lovable.app') && origin.startsWith('http:')) {
-          const httpsOrigin = origin.replace('http:', 'https:');
-          console.log("✅ Using origin (converted to HTTPS):", httpsOrigin);
-          return httpsOrigin;
-        }
-        console.log("✅ Using origin:", origin);
-        return origin;
-      }
-      
-      // Priority 3: Intelligent fallback based on environment detection
-      const host = req.headers.get("host");
-      console.log("🔍 DEBUG - Host header:", host);
-      
-      if (host) {
-        if (host.includes('localhost') || host.includes('127.0.0.1')) {
-          console.log("✅ Using localhost fallback");
-          return "http://localhost:5173";
-        }
-        if (host.includes('lovable.app')) {
-          const hostUrl = `https://${host}`;
-          console.log("✅ Using host-based URL:", hostUrl);
-          return hostUrl;
-        }
-        // Default to HTTPS for unknown production domains
-        const httpsHost = `https://${host}`;
-        console.log("✅ Using HTTPS host fallback:", httpsHost);
-        return httpsHost;
-      }
-      
-      // Final fallback for development
-      console.log("⚠️ Using final fallback: localhost");
-      return "http://localhost:5173";
-    };
-
-    const frontendUrl = getSmartFrontendUrl();
-    console.log("🎯 FINAL frontendUrl being used:", frontendUrl);
-
     // Create checkout session
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
@@ -169,8 +114,8 @@ serve(async (req) => {
         },
       ],
       mode: "payment",
-      success_url: `${frontendUrl}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${frontendUrl}/`,
+      success_url: `${Deno.env.get("FRONTEND_URL") || "http://localhost:3000"}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${Deno.env.get("FRONTEND_URL") || "http://localhost:3000"}/`,
       metadata: {
         user_id: user.id,
         image_count: imageCount.toString(),
