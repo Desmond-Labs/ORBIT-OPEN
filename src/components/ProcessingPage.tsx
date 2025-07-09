@@ -11,6 +11,8 @@ import { UploadStep } from './processing/UploadStep';
 
 import { ProcessingStep } from './processing/ProcessingStep';
 import { CompleteStep } from './processing/CompleteStep';
+import { ProcessingStatusDashboard } from './processing/ProcessingStatusDashboard';
+import { useOrderProcessingStatus } from '@/hooks/useOrderProcessingStatus';
 import { useProcessingState } from '@/hooks/useProcessingState';
 import { useRealTimeOrderUpdates } from '@/hooks/useRealTimeOrderUpdates';
 import { calculateCost } from '@/utils/processingUtils';
@@ -54,6 +56,8 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
     setCurrentStep
   );
 
+  const { status: orderStatus, loading: statusLoading } = useOrderProcessingStatus(orderId);
+
   const { toast } = useToast();
 
   // Setup real-time subscription when order ID is available
@@ -83,50 +87,9 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
       // Set total cost and image count from order
       setTotalCost(order.total_cost);
       
-      // Since images are already uploaded during payment, mark as processing complete
-      // (AI analysis removed from pipeline - will be done manually)
+      // Don't auto-complete - let real-time updates handle status changes
+      console.log('Order loaded, monitoring for processing updates...');
       
-      // Get uploaded images from the order
-      const { data: images, error: imagesError } = await supabase
-        .from('images')
-        .select('*')
-        .eq('order_id', orderIdParam);
-
-      if (imagesError) {
-        console.error('Error loading images:', imagesError);
-      }
-
-      // Update order status to processing complete
-      const { error: updateError } = await supabase
-        .from('orders')
-        .update({
-          order_status: 'processing_complete',
-          processing_completion_percentage: 100,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', orderIdParam);
-
-      if (updateError) {
-        console.error('Error updating order status:', updateError);
-      }
-
-      // Set mock processing results since AI analysis is removed
-      setProcessingResults({
-        orderId: orderIdParam,
-        totalFiles: images?.length || 0,
-        processedFiles: images?.length || 0,
-        message: 'Images uploaded successfully. Processing will be done manually.',
-        images: images || []
-      });
-      
-      setCurrentStep('complete');
-      
-      toast({
-        title: "Processing Complete!",
-        description: `Successfully processed ${images?.length || order.image_count} images`,
-        variant: "default"
-      });
-
     } catch (error: any) {
       console.error('Order processing error:', error);
       toast({
@@ -312,22 +275,40 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
             )}
 
             {currentStep === 'processing' && (
-              <ProcessingStep
-                processingStage={processingStage}
-                analysisType={analysisType}
-                realTimeOrderData={realTimeOrderData}
-                processingProgress={processingProgress}
-                uploadedFiles={uploadedFiles}
-              />
+              <>
+                {orderStatus ? (
+                  <ProcessingStatusDashboard
+                    status={orderStatus}
+                    onProcessMore={handleProcessMore}
+                  />
+                ) : (
+                  <ProcessingStep
+                    processingStage={processingStage}
+                    analysisType={analysisType}
+                    realTimeOrderData={realTimeOrderData}
+                    processingProgress={processingProgress}
+                    uploadedFiles={uploadedFiles}
+                  />
+                )}
+              </>
             )}
 
             {currentStep === 'complete' && (
-              <CompleteStep
-                analysisType={analysisType}
-                processingResults={processingResults}
-                uploadedFiles={uploadedFiles}
-                onProcessMore={handleProcessMore}
-              />
+              <>
+                {orderStatus ? (
+                  <ProcessingStatusDashboard
+                    status={orderStatus}
+                    onProcessMore={handleProcessMore}
+                  />
+                ) : (
+                  <CompleteStep
+                    analysisType={analysisType}
+                    processingResults={processingResults}
+                    uploadedFiles={uploadedFiles}
+                    onProcessMore={handleProcessMore}
+                  />
+                )}
+              </>
             )}
           </Card>
         </div>
