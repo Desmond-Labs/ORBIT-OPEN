@@ -102,48 +102,25 @@ const PaymentSuccess: React.FC = () => {
 
   const handleFileUploadAfterPayment = async (order: any) => {
     try {
-      // Get files from localStorage
-      const storedFiles = localStorage.getItem('orbit_pending_files');
-      if (!storedFiles) {
-        console.log('No files found in localStorage');
-        return;
-      }
-
-      const filesData = JSON.parse(storedFiles);
-      console.log('📁 Found', filesData.length, 'files in localStorage');
-
-      // Convert back to File objects for upload
-      const files = filesData.map((fileData: any) => ({
-        name: fileData.name,
-        type: fileData.type,
-        data: fileData.data.split(',')[1] // Remove data URL prefix
-      }));
-
+      // Files are already uploaded during the payment process
+      // No need to handle file uploads here anymore
+      console.log('✅ Files were already uploaded during payment process for order:', order.id);
+      
+      // Just clean up localStorage
+      localStorage.removeItem('orbit_pending_order_id');
+      
+      // No file upload needed - show success message
       toast({
-        title: "Uploading Images",
-        description: `Uploading ${files.length} images to your order...`,
+        title: "Order Complete!",
+        description: "Your images are ready for processing",
         variant: "default"
       });
 
-      const uploadResult = await uploadFiles(files);
-      
-      if (uploadResult.successCount > 0) {
-        toast({
-          title: "Upload Complete!",
-          description: `Successfully uploaded ${uploadResult.successCount} images`,
-          variant: "default"
-        });
-      }
-
-      // Clean up localStorage
-      localStorage.removeItem('orbit_pending_files');
-      localStorage.removeItem('orbit_pending_order_id');
-
     } catch (error: any) {
-      console.error('File upload error:', error);
+      console.error('Order completion error:', error);
       toast({
-        title: "Upload Failed",
-        description: "There was an error uploading your images. Please contact support.",
+        title: "Order Processing Error",
+        description: "There was an error with your order. Please contact support.",
         variant: "destructive"
       });
     }

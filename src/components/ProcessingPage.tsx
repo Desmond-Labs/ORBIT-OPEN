@@ -153,25 +153,22 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
     setCurrentStep('upload');
   };
 
-  const handlePayment = async () => {
-    if (!user || uploadedFiles.length === 0 || paymentLoading) return;
-
-    setPaymentLoading(true);
+  const uploadFilesToStorage = async (orderId: string) => {
     try {
-      console.log('🚀 Starting payment process with', uploadedFiles.length, 'files');
+      console.log('📤 Uploading files to storage for order:', orderId);
       
-      // Store files in localStorage temporarily for after payment
+      // Convert files to the format expected by upload-order-images
       const filesData = await Promise.all(
         uploadedFiles.map(async (file) => {
-          return new Promise<any>((resolve, reject) => {
+          return new Promise<{name: string, data: string, type: string}>((resolve, reject) => {
             const reader = new FileReader();
             reader.onload = () => {
+              const base64 = reader.result as string;
+              const data = base64.split(',')[1]; // Remove data:image/jpeg;base64, prefix
               resolve({
                 name: file.name,
-                size: file.size,
-                type: file.type,
-                data: reader.result, // Full data URL including prefix
-                lastModified: file.lastModified
+                data,
+                type: file.type
               });
             };
             reader.onerror = reject;
@@ -179,26 +176,53 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
           });
         })
       );
-      
-      localStorage.setItem('orbit_pending_files', JSON.stringify(filesData));
-      console.log('📁 Stored', filesData.length, 'files in localStorage');
 
-      // Create checkout session
-      const { data, error } = await supabase.functions.invoke('create-payment-intent', {
+      const { data, error } = await supabase.functions.invoke('upload-order-images', {
+        body: {
+          orderId: orderId,
+          files: filesData
+        }
+      });
+
+      if (error) throw error;
+      
+      console.log('✅ Files uploaded successfully:', data);
+      return data;
+    } catch (error) {
+      console.error('❌ File upload failed:', error);
+      throw error;
+    }
+  };
+
+  const handlePayment = async () => {
+    if (!user || uploadedFiles.length === 0 || paymentLoading) return;
+
+    setPaymentLoading(true);
+    try {
+      console.log('🚀 Starting payment process with', uploadedFiles.length, 'files');
+      
+      // Create checkout session first
+      const { data: paymentData, error: paymentError } = await supabase.functions.invoke('create-payment-intent', {
         body: {
           imageCount: uploadedFiles.length,
           batchName: `Batch ${new Date().toISOString()}`
         }
       });
 
-      if (error) throw error;
+      if (paymentError) throw paymentError;
 
-      setOrderId(data.order_id);
-      localStorage.setItem('orbit_pending_order_id', data.order_id);
+      console.log('💳 Order created:', paymentData.order_id);
+      setOrderId(paymentData.order_id);
+      
+      // Upload files immediately to storage (before payment)
+      await uploadFilesToStorage(paymentData.order_id);
+      
+      // Store only the order ID (not file data) in localStorage
+      localStorage.setItem('orbit_pending_order_id', paymentData.order_id);
 
       // Redirect to Stripe Checkout
-      if (data.checkout_url) {
-        window.location.href = data.checkout_url;
+      if (paymentData.checkout_url) {
+        window.location.href = paymentData.checkout_url;
       } else {
         throw new Error('No checkout URL received');
       }
