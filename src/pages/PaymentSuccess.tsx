@@ -47,10 +47,11 @@ const PaymentSuccess: React.FC = () => {
           // Upload files if they haven't been uploaded yet
           await handleFileUploadAfterPayment(order);
           
-          // Auto-redirect to processing after 5 seconds
+          // Auto-redirect to processing after 3 seconds
           setTimeout(() => {
+            console.log('🔄 Redirecting to processing page with order:', order.id);
             navigate(`/?step=processing&order=${order.id}`);
-          }, 5000);
+          }, 3000);
           return;
         }
 
@@ -81,10 +82,11 @@ const PaymentSuccess: React.FC = () => {
         // Upload files after successful payment
         await handleFileUploadAfterPayment(order);
 
-        // Auto-redirect to processing after 5 seconds
+        // Auto-redirect to processing after 3 seconds
         setTimeout(() => {
+          console.log('🔄 Redirecting to processing page with order:', order.id);
           navigate(`/?step=processing&order=${order.id}`);
-        }, 5000);
+        }, 3000);
 
       } catch (error: any) {
         console.error('Payment verification error:', error);

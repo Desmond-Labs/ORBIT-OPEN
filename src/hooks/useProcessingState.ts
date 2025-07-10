@@ -26,11 +26,25 @@ export const useProcessingState = () => {
     const checkUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       const orderIdFromUrl = searchParams.get('order');
+      const stepFromUrl = searchParams.get('step');
+      
+      console.log('🔍 Processing state check:', { 
+        hasUser: !!session?.user, 
+        orderIdFromUrl, 
+        stepFromUrl,
+        currentStep 
+      });
       
       if (session?.user) {
         setUser(session.user);
         
-        if (orderIdFromUrl) {
+        // Priority: URL parameters override default flow
+        if (orderIdFromUrl && stepFromUrl === 'processing') {
+          console.log('📋 Setting processing state with order:', orderIdFromUrl);
+          setOrderId(orderIdFromUrl);
+          setCurrentStep('processing');
+        } else if (orderIdFromUrl) {
+          console.log('📋 Setting processing state with order (no step):', orderIdFromUrl);
           setOrderId(orderIdFromUrl);
           setCurrentStep('processing');
         } else {
@@ -46,9 +60,12 @@ export const useProcessingState = () => {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
+        const orderIdFromUrl = searchParams.get('order');
+        
         if (session?.user) {
           setUser(session.user);
-          if (currentStep === 'auth') {
+          // Don't override processing step if we have an order ID
+          if (currentStep === 'auth' && !orderIdFromUrl) {
             setCurrentStep('upload');
           }
         } else {

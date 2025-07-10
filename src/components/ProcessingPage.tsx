@@ -253,7 +253,7 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
 
           {/* Debug info */}
           <div className="mb-4 p-2 bg-secondary/20 rounded text-xs">
-            Current step: {currentStep} | Files: {uploadedFiles.length} | Cost: ${totalCost}
+            Current step: {currentStep} | Files: {uploadedFiles.length} | Cost: ${totalCost} | OrderID: {orderId} | Status Loading: {statusLoading}
           </div>
 
           {/* Step Content */}
@@ -276,7 +276,12 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
 
             {currentStep === 'processing' && (
               <>
-                {orderStatus ? (
+                {statusLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="w-8 h-8 animate-spin text-accent" />
+                    <span className="ml-2">Loading order status...</span>
+                  </div>
+                ) : orderId && orderStatus ? (
                   <ProcessingStatusDashboard
                     status={orderStatus}
                     onProcessMore={handleProcessMore}
