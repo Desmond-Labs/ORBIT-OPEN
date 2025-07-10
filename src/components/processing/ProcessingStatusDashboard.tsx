@@ -11,7 +11,10 @@ import {
   FileText, 
   DollarSign,
   Calendar,
-  Image
+  Image,
+  Download,
+  Upload,
+  ArrowLeft
 } from 'lucide-react';
 import { ProcessingStatus } from '@/hooks/useOrderProcessingStatus';
 
@@ -19,12 +22,14 @@ interface ProcessingStatusDashboardProps {
   status: ProcessingStatus;
   onDownload?: () => void;
   onProcessMore?: () => void;
+  onBackToDashboard?: () => void;
 }
 
 export const ProcessingStatusDashboard: React.FC<ProcessingStatusDashboardProps> = ({
   status,
   onDownload,
-  onProcessMore
+  onProcessMore,
+  onBackToDashboard
 }) => {
   const getStatusIcon = () => {
     switch (status.orderStatus) {
@@ -173,20 +178,36 @@ export const ProcessingStatusDashboard: React.FC<ProcessingStatusDashboardProps>
             className="w-full"
             onClick={onDownload}
           >
+            <Download className="w-5 h-5" />
             Download Results
           </Button>
         )}
         
-        {onProcessMore && (
-          <Button 
-            variant="outline" 
-            size="lg" 
-            className="w-full"
-            onClick={onProcessMore}
-          >
-            Process More Images
-          </Button>
-        )}
+        <div className="flex gap-3">
+          {onProcessMore && (
+            <Button 
+              variant="outline" 
+              size="lg" 
+              className="flex-1"
+              onClick={onProcessMore}
+            >
+              <Upload className="w-5 h-5" />
+              Process More Images
+            </Button>
+          )}
+          
+          {onBackToDashboard && (
+            <Button 
+              variant="ghost" 
+              size="lg" 
+              className="flex-1"
+              onClick={onBackToDashboard}
+            >
+              <ArrowLeft className="w-5 h-5" />
+              Back to Dashboard
+            </Button>
+          )}
+        </div>
       </div>
     </div>
   );

@@ -285,6 +285,7 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
                   <ProcessingStatusDashboard
                     status={orderStatus}
                     onProcessMore={handleProcessMore}
+                    onBackToDashboard={user ? () => onBack() : undefined}
                   />
                 ) : (
                   <ProcessingStep
@@ -304,6 +305,7 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
                   <ProcessingStatusDashboard
                     status={orderStatus}
                     onProcessMore={handleProcessMore}
+                    onBackToDashboard={user ? () => onBack() : undefined}
                   />
                 ) : (
                   <CompleteStep
