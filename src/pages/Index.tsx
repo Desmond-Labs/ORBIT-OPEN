@@ -18,10 +18,14 @@ const Index = () => {
   const [loading, setLoading] = useState(true);
 
   const { orders, loading: ordersLoading } = useAllUserOrders(user?.id || null);
+  
+  // Combined loading state - wait for both auth and orders (if user exists)
+  const isInitialLoading = loading || (user && ordersLoading);
 
   useEffect(() => {
     const checkUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
+      console.log('🔐 Initial auth check:', { hasUser: !!session?.user, email: session?.user?.email });
       setUser(session?.user || null);
       setLoading(false);
     };
@@ -30,6 +34,7 @@ const Index = () => {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
+        console.log('🔐 Auth state changed:', { event, hasUser: !!session?.user, email: session?.user?.email });
         setUser(session?.user || null);
         setLoading(false);
       }
@@ -78,12 +83,25 @@ const Index = () => {
     setSearchParams({});
   };
 
-  if (loading) {
+  // Debug logging for state tracking
+  useEffect(() => {
+    console.log('📊 State update:', { 
+      hasUser: !!user, 
+      ordersCount: orders.length, 
+      ordersLoading, 
+      isInitialLoading,
+      currentView 
+    });
+  }, [user, orders.length, ordersLoading, isInitialLoading, currentView]);
+
+  if (isInitialLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 flex items-center justify-center">
         <div className="text-center">
           <div className="w-12 h-12 bg-gradient-primary rounded-full animate-pulse mx-auto mb-4" />
-          <p className="text-muted-foreground">Loading...</p>
+          <p className="text-muted-foreground">
+            {loading ? 'Loading...' : 'Loading your orders...'}
+          </p>
         </div>
       </div>
     );

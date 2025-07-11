@@ -17,13 +17,19 @@ export interface UserOrder {
 
 export const useAllUserOrders = (userId: string | null) => {
   const [orders, setOrders] = useState<UserOrder[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true); // Start with loading=true
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
   const fetchUserOrders = async () => {
-    if (!userId) return;
+    if (!userId) {
+      console.log('📋 No userId provided, setting empty orders');
+      setOrders([]);
+      setLoading(false);
+      return;
+    }
 
+    console.log('📋 Fetching orders for user:', userId);
     setLoading(true);
     setError(null);
 
@@ -38,9 +44,12 @@ export const useAllUserOrders = (userId: string | null) => {
       if (ordersError) throw new Error(`Error fetching orders: ${ordersError.message}`);
 
       if (!ordersData) {
+        console.log('📋 No orders found for user');
         setOrders([]);
         return;
       }
+
+      console.log('📋 Found orders:', ordersData.length);
 
       // For each order, get image counts and processing status
       const enrichedOrders = await Promise.all(
@@ -96,6 +105,7 @@ export const useAllUserOrders = (userId: string | null) => {
       );
 
       setOrders(enrichedOrders);
+      console.log('📋 Orders enriched and set:', enrichedOrders.length);
 
     } catch (err: any) {
       setError(err.message);
@@ -111,7 +121,14 @@ export const useAllUserOrders = (userId: string | null) => {
 
   // Set up real-time subscription for user orders
   useEffect(() => {
-    if (!userId) return;
+    console.log('📋 useAllUserOrders effect triggered, userId:', userId);
+    
+    if (!userId) {
+      console.log('📋 No userId, setting empty state');
+      setOrders([]);
+      setLoading(false);
+      return;
+    }
 
     // Initial fetch
     fetchUserOrders();
