@@ -260,7 +260,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onBack, onAuthenticated }) =
                     <div className="flex justify-center">
                       <Turnstile
                         ref={captchaRef}
-                        siteKey="1x00000000000000000000AA"
+                        siteKey="0x4AAAAAABlD3dqUVjIBd-7w"
                         onSuccess={handleCaptchaSuccess}
                         onError={handleCaptchaError}
                       />
