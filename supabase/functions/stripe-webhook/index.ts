@@ -68,6 +68,32 @@ serve(async (req) => {
           return new Response("Error retrieving session", { status: 500 });
         }
 
+        // Check for duplicate webhook events
+        const eventId = event.id;
+        const { data: existingPayment } = await supabaseClient
+          .from("payments")
+          .select("webhook_event_ids")
+          .eq("stripe_payment_intent_id", checkoutSessionId)
+          .single();
+
+        if (existingPayment?.webhook_event_ids?.includes(eventId)) {
+          console.log(`Webhook event ${eventId} already processed, skipping`);
+          return new Response(JSON.stringify({ received: true, duplicate: true }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+            status: 200,
+          });
+        }
+
+        // Get current webhook events for proper JSONB array operations
+        const { data: currentPayment } = await supabaseClient
+          .from("payments")
+          .select("stripe_webhook_events, webhook_event_ids")
+          .eq("stripe_payment_intent_id", checkoutSessionId)
+          .single();
+
+        const currentWebhookEvents = currentPayment?.stripe_webhook_events || [];
+        const currentEventIds = currentPayment?.webhook_event_ids || [];
+
         // Update payment status in database using checkout session ID
         const { error: paymentError } = await supabaseClient
           .from("payments")
@@ -75,16 +101,25 @@ serve(async (req) => {
             payment_status: "succeeded",
             processed_at: new Date().toISOString(),
             stripe_payment_intent_id_actual: paymentIntent.id,
-            stripe_webhook_events: supabaseClient.rpc('array_append', {
-              array_field: 'stripe_webhook_events',
-              new_element: event
-            })
+            stripe_webhook_events: [...currentWebhookEvents, event],
+            webhook_event_ids: [...currentEventIds, eventId],
+            last_webhook_at: new Date().toISOString()
           })
           .eq("stripe_payment_intent_id", checkoutSessionId);
 
         if (paymentError) {
           console.error("Error updating payment:", paymentError);
         }
+
+        // Get current order webhook events
+        const { data: currentOrder } = await supabaseClient
+          .from("orders")
+          .select("webhook_events, webhook_event_ids")
+          .eq("stripe_payment_intent_id", checkoutSessionId)
+          .single();
+
+        const currentOrderEvents = currentOrder?.webhook_events || [];
+        const currentOrderEventIds = currentOrder?.webhook_event_ids || [];
 
         // Update order status using checkout session ID
         const { data: orderData, error: orderError } = await supabaseClient
@@ -96,10 +131,9 @@ serve(async (req) => {
             processing_stage: "initializing",
             processing_started_at: new Date().toISOString(),
             processing_completion_percentage: 10,
-            webhook_events: supabaseClient.rpc('array_append', {
-              array_field: 'webhook_events',
-              new_element: event
-            }),
+            webhook_events: [...currentOrderEvents, event],
+            webhook_event_ids: [...currentOrderEventIds, eventId],
+            last_webhook_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
           })
           .eq("stripe_payment_intent_id", checkoutSessionId)
@@ -149,27 +183,67 @@ serve(async (req) => {
 
       case "payment_intent.payment_failed":
         const failedPayment = event.data.object as Stripe.PaymentIntent;
+        const failedEventId = event.id;
         
-        await supabaseClient
-          .from("payments")
-          .update({
-            payment_status: "failed",
-            failure_reason: failedPayment.last_payment_error?.message || "Payment failed",
-            stripe_webhook_events: supabaseClient.rpc('array_append', {
-              array_field: 'stripe_webhook_events',
-              new_element: event
-            })
-          })
-          .eq("stripe_payment_intent_id", failedPayment.id);
+        // Get the checkout session for failed payment
+        let failedCheckoutSessionId = null;
+        try {
+          const failedSessions = await stripe.checkout.sessions.list({
+            payment_intent: failedPayment.id,
+            limit: 1
+          });
+          
+          if (failedSessions.data.length > 0) {
+            failedCheckoutSessionId = failedSessions.data[0].id;
+          }
+        } catch (sessionError) {
+          console.error("Error retrieving checkout session for failed payment:", sessionError);
+        }
 
-        await supabaseClient
-          .from("orders")
-          .update({
-            payment_status: "failed",
-            order_status: "failed",
-            updated_at: new Date().toISOString()
-          })
-          .eq("stripe_payment_intent_id", failedPayment.id);
+        // Update failed payment with webhook events
+        if (failedCheckoutSessionId) {
+          const { data: failedCurrentPayment } = await supabaseClient
+            .from("payments")
+            .select("stripe_webhook_events, webhook_event_ids")
+            .eq("stripe_payment_intent_id", failedCheckoutSessionId)
+            .single();
+
+          const failedCurrentEvents = failedCurrentPayment?.stripe_webhook_events || [];
+          const failedCurrentEventIds = failedCurrentPayment?.webhook_event_ids || [];
+
+          await supabaseClient
+            .from("payments")
+            .update({
+              payment_status: "failed",
+              failure_reason: failedPayment.last_payment_error?.message || "Payment failed",
+              stripe_webhook_events: [...failedCurrentEvents, event],
+              webhook_event_ids: [...failedCurrentEventIds, failedEventId],
+              last_webhook_at: new Date().toISOString()
+            })
+            .eq("stripe_payment_intent_id", failedCheckoutSessionId);
+
+          // Get current order webhook events for failed payment
+          const { data: failedCurrentOrder } = await supabaseClient
+            .from("orders")
+            .select("webhook_events, webhook_event_ids")
+            .eq("stripe_payment_intent_id", failedCheckoutSessionId)
+            .single();
+
+          const failedOrderEvents = failedCurrentOrder?.webhook_events || [];
+          const failedOrderEventIds = failedCurrentOrder?.webhook_event_ids || [];
+
+          await supabaseClient
+            .from("orders")
+            .update({
+              payment_status: "failed",
+              order_status: "failed",
+              webhook_events: [...failedOrderEvents, event],
+              webhook_event_ids: [...failedOrderEventIds, failedEventId],
+              last_webhook_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            })
+            .eq("stripe_payment_intent_id", failedCheckoutSessionId);
+        }
 
         console.log(`Payment failed for intent: ${failedPayment.id}`);
         break;

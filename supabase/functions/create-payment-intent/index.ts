@@ -133,10 +133,33 @@ serve(async (req) => {
     // Generate order number
     const { data: orderNumber } = await supabaseService.rpc('generate_order_number');
 
+    // Create batch first
+    const { data: batch, error: batchError } = await supabaseService
+      .from("batches")
+      .insert({
+        user_id: user.id,
+        name: batchName || `Batch ${new Date().toISOString()}`,
+        status: "pending",
+        image_count: imageCount,
+        quality_level: "standard"
+      })
+      .select()
+      .single();
+
+    if (batchError) {
+      console.error("Error creating batch:", batchError);
+      return new Response(JSON.stringify({ error: "Error creating batch" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 500,
+      });
+    }
+
+    // Create order with batch_id
     const { data: order, error: orderError } = await supabaseService
       .from("orders")
       .insert({
         user_id: user.id,
+        batch_id: batch.id,
         order_number: orderNumber,
         image_count: imageCount,
         base_cost: totalCost,
@@ -149,6 +172,12 @@ serve(async (req) => {
       })
       .select()
       .single();
+
+    // Update batch with order_id
+    await supabaseService
+      .from("batches")
+      .update({ order_id: order.id })
+      .eq("id", batch.id);
 
     if (orderError) {
       console.error("Error creating order:", orderError);

@@ -399,13 +399,14 @@ export type Database = {
       orders: {
         Row: {
           base_cost: number
-          batch_id: string | null
+          batch_id: string
           completed_at: string | null
           cost_breakdown: Json | null
           created_at: string
           estimated_completion_time: string | null
           id: string
           image_count: number
+          last_webhook_at: string | null
           metadata: Json | null
           order_number: string
           order_status: string | null
@@ -420,17 +421,19 @@ export type Database = {
           total_cost: number
           updated_at: string
           user_id: string
+          webhook_event_ids: Json | null
           webhook_events: Json | null
         }
         Insert: {
           base_cost?: number
-          batch_id?: string | null
+          batch_id: string
           completed_at?: string | null
           cost_breakdown?: Json | null
           created_at?: string
           estimated_completion_time?: string | null
           id?: string
           image_count?: number
+          last_webhook_at?: string | null
           metadata?: Json | null
           order_number: string
           order_status?: string | null
@@ -445,17 +448,19 @@ export type Database = {
           total_cost?: number
           updated_at?: string
           user_id: string
+          webhook_event_ids?: Json | null
           webhook_events?: Json | null
         }
         Update: {
           base_cost?: number
-          batch_id?: string | null
+          batch_id?: string
           completed_at?: string | null
           cost_breakdown?: Json | null
           created_at?: string
           estimated_completion_time?: string | null
           id?: string
           image_count?: number
+          last_webhook_at?: string | null
           metadata?: Json | null
           order_number?: string
           order_status?: string | null
@@ -470,9 +475,17 @@ export type Database = {
           total_cost?: number
           updated_at?: string
           user_id?: string
+          webhook_event_ids?: Json | null
           webhook_events?: Json | null
         }
         Relationships: [
+          {
+            foreignKeyName: "fk_orders_batch_id"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "orders_batch_id_fkey"
             columns: ["batch_id"]
@@ -496,6 +509,7 @@ export type Database = {
           currency: string | null
           failure_reason: string | null
           id: string
+          last_webhook_at: string | null
           metadata: Json | null
           order_id: string
           payment_method: string | null
@@ -508,6 +522,7 @@ export type Database = {
           stripe_webhook_events: Json | null
           updated_at: string
           user_id: string
+          webhook_event_ids: Json | null
         }
         Insert: {
           amount: number
@@ -515,6 +530,7 @@ export type Database = {
           currency?: string | null
           failure_reason?: string | null
           id?: string
+          last_webhook_at?: string | null
           metadata?: Json | null
           order_id: string
           payment_method?: string | null
@@ -527,6 +543,7 @@ export type Database = {
           stripe_webhook_events?: Json | null
           updated_at?: string
           user_id: string
+          webhook_event_ids?: Json | null
         }
         Update: {
           amount?: number
@@ -534,6 +551,7 @@ export type Database = {
           currency?: string | null
           failure_reason?: string | null
           id?: string
+          last_webhook_at?: string | null
           metadata?: Json | null
           order_id?: string
           payment_method?: string | null
@@ -546,6 +564,7 @@ export type Database = {
           stripe_webhook_events?: Json | null
           updated_at?: string
           user_id?: string
+          webhook_event_ids?: Json | null
         }
         Relationships: [
           {

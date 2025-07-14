@@ -63,29 +63,13 @@ serve(async (req) => {
       throw new Error('Order not found or access denied');
     }
 
-    // 2. Get the batch associated with this order
+    // 2. Get the batch associated with this order (should already exist)
     let batch = order.batches;
     if (!batch) {
-      // Create a new batch if none exists
-      const { data: newBatch, error: batchError } = await supabase
-        .from('batches')
-        .insert({
-          user_id: user.id,
-          order_id: orderId,
-          name: `Batch for Order ${order.order_number}`,
-          status: 'processing',
-          image_count: order.image_count,
-          processing_start_time: new Date().toISOString(),
-          quality_level: 'standard'
-        })
-        .select()
-        .single();
-
-      if (batchError) {
-        throw new Error('Failed to create batch');
-      }
-      batch = newBatch;
+      throw new Error('No batch found for this order. Order should have been created with a batch.');
     }
+
+    console.log(`Using existing batch: ${batch.id} for order: ${orderId}`);
 
     // 3. Get all images for this batch
     const { data: images, error: imagesError } = await supabase
