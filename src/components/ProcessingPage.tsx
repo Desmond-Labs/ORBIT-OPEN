@@ -113,7 +113,21 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
 
   const handleAuthSuccess = () => {
     setShowAuthPage(false);
-    setCurrentStep('upload');
+    
+    // Check if user was in the middle of an upload workflow
+    const orderIdFromUrl = new URLSearchParams(window.location.search).get('order');
+    const stepFromUrl = new URLSearchParams(window.location.search).get('step');
+    const hasUploadedFiles = uploadedFiles.length > 0;
+    
+    // Only proceed to upload if user was already in an upload workflow
+    if (orderIdFromUrl || stepFromUrl || hasUploadedFiles) {
+      console.log('🔄 Continuing upload workflow after auth');
+      setCurrentStep('upload');
+    } else {
+      console.log('🏠 Returning to main page after auth');
+      // User just wanted to authenticate, return them to main page
+      onBack();
+    }
   };
 
   const uploadFilesToStorage = async (orderId: string) => {
