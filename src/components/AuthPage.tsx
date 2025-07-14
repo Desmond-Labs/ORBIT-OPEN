@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -6,6 +6,7 @@ import { Card } from '@/components/ui/card';
 import { ArrowLeft, Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { Turnstile } from '@marsidev/react-turnstile';
 
 interface AuthPageProps {
   onBack: () => void;
@@ -16,6 +17,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onBack, onAuthenticated }) =
   const [isSignUp, setIsSignUp] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState<string>('');
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -23,6 +25,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onBack, onAuthenticated }) =
   });
   
   const { toast } = useToast();
+  const captchaRef = useRef<any>(null);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData(prev => ({
@@ -46,11 +49,21 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onBack, onAuthenticated }) =
           return;
         }
 
+        if (!captchaToken) {
+          toast({
+            title: "Error",
+            description: "Please complete the CAPTCHA verification",
+            variant: "destructive"
+          });
+          return;
+        }
+
         const { error } = await supabase.auth.signUp({
           email: formData.email,
           password: formData.password,
           options: {
             emailRedirectTo: `${window.location.origin}/`,
+            captchaToken,
             data: {
               email: formData.email
             }
@@ -121,9 +134,27 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onBack, onAuthenticated }) =
         description: error.message || "An unexpected error occurred",
         variant: "destructive"
       });
+      // Reset CAPTCHA on error
+      if (isSignUp && captchaRef.current) {
+        captchaRef.current.reset();
+        setCaptchaToken('');
+      }
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleCaptchaSuccess = (token: string) => {
+    setCaptchaToken(token);
+  };
+
+  const handleCaptchaError = () => {
+    setCaptchaToken('');
+    toast({
+      title: "CAPTCHA Error",
+      description: "Please try again",
+      variant: "destructive"
+    });
   };
 
   return (
@@ -206,22 +237,36 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onBack, onAuthenticated }) =
               </div>
 
               {isSignUp && (
-                <div className="space-y-2">
-                  <Label htmlFor="confirmPassword">Confirm Password</Label>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-                    <Input
-                      id="confirmPassword"
-                      name="confirmPassword"
-                      type={showPassword ? "text" : "password"}
-                      placeholder="Confirm your password"
-                      value={formData.confirmPassword}
-                      onChange={handleInputChange}
-                      className="pl-10"
-                      required
-                    />
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="confirmPassword">Confirm Password</Label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                      <Input
+                        id="confirmPassword"
+                        name="confirmPassword"
+                        type={showPassword ? "text" : "password"}
+                        placeholder="Confirm your password"
+                        value={formData.confirmPassword}
+                        onChange={handleInputChange}
+                        className="pl-10"
+                        required
+                      />
+                    </div>
                   </div>
-                </div>
+                  
+                  <div className="space-y-2">
+                    <Label>Security Verification</Label>
+                    <div className="flex justify-center">
+                      <Turnstile
+                        ref={captchaRef}
+                        siteKey="1x00000000000000000000AA"
+                        onSuccess={handleCaptchaSuccess}
+                        onError={handleCaptchaError}
+                      />
+                    </div>
+                  </div>
+                </>
               )}
 
               <Button 
@@ -229,7 +274,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onBack, onAuthenticated }) =
                 variant="cosmic" 
                 size="lg" 
                 className="w-full"
-                disabled={isLoading}
+                disabled={isLoading || (isSignUp && !captchaToken)}
               >
                 {isLoading ? 'Please wait...' : (isSignUp ? 'Create Account' : 'Sign In')}
               </Button>
