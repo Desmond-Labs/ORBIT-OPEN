@@ -39,20 +39,20 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onBack, onAuthenticated }) =
     setIsLoading(true);
 
     try {
+      if (!captchaToken) {
+        toast({
+          title: "Error",
+          description: "Please complete the CAPTCHA verification",
+          variant: "destructive"
+        });
+        return;
+      }
+
       if (isSignUp) {
         if (formData.password !== formData.confirmPassword) {
           toast({
             title: "Error",
             description: "Passwords do not match",
-            variant: "destructive"
-          });
-          return;
-        }
-
-        if (!captchaToken) {
-          toast({
-            title: "Error",
-            description: "Please complete the CAPTCHA verification",
             variant: "destructive"
           });
           return;
@@ -107,6 +107,9 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onBack, onAuthenticated }) =
         const { error } = await supabase.auth.signInWithPassword({
           email: formData.email,
           password: formData.password,
+          options: {
+            captchaToken
+          }
         });
 
         if (error) {
@@ -135,7 +138,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onBack, onAuthenticated }) =
         variant: "destructive"
       });
       // Reset CAPTCHA on error
-      if (isSignUp && captchaRef.current) {
+      if (captchaRef.current) {
         captchaRef.current.reset();
         setCaptchaToken('');
       }
@@ -237,44 +240,42 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onBack, onAuthenticated }) =
               </div>
 
               {isSignUp && (
-                <>
-                  <div className="space-y-2">
-                    <Label htmlFor="confirmPassword">Confirm Password</Label>
-                    <div className="relative">
-                      <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-                      <Input
-                        id="confirmPassword"
-                        name="confirmPassword"
-                        type={showPassword ? "text" : "password"}
-                        placeholder="Confirm your password"
-                        value={formData.confirmPassword}
-                        onChange={handleInputChange}
-                        className="pl-10"
-                        required
-                      />
-                    </div>
+                <div className="space-y-2">
+                  <Label htmlFor="confirmPassword">Confirm Password</Label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                    <Input
+                      id="confirmPassword"
+                      name="confirmPassword"
+                      type={showPassword ? "text" : "password"}
+                      placeholder="Confirm your password"
+                      value={formData.confirmPassword}
+                      onChange={handleInputChange}
+                      className="pl-10"
+                      required
+                    />
                   </div>
-                  
-                  <div className="space-y-2">
-                    <Label>Security Verification</Label>
-                    <div className="flex justify-center">
-                      <Turnstile
-                        ref={captchaRef}
-                        siteKey="0x4AAAAAABlD3dqUVjIBd-7w"
-                        onSuccess={handleCaptchaSuccess}
-                        onError={handleCaptchaError}
-                      />
-                    </div>
-                  </div>
-                </>
+                </div>
               )}
+              
+              <div className="space-y-2">
+                <Label>Security Verification</Label>
+                <div className="flex justify-center">
+                  <Turnstile
+                    ref={captchaRef}
+                    siteKey="0x4AAAAAABlD3dqUVjIBd-7w"
+                    onSuccess={handleCaptchaSuccess}
+                    onError={handleCaptchaError}
+                  />
+                </div>
+              </div>
 
               <Button 
                 type="submit" 
                 variant="cosmic" 
                 size="lg" 
                 className="w-full"
-                disabled={isLoading || (isSignUp && !captchaToken)}
+                disabled={isLoading || !captchaToken}
               >
                 {isLoading ? 'Please wait...' : (isSignUp ? 'Create Account' : 'Sign In')}
               </Button>
@@ -283,7 +284,14 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onBack, onAuthenticated }) =
             <div className="mt-6 text-center">
               <button
                 type="button"
-                onClick={() => setIsSignUp(!isSignUp)}
+                onClick={() => {
+                  setIsSignUp(!isSignUp);
+                  // Reset CAPTCHA when switching modes
+                  if (captchaRef.current) {
+                    captchaRef.current.reset();
+                    setCaptchaToken('');
+                  }
+                }}
                 className="text-accent hover:text-accent/80 transition-colors"
               >
                 {isSignUp 
