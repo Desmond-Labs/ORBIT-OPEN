@@ -164,13 +164,6 @@ export type Database = {
             foreignKeyName: "file_downloads_batch_id_fkey"
             columns: ["batch_id"]
             isOneToOne: false
-            referencedRelation: "batch_processing_summary"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "file_downloads_batch_id_fkey"
-            columns: ["batch_id"]
-            isOneToOne: false
             referencedRelation: "batches"
             referencedColumns: ["id"]
           },
@@ -189,51 +182,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      image_analysis_results: {
-        Row: {
-          analysis_type: string
-          confidence: number
-          created_at: string | null
-          id: string
-          image_checksum: string | null
-          image_size: number | null
-          integrity_info: Json | null
-          metadata: Json
-          mime_type: string | null
-          processing_time_ms: number | null
-          security_scan: Json | null
-          user_id: string | null
-        }
-        Insert: {
-          analysis_type: string
-          confidence: number
-          created_at?: string | null
-          id?: string
-          image_checksum?: string | null
-          image_size?: number | null
-          integrity_info?: Json | null
-          metadata: Json
-          mime_type?: string | null
-          processing_time_ms?: number | null
-          security_scan?: Json | null
-          user_id?: string | null
-        }
-        Update: {
-          analysis_type?: string
-          confidence?: number
-          created_at?: string | null
-          id?: string
-          image_checksum?: string | null
-          image_size?: number | null
-          integrity_info?: Json | null
-          metadata?: Json
-          mime_type?: string | null
-          processing_time_ms?: number | null
-          security_scan?: Json | null
-          user_id?: string | null
-        }
-        Relationships: []
       }
       images: {
         Row: {
@@ -319,13 +267,6 @@ export type Database = {
             foreignKeyName: "images_batch_id_fkey"
             columns: ["batch_id"]
             isOneToOne: false
-            referencedRelation: "batch_processing_summary"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "images_batch_id_fkey"
-            columns: ["batch_id"]
-            isOneToOne: false
             referencedRelation: "batches"
             referencedColumns: ["id"]
           },
@@ -397,69 +338,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      mcp_rate_limits: {
-        Row: {
-          client_identifier: string
-          created_at: string | null
-          id: string
-          last_request: string | null
-          request_count: number
-          window_start: string | null
-        }
-        Insert: {
-          client_identifier: string
-          created_at?: string | null
-          id?: string
-          last_request?: string | null
-          request_count?: number
-          window_start?: string | null
-        }
-        Update: {
-          client_identifier?: string
-          created_at?: string | null
-          id?: string
-          last_request?: string | null
-          request_count?: number
-          window_start?: string | null
-        }
-        Relationships: []
-      }
-      mcp_requests: {
-        Row: {
-          created_at: string | null
-          error_message: string | null
-          id: string
-          processing_time_ms: number | null
-          request_data: Json | null
-          response_data: Json | null
-          success: boolean
-          tool_name: string
-          user_id: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          error_message?: string | null
-          id?: string
-          processing_time_ms?: number | null
-          request_data?: Json | null
-          response_data?: Json | null
-          success?: boolean
-          tool_name: string
-          user_id?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          error_message?: string | null
-          id?: string
-          processing_time_ms?: number | null
-          request_data?: Json | null
-          response_data?: Json | null
-          success?: boolean
-          tool_name?: string
-          user_id?: string | null
-        }
-        Relationships: []
       }
       orbit_users: {
         Row: {
@@ -599,13 +477,6 @@ export type Database = {
             foreignKeyName: "orders_batch_id_fkey"
             columns: ["batch_id"]
             isOneToOne: false
-            referencedRelation: "batch_processing_summary"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "orders_batch_id_fkey"
-            columns: ["batch_id"]
-            isOneToOne: false
             referencedRelation: "batches"
             referencedColumns: ["id"]
           },
@@ -693,307 +564,9 @@ export type Database = {
           },
         ]
       }
-      processing_steps: {
-        Row: {
-          batch_id: string | null
-          end_time: string | null
-          error_message: string | null
-          id: string
-          progress: number | null
-          start_time: string | null
-          status: string | null
-          step_data: Json | null
-          step_type: string
-        }
-        Insert: {
-          batch_id?: string | null
-          end_time?: string | null
-          error_message?: string | null
-          id?: string
-          progress?: number | null
-          start_time?: string | null
-          status?: string | null
-          step_data?: Json | null
-          step_type: string
-        }
-        Update: {
-          batch_id?: string | null
-          end_time?: string | null
-          error_message?: string | null
-          id?: string
-          progress?: number | null
-          start_time?: string | null
-          status?: string | null
-          step_data?: Json | null
-          step_type?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "processing_steps_batch_id_fkey"
-            columns: ["batch_id"]
-            isOneToOne: false
-            referencedRelation: "batch_processing_summary"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "processing_steps_batch_id_fkey"
-            columns: ["batch_id"]
-            isOneToOne: false
-            referencedRelation: "batches"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      service_logs: {
-        Row: {
-          action: string
-          batch_id: string | null
-          created_at: string | null
-          error_message: string | null
-          execution_time_ms: number | null
-          id: string
-          request_payload: Json | null
-          response_payload: Json | null
-          service_name: string
-          success: boolean
-          user_id: string | null
-        }
-        Insert: {
-          action: string
-          batch_id?: string | null
-          created_at?: string | null
-          error_message?: string | null
-          execution_time_ms?: number | null
-          id?: string
-          request_payload?: Json | null
-          response_payload?: Json | null
-          service_name: string
-          success: boolean
-          user_id?: string | null
-        }
-        Update: {
-          action?: string
-          batch_id?: string | null
-          created_at?: string | null
-          error_message?: string | null
-          execution_time_ms?: number | null
-          id?: string
-          request_payload?: Json | null
-          response_payload?: Json | null
-          service_name?: string
-          success?: boolean
-          user_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "service_logs_batch_id_fkey"
-            columns: ["batch_id"]
-            isOneToOne: false
-            referencedRelation: "batch_processing_summary"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "service_logs_batch_id_fkey"
-            columns: ["batch_id"]
-            isOneToOne: false
-            referencedRelation: "batches"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "service_logs_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "orbit_users"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      storage_buckets: {
-        Row: {
-          bucket_name: string
-          bucket_type: string
-          cleanup_enabled: boolean | null
-          created_at: string
-          file_count: number | null
-          id: string
-          last_cleanup_at: string | null
-          metadata: Json | null
-          retention_days: number | null
-          storage_size_bytes: number | null
-          user_id: string
-        }
-        Insert: {
-          bucket_name: string
-          bucket_type: string
-          cleanup_enabled?: boolean | null
-          created_at?: string
-          file_count?: number | null
-          id?: string
-          last_cleanup_at?: string | null
-          metadata?: Json | null
-          retention_days?: number | null
-          storage_size_bytes?: number | null
-          user_id: string
-        }
-        Update: {
-          bucket_name?: string
-          bucket_type?: string
-          cleanup_enabled?: boolean | null
-          created_at?: string
-          file_count?: number | null
-          id?: string
-          last_cleanup_at?: string | null
-          metadata?: Json | null
-          retention_days?: number | null
-          storage_size_bytes?: number | null
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "storage_buckets_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "orbit_users"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      subscriptions: {
-        Row: {
-          created_at: string | null
-          current_period_end: string | null
-          current_period_start: string | null
-          id: string
-          status: string | null
-          stripe_price_id: string | null
-          stripe_subscription_id: string | null
-          updated_at: string | null
-          user_id: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          current_period_end?: string | null
-          current_period_start?: string | null
-          id?: string
-          status?: string | null
-          stripe_price_id?: string | null
-          stripe_subscription_id?: string | null
-          updated_at?: string | null
-          user_id?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          current_period_end?: string | null
-          current_period_start?: string | null
-          id?: string
-          status?: string | null
-          stripe_price_id?: string | null
-          stripe_subscription_id?: string | null
-          updated_at?: string | null
-          user_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "subscriptions_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "orbit_users"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      workflow_events: {
-        Row: {
-          batch_id: string | null
-          created_at: string | null
-          event_data: Json | null
-          event_type: string
-          id: string
-          step_type: string | null
-          user_id: string | null
-        }
-        Insert: {
-          batch_id?: string | null
-          created_at?: string | null
-          event_data?: Json | null
-          event_type: string
-          id?: string
-          step_type?: string | null
-          user_id?: string | null
-        }
-        Update: {
-          batch_id?: string | null
-          created_at?: string | null
-          event_data?: Json | null
-          event_type?: string
-          id?: string
-          step_type?: string | null
-          user_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "workflow_events_batch_id_fkey"
-            columns: ["batch_id"]
-            isOneToOne: false
-            referencedRelation: "batch_processing_summary"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "workflow_events_batch_id_fkey"
-            columns: ["batch_id"]
-            isOneToOne: false
-            referencedRelation: "batches"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "workflow_events_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "orbit_users"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
     }
     Views: {
-      batch_processing_summary: {
-        Row: {
-          completed_at: string | null
-          completed_steps: number | null
-          created_at: string | null
-          error_count: number | null
-          id: string | null
-          image_count: number | null
-          name: string | null
-          processed_count: number | null
-          status: string | null
-          success_rate_percent: number | null
-          total_steps: number | null
-          total_time_ms: number | null
-          user_id: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "batches_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "orbit_users"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      service_health_summary: {
-        Row: {
-          avg_execution_time_ms: number | null
-          failed_calls: number | null
-          hour: string | null
-          max_execution_time_ms: number | null
-          service_name: string | null
-          successful_calls: number | null
-          total_calls: number | null
-        }
-        Relationships: []
-      }
+      [_ in never]: never
     }
     Functions: {
       calculate_tier_pricing: {
@@ -1004,63 +577,13 @@ export type Database = {
         }
         Returns: Json
       }
-      cleanup_old_rate_limits: {
-        Args: Record<PropertyKey, never>
-        Returns: number
-      }
-      emit_workflow_event: {
-        Args: {
-          p_event_type: string
-          p_batch_id: string
-          p_user_id?: string
-          p_step_type?: string
-          p_event_data?: Json
-        }
-        Returns: string
-      }
       generate_order_number: {
         Args: Record<PropertyKey, never>
         Returns: string
       }
-      get_mcp_statistics: {
-        Args: { time_window?: unknown }
-        Returns: {
-          total_requests: number
-          successful_requests: number
-          failed_requests: number
-          success_rate: number
-          avg_processing_time: number
-          most_used_tool: string
-        }[]
-      }
-      get_user_processing_stats: {
-        Args: { p_user_id: string }
-        Returns: {
-          total_batches: number
-          total_images: number
-          images_this_month: number
-          successful_images: number
-          failed_images: number
-          avg_processing_time_ms: number
-        }[]
-      }
       increment_user_stats: {
         Args: { user_id: string; images_count: number; amount: number }
         Returns: undefined
-      }
-      log_service_call: {
-        Args: {
-          p_service_name: string
-          p_action: string
-          p_user_id?: string
-          p_batch_id?: string
-          p_request_payload?: Json
-          p_response_payload?: Json
-          p_success?: boolean
-          p_error_message?: string
-          p_execution_time_ms?: number
-        }
-        Returns: string
       }
       setup_user_buckets: {
         Args: { user_id: string }
