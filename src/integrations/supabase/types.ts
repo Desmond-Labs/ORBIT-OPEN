@@ -208,6 +208,7 @@ export type Database = {
           storage_path_processed: string | null
           thumbnail_path: string | null
           tier_price_applied: number | null
+          updated_at: string | null
           user_id: string | null
         }
         Insert: {
@@ -234,6 +235,7 @@ export type Database = {
           storage_path_processed?: string | null
           thumbnail_path?: string | null
           tier_price_applied?: number | null
+          updated_at?: string | null
           user_id?: string | null
         }
         Update: {
@@ -260,6 +262,7 @@ export type Database = {
           storage_path_processed?: string | null
           thumbnail_path?: string | null
           tier_price_applied?: number | null
+          updated_at?: string | null
           user_id?: string | null
         }
         Relationships: [

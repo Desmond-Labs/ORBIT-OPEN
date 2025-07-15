@@ -17,6 +17,7 @@ import {
   ArrowLeft
 } from 'lucide-react';
 import { ProcessingStatus } from '@/hooks/useOrderProcessingStatus';
+import { useDownloadProcessedImages } from '@/hooks/useDownloadProcessedImages';
 
 interface ProcessingStatusDashboardProps {
   status: ProcessingStatus;
@@ -31,6 +32,7 @@ export const ProcessingStatusDashboard: React.FC<ProcessingStatusDashboardProps>
   onProcessMore,
   onBackToDashboard
 }) => {
+  const { downloadProcessedImages, downloading } = useDownloadProcessedImages();
   const getStatusIcon = () => {
     switch (status.orderStatus) {
       case 'completed':
@@ -171,15 +173,20 @@ export const ProcessingStatusDashboard: React.FC<ProcessingStatusDashboardProps>
 
       {/* Action Buttons */}
       <div className="space-y-3">
-        {status.orderStatus === 'completed' && onDownload && (
+        {status.orderStatus === 'completed' && (
           <Button 
             variant="default" 
             size="lg" 
             className="w-full"
-            onClick={onDownload}
+            onClick={() => downloadProcessedImages(status.orderId)}
+            disabled={downloading}
           >
-            <Download className="w-5 h-5" />
-            Download Results
+            {downloading ? (
+              <Loader2 className="w-5 h-5 animate-spin" />
+            ) : (
+              <Download className="w-5 h-5" />
+            )}
+            {downloading ? 'Preparing Download...' : 'Download Processed Images'}
           </Button>
         )}
         

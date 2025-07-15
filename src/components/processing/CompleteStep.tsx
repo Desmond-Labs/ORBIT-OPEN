@@ -1,20 +1,24 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { CheckCircle } from 'lucide-react';
+import { CheckCircle, Download, Loader2 } from 'lucide-react';
+import { useDownloadProcessedImages } from '@/hooks/useDownloadProcessedImages';
 
 interface CompleteStepProps {
   analysisType: 'product' | 'lifestyle';
   processingResults: any;
   uploadedFiles: File[];
   onProcessMore: () => void;
+  orderId?: string;
 }
 
 export const CompleteStep: React.FC<CompleteStepProps> = ({
   analysisType,
   processingResults,
   uploadedFiles,
-  onProcessMore
+  onProcessMore,
+  orderId
 }) => {
+  const { downloadProcessedImages, downloading } = useDownloadProcessedImages();
   return (
     <div className="text-center">
       <CheckCircle className="w-16 h-16 text-success mx-auto mb-4" />
@@ -48,9 +52,22 @@ export const CompleteStep: React.FC<CompleteStepProps> = ({
       )}
 
       <div className="space-y-4">
-        <Button variant="success" size="lg" className="w-full">
-          Download Analysis Results
-        </Button>
+        {orderId && (
+          <Button 
+            variant="default" 
+            size="lg" 
+            className="w-full"
+            onClick={() => downloadProcessedImages(orderId)}
+            disabled={downloading}
+          >
+            {downloading ? (
+              <Loader2 className="w-5 h-5 animate-spin" />
+            ) : (
+              <Download className="w-5 h-5" />
+            )}
+            {downloading ? 'Preparing Download...' : 'Download Processed Images'}
+          </Button>
+        )}
         <Button variant="outline" size="lg" className="w-full" onClick={onProcessMore}>
           Process More Images
         </Button>

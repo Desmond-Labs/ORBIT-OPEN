@@ -327,6 +327,7 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
                     processingResults={processingResults}
                     uploadedFiles={uploadedFiles}
                     onProcessMore={handleProcessMore}
+                    orderId={orderId}
                   />
                 )}
               </>

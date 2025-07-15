@@ -11,3 +11,9 @@ verify_jwt = true
 
 [functions.stripe-webhook]
 verify_jwt = false
+
+[functions.download-processed-images]
+verify_jwt = true
+
+[functions.upload-order-images]
+verify_jwt = true
