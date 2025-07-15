@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0/+esm";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.50.3";
+import JSZip from "https://esm.sh/jszip@3.10.1";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -7,19 +8,23 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
+  console.log(`${req.method} request to download-processed-images`);
+  
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
+    // Use ANON_KEY for consistency with other functions
     const supabaseClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+      Deno.env.get("SUPABASE_ANON_KEY") ?? ""
     );
 
-    // Get authenticated user
-    const authHeader = req.headers.get("Authorization") || req.headers.get("authorization");
+    // Get authenticated user from the Authorization header
+    const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
+      console.log("Missing authorization header");
       return new Response(JSON.stringify({ error: "Missing authorization header" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 401,
@@ -27,26 +32,29 @@ serve(async (req) => {
     }
     
     const token = authHeader.replace("Bearer ", "");
-    const { data } = await supabaseClient.auth.getUser(token);
-    const user = data.user;
-
-    if (!user) {
+    const { data: { user }, error: userError } = await supabaseClient.auth.getUser(token);
+    
+    if (userError || !user) {
+      console.log("User authentication failed:", userError);
       return new Response(JSON.stringify({ error: "User not authenticated" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 401,
       });
     }
 
+    console.log('User authenticated:', user.id);
+
     const { orderId } = await req.json();
 
     if (!orderId) {
+      console.log("Missing orderId in request body");
       return new Response(JSON.stringify({ error: "Order ID is required" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 400,
       });
     }
 
-    console.log('Processing download request for order:', orderId);
+    console.log('Processing download request for order:', orderId, 'user:', user.id);
 
     // Get order information and verify ownership
     const { data: order, error: orderError } = await supabaseClient
@@ -57,23 +65,25 @@ serve(async (req) => {
       .single();
 
     if (orderError || !order) {
-      console.error('Order not found or access denied:', orderError);
+      console.error('Order query failed:', orderError);
       return new Response(JSON.stringify({ error: "Order not found or access denied" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 404,
       });
     }
 
+    console.log('Order found:', order.order_number);
+
     // Get all processed images for this order
     const { data: images, error: imagesError } = await supabaseClient
       .from('images')
-      .select('*')
+      .select('original_filename, storage_path_processed, processing_status')
       .eq('order_id', orderId)
       .eq('processing_status', 'completed')
       .not('storage_path_processed', 'is', null);
 
     if (imagesError) {
-      console.error('Error fetching images:', imagesError);
+      console.error('Images query failed:', imagesError);
       return new Response(JSON.stringify({ error: "Error fetching processed images" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 500,
@@ -81,6 +91,7 @@ serve(async (req) => {
     }
 
     if (!images || images.length === 0) {
+      console.log('No processed images found for order:', orderId);
       return new Response(JSON.stringify({ error: "No processed images found for this order" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 404,
@@ -89,8 +100,7 @@ serve(async (req) => {
 
     console.log(`Found ${images.length} processed images for order ${orderId}`);
 
-    // Create a ZIP file containing all processed images
-    const JSZip = (await import('https://esm.sh/jszip@3.10.1')).default;
+    // Create a ZIP file using the static import
     const zip = new JSZip();
 
     // Add each processed image to the ZIP
