@@ -75,11 +75,12 @@ serve(async (req) => {
     console.log('Order found:', order.order_number);
 
     // Get all processed images for this order
+    console.log('Searching for images with processing_status in: ["completed", "complete"]');
     const { data: images, error: imagesError } = await supabaseClient
       .from('images')
       .select('original_filename, storage_path_processed, processing_status')
       .eq('order_id', orderId)
-      .eq('processing_status', 'completed')
+      .in('processing_status', ['completed', 'complete'])
       .not('storage_path_processed', 'is', null);
 
     if (imagesError) {
