@@ -15,10 +15,10 @@ serve(async (req) => {
   }
 
   try {
-    // Use ANON_KEY for consistency with other functions
+    // Use SERVICE_ROLE_KEY for database access while maintaining user auth
     const supabaseClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_ANON_KEY") ?? ""
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
     // Get authenticated user from the Authorization header
