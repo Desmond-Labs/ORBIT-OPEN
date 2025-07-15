@@ -1,57 +1,71 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0/+esm";
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
 serve(async (req) => {
-  // Handle CORS preflight requests
-  if (req.method === 'OPTIONS') {
+  if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+    const supabaseClient = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
+
+    // Get authenticated user
+    const authHeader = req.headers.get("Authorization") || req.headers.get("authorization");
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: "Missing authorization header" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 401,
+      });
+    }
+    
+    const token = authHeader.replace("Bearer ", "");
+    const { data } = await supabaseClient.auth.getUser(token);
+    const user = data.user;
+
+    if (!user) {
+      return new Response(JSON.stringify({ error: "User not authenticated" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 401,
+      });
+    }
 
     const { orderId } = await req.json();
 
     if (!orderId) {
-      return new Response(
-        JSON.stringify({ error: 'Order ID is required' }),
-        { 
-          status: 400, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      );
+      return new Response(JSON.stringify({ error: "Order ID is required" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 400,
+      });
     }
 
     console.log('Processing download request for order:', orderId);
 
-    // Get order information
-    const { data: order, error: orderError } = await supabase
+    // Get order information and verify ownership
+    const { data: order, error: orderError } = await supabaseClient
       .from('orders')
       .select('*')
       .eq('id', orderId)
+      .eq('user_id', user.id)
       .single();
 
     if (orderError || !order) {
-      console.error('Order not found:', orderError);
-      return new Response(
-        JSON.stringify({ error: 'Order not found' }),
-        { 
-          status: 404, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      );
+      console.error('Order not found or access denied:', orderError);
+      return new Response(JSON.stringify({ error: "Order not found or access denied" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 404,
+      });
     }
 
     // Get all processed images for this order
-    const { data: images, error: imagesError } = await supabase
+    const { data: images, error: imagesError } = await supabaseClient
       .from('images')
       .select('*')
       .eq('order_id', orderId)
@@ -60,23 +74,17 @@ serve(async (req) => {
 
     if (imagesError) {
       console.error('Error fetching images:', imagesError);
-      return new Response(
-        JSON.stringify({ error: 'Error fetching processed images' }),
-        { 
-          status: 500, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      );
+      return new Response(JSON.stringify({ error: "Error fetching processed images" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 500,
+      });
     }
 
     if (!images || images.length === 0) {
-      return new Response(
-        JSON.stringify({ error: 'No processed images found for this order' }),
-        { 
-          status: 404, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      );
+      return new Response(JSON.stringify({ error: "No processed images found for this order" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 404,
+      });
     }
 
     console.log(`Found ${images.length} processed images for order ${orderId}`);
@@ -91,7 +99,7 @@ serve(async (req) => {
         if (!image.storage_path_processed) continue;
 
         // Download the file from Supabase storage
-        const { data: fileData, error: downloadError } = await supabase.storage
+        const { data: fileData, error: downloadError } = await supabaseClient.storage
           .from('processed_images')
           .download(image.storage_path_processed);
 
@@ -128,7 +136,7 @@ serve(async (req) => {
       }
     };
 
-    const { error: downloadRecordError } = await supabase
+    const { error: downloadRecordError } = await supabaseClient
       .from('file_downloads')
       .insert(downloadRecord);
 
@@ -150,12 +158,9 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('Error in download-processed-images function:', error);
-    return new Response(
-      JSON.stringify({ error: 'Internal server error' }),
-      { 
-        status: 500, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
-    );
+    return new Response(JSON.stringify({ error: "Internal server error" }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 500,
+    });
   }
 });
