@@ -110,8 +110,9 @@ serve(async (req) => {
         if (!image.storage_path_processed) continue;
 
         // Download the file from Supabase storage
+        console.log(`Downloading image from orbit-images bucket: ${image.storage_path_processed}`);
         const { data: fileData, error: downloadError } = await supabaseClient.storage
-          .from('processed_images')
+          .from('orbit-images')
           .download(image.storage_path_processed);
 
         if (downloadError) {
