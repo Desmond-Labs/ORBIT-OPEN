@@ -21,38 +21,58 @@ export const useDownloadProcessedImages = () => {
     try {
       console.log('Starting download for order:', orderId);
 
-      // Call the edge function to get the ZIP file
-      const { data, error } = await supabase.functions.invoke('download-processed-images', {
-        body: { orderId }
+      // Get the auth session to get the access token
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session?.access_token) {
+        throw new Error('Not authenticated');
+      }
+
+      // Call the edge function directly to get the ZIP file
+      const response = await fetch(`https://ufdcvxmizlzlnyyqpfck.supabase.co/functions/v1/download-processed-images`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+          'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVmZGN2eG1pemx6bG55eXFwZmNrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDYyMzM1NzMsImV4cCI6MjA2MTgwOTU3M30.bpYLwFpQxq5tAw4uvRrHPi9WeFmxHnLjQaZraZqa3Bs'
+        },
+        body: JSON.stringify({ orderId })
       });
 
-      if (error) {
-        throw new Error(error.message || 'Failed to download processed images');
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Download response error:', errorText);
+        
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch {
+          errorData = { error: `HTTP ${response.status}: ${response.statusText}` };
+        }
+        
+        throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
       }
 
-      // Convert the response to a blob and trigger download
-      if (data) {
-        // Create blob URL and trigger download
-        const blob = new Blob([data], { type: 'application/zip' });
-        const url = window.URL.createObjectURL(blob);
+      // Get the response as a blob and trigger download
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      
+      // Create temporary link and click it
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `orbit-processed-images-${orderId.slice(0, 8)}.zip`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
         
-        // Create temporary link and click it
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `orbit-processed-images-${orderId.slice(0, 8)}.zip`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        
-        // Clean up the blob URL
-        window.URL.revokeObjectURL(url);
+      // Clean up the blob URL
+      window.URL.revokeObjectURL(url);
 
-        toast({
-          title: "Download Started",
-          description: "Your processed images are being downloaded as a ZIP file.",
-          variant: "default"
-        });
-      }
+      toast({
+        title: "Download Started",
+        description: "Your processed images are being downloaded as a ZIP file.",
+        variant: "default"
+      });
 
     } catch (error: any) {
       console.error('Download error:', error);
