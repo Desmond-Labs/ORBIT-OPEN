@@ -611,10 +611,6 @@ export type Database = {
         Args: { user_id: string }
         Returns: undefined
       }
-      setup_user_storage_buckets: {
-        Args: { user_id_param: string }
-        Returns: undefined
-      }
     }
     Enums: {
       [_ in never]: never
