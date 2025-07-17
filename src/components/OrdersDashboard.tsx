@@ -2,7 +2,7 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Loader2, Clock, CheckCircle, XCircle, ArrowRight, Upload } from 'lucide-react';
+import { Loader2, Clock, CheckCircle, XCircle, ArrowRight, Upload, CreditCard } from 'lucide-react';
 import { UserOrder } from '@/hooks/useAllUserOrders';
 
 interface OrdersDashboardProps {
@@ -65,9 +65,16 @@ export const OrdersDashboard: React.FC<OrdersDashboardProps> = ({
     );
   }
 
-  const activeOrders = orders.filter(order => order.orderStatus === 'processing' || order.orderStatus === 'pending');
-  const completedOrders = orders.filter(order => order.orderStatus === 'completed');
-  const failedOrders = orders.filter(order => order.orderStatus === 'failed');
+  // Filter orders by payment status as well - only show paid orders
+  const paidOrders = orders.filter(order => 
+    order.paymentStatus === 'completed' || order.paymentStatus === 'succeeded'
+  );
+  
+  const activeOrders = paidOrders.filter(order => 
+    order.orderStatus === 'processing' || order.orderStatus === 'pending'
+  );
+  const completedOrders = paidOrders.filter(order => order.orderStatus === 'completed');
+  const failedOrders = paidOrders.filter(order => order.orderStatus === 'failed');
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
@@ -92,14 +99,15 @@ export const OrdersDashboard: React.FC<OrdersDashboardProps> = ({
         </div>
 
         {/* No Orders State */}
-        {orders.length === 0 && (
+        {paidOrders.length === 0 && (
           <div className="text-center py-16">
             <div className="w-24 h-24 bg-gradient-primary rounded-full flex items-center justify-center mx-auto mb-6">
               <Upload className="w-12 h-12 text-foreground" />
             </div>
-            <h2 className="text-2xl font-bold mb-4">No orders yet</h2>
+            <h2 className="text-2xl font-bold mb-4">No completed orders yet</h2>
             <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-              Start by uploading your first batch of images to see them processed with AI analysis.
+              Start by uploading your first batch of images to see them processed with AI analysis. 
+              Only successfully paid orders will appear here.
             </p>
             <Button 
               onClick={onNewUpload}
@@ -125,7 +133,13 @@ export const OrdersDashboard: React.FC<OrdersDashboardProps> = ({
                   <CardHeader className="pb-3">
                     <div className="flex items-center justify-between">
                       <CardTitle className="text-lg">{order.orderNumber}</CardTitle>
-                      {getStatusBadge(order.orderStatus)}
+                      <div className="flex gap-2">
+                        <Badge variant="outline" className="text-green-600 bg-green-50">
+                          <CreditCard className="w-3 h-3 mr-1" />
+                          Paid
+                        </Badge>
+                        {getStatusBadge(order.orderStatus)}
+                      </div>
                     </div>
                   </CardHeader>
                   <CardContent>
@@ -177,7 +191,13 @@ export const OrdersDashboard: React.FC<OrdersDashboardProps> = ({
                   <CardHeader className="pb-3">
                     <div className="flex items-center justify-between">
                       <CardTitle className="text-lg">{order.orderNumber}</CardTitle>
-                      {getStatusBadge(order.orderStatus)}
+                      <div className="flex gap-2">
+                        <Badge variant="outline" className="text-green-600 bg-green-50">
+                          <CreditCard className="w-3 h-3 mr-1" />
+                          Paid
+                        </Badge>
+                        {getStatusBadge(order.orderStatus)}
+                      </div>
                     </div>
                   </CardHeader>
                   <CardContent>
@@ -223,7 +243,13 @@ export const OrdersDashboard: React.FC<OrdersDashboardProps> = ({
                   <CardHeader className="pb-3">
                     <div className="flex items-center justify-between">
                       <CardTitle className="text-lg">{order.orderNumber}</CardTitle>
-                      {getStatusBadge(order.orderStatus)}
+                      <div className="flex gap-2">
+                        <Badge variant="outline" className="text-green-600 bg-green-50">
+                          <CreditCard className="w-3 h-3 mr-1" />
+                          Paid
+                        </Badge>
+                        {getStatusBadge(order.orderStatus)}
+                      </div>
                     </div>
                   </CardHeader>
                   <CardContent>

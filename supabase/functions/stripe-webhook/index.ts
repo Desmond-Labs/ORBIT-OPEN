@@ -61,19 +61,23 @@ serve(async (req) => {
             console.log(`Found checkout session: ${checkoutSessionId}`);
           } else {
             console.log(`No checkout session found for payment intent: ${paymentIntent.id}`);
-            return new Response("No checkout session found", { status: 404 });
+            // Try using the payment intent ID directly as fallback
+            checkoutSessionId = paymentIntent.id;
+            console.log(`Using payment intent ID as fallback: ${checkoutSessionId}`);
           }
         } catch (sessionError) {
           console.error("Error retrieving checkout session:", sessionError);
-          return new Response("Error retrieving session", { status: 500 });
+          // Use payment intent ID as fallback
+          checkoutSessionId = paymentIntent.id;
+          console.log(`Using payment intent ID as fallback due to error: ${checkoutSessionId}`);
         }
 
-        // Check for duplicate webhook events
+        // Check for duplicate webhook events - try both session ID and payment intent ID
         const eventId = event.id;
         const { data: existingPayment } = await supabaseClient
           .from("payments")
           .select("webhook_event_ids")
-          .eq("stripe_payment_intent_id", checkoutSessionId)
+          .or(`stripe_payment_intent_id.eq.${checkoutSessionId},stripe_payment_intent_id_actual.eq.${paymentIntent.id}`)
           .single();
 
         if (existingPayment?.webhook_event_ids?.includes(eventId)) {
@@ -84,17 +88,17 @@ serve(async (req) => {
           });
         }
 
-        // Get current webhook events for proper JSONB array operations
+        // Get current webhook events for proper JSONB array operations - try both session ID and payment intent ID
         const { data: currentPayment } = await supabaseClient
           .from("payments")
           .select("stripe_webhook_events, webhook_event_ids")
-          .eq("stripe_payment_intent_id", checkoutSessionId)
+          .or(`stripe_payment_intent_id.eq.${checkoutSessionId},stripe_payment_intent_id_actual.eq.${paymentIntent.id}`)
           .single();
 
         const currentWebhookEvents = currentPayment?.stripe_webhook_events || [];
         const currentEventIds = currentPayment?.webhook_event_ids || [];
 
-        // Update payment status in database using checkout session ID
+        // Update payment status in database - try both session ID and payment intent ID
         const { error: paymentError } = await supabaseClient
           .from("payments")
           .update({
@@ -105,23 +109,23 @@ serve(async (req) => {
             webhook_event_ids: [...currentEventIds, eventId],
             last_webhook_at: new Date().toISOString()
           })
-          .eq("stripe_payment_intent_id", checkoutSessionId);
+          .or(`stripe_payment_intent_id.eq.${checkoutSessionId},stripe_payment_intent_id_actual.eq.${paymentIntent.id}`);
 
         if (paymentError) {
           console.error("Error updating payment:", paymentError);
         }
 
-        // Get current order webhook events
+        // Get current order webhook events - try both session ID and payment intent ID
         const { data: currentOrder } = await supabaseClient
           .from("orders")
           .select("webhook_events, webhook_event_ids")
-          .eq("stripe_payment_intent_id", checkoutSessionId)
+          .or(`stripe_payment_intent_id.eq.${checkoutSessionId},stripe_payment_intent_id_actual.eq.${paymentIntent.id}`)
           .single();
 
         const currentOrderEvents = currentOrder?.webhook_events || [];
         const currentOrderEventIds = currentOrder?.webhook_event_ids || [];
 
-        // Update order status using checkout session ID
+        // Update order status - try both session ID and payment intent ID
         const { data: orderData, error: orderError } = await supabaseClient
           .from("orders")
           .update({
@@ -136,7 +140,7 @@ serve(async (req) => {
             last_webhook_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
           })
-          .eq("stripe_payment_intent_id", checkoutSessionId)
+          .or(`stripe_payment_intent_id.eq.${checkoutSessionId},stripe_payment_intent_id_actual.eq.${paymentIntent.id}`)
           .select()
           .single();
 

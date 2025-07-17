@@ -13,6 +13,7 @@ export interface UserOrder {
   completedAt?: string;
   processedCount: number;
   failedCount: number;
+  paymentStatus: 'pending' | 'completed' | 'succeeded' | 'failed';
 }
 
 export const useAllUserOrders = (userId: string | null) => {
@@ -34,11 +35,12 @@ export const useAllUserOrders = (userId: string | null) => {
     setError(null);
 
     try {
-      // Fetch orders for the user
+      // Fetch orders for the user - only show orders with completed payments
       const { data: ordersData, error: ordersError } = await supabase
         .from('orders')
         .select('*')
         .eq('user_id', userId)
+        .in('payment_status', ['completed', 'succeeded'])
         .order('created_at', { ascending: false });
 
       if (ordersError) throw new Error(`Error fetching orders: ${ordersError.message}`);
@@ -72,6 +74,7 @@ export const useAllUserOrders = (userId: string | null) => {
               completedAt: order.completed_at,
               processedCount: 0,
               failedCount: 0,
+              paymentStatus: order.payment_status || 'pending',
             } as UserOrder;
           }
 
@@ -100,6 +103,7 @@ export const useAllUserOrders = (userId: string | null) => {
             completedAt: order.completed_at,
             processedCount: processedImages,
             failedCount: failedImages,
+            paymentStatus: order.payment_status || 'pending',
           } as UserOrder;
         })
       );

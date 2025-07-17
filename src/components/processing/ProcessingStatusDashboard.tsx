@@ -14,7 +14,9 @@ import {
   Image,
   Download,
   Upload,
-  ArrowLeft
+  ArrowLeft,
+  CreditCard,
+  XCircle
 } from 'lucide-react';
 import { ProcessingStatus } from '@/hooks/useOrderProcessingStatus';
 import { useDownloadProcessedImages } from '@/hooks/useDownloadProcessedImages';
@@ -33,6 +35,62 @@ export const ProcessingStatusDashboard: React.FC<ProcessingStatusDashboardProps>
   onBackToDashboard
 }) => {
   const { downloadProcessedImages, downloading } = useDownloadProcessedImages();
+  
+  // Check if payment is completed
+  const isPaymentCompleted = status.paymentStatus === 'completed' || status.paymentStatus === 'succeeded';
+  
+  // If payment is not completed, show payment pending message
+  if (!isPaymentCompleted) {
+    return (
+      <div className="space-y-6">
+        <div className="text-center">
+          <div className="flex items-center justify-center mb-4">
+            <CreditCard className="w-12 h-12 text-amber-500" />
+          </div>
+          <h3 className="text-2xl font-semibold mb-2">Payment Required</h3>
+          <p className="text-muted-foreground mb-4">
+            This order requires payment confirmation before processing can begin.
+          </p>
+          <div className="flex justify-center">
+            <Badge variant="outline" className="text-amber-600 bg-amber-50">
+              Payment {status.paymentStatus || 'pending'}
+            </Badge>
+          </div>
+        </div>
+        
+        <Card className="bg-secondary/50 p-6">
+          <h4 className="text-lg font-semibold mb-4">Order Details</h4>
+          <div className="space-y-2">
+            <div className="flex justify-between">
+              <span>Order Number:</span>
+              <span className="font-medium">{status.orderNumber}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Total Cost:</span>
+              <span className="font-medium">${status.totalCost.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Images:</span>
+              <span className="font-medium">{status.imageCount}</span>
+            </div>
+          </div>
+        </Card>
+        
+        <div className="flex justify-center">
+          {onBackToDashboard && (
+            <Button 
+              variant="outline" 
+              size="lg" 
+              onClick={onBackToDashboard}
+            >
+              <ArrowLeft className="w-5 h-5" />
+              Back to Dashboard
+            </Button>
+          )}
+        </div>
+      </div>
+    );
+  }
   const getStatusIcon = () => {
     switch (status.orderStatus) {
       case 'completed':

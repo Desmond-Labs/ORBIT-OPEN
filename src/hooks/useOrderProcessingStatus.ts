@@ -15,6 +15,7 @@ export interface ProcessingStatus {
   images: any[];
   createdAt: string;
   completedAt?: string;
+  paymentStatus: 'pending' | 'completed' | 'succeeded' | 'failed';
 }
 
 export const useOrderProcessingStatus = (orderId: string | null) => {
@@ -66,6 +67,11 @@ export const useOrderProcessingStatus = (orderId: string | null) => {
       // Calculate progress percentage
       const progressPercentage = totalImages > 0 ? Math.round((processedImages / totalImages) * 100) : 0;
 
+      // Cast payment status to the expected type
+      const paymentStatus = (['pending', 'completed', 'succeeded', 'failed'] as const).includes(order.payment_status as any) 
+        ? order.payment_status as 'pending' | 'completed' | 'succeeded' | 'failed'
+        : 'pending';
+
       setStatus({
         orderId: order.id,
         orderNumber: order.order_number,
@@ -79,6 +85,7 @@ export const useOrderProcessingStatus = (orderId: string | null) => {
         images: images || [],
         createdAt: order.created_at,
         completedAt: order.completed_at,
+        paymentStatus,
       });
 
     } catch (err: any) {
