@@ -4,13 +4,10 @@ import { supabase } from '@/integrations/supabase/client';
 interface ProcessedImage {
   id: string;
   original_filename: string;
-  thumbnail_path: string | null;
-  ai_analysis: any;
-  processing_cost: number | null;
-  processing_duration_ms: number | null;
+  storage_path_processed: string | null;
+  gemini_analysis_raw: string | null;
   processed_at: string | null;
   analysis_type: string | null;
-  storage_path_processed: string | null;
 }
 
 export const useProcessedImages = (orderId: string | null) => {
@@ -31,16 +28,13 @@ export const useProcessedImages = (orderId: string | null) => {
           .select(`
             id,
             original_filename,
-            thumbnail_path,
-            ai_analysis,
-            processing_cost,
-            processing_duration_ms,
+            storage_path_processed,
+            gemini_analysis_raw,
             processed_at,
-            analysis_type,
-            storage_path_processed
+            analysis_type
           `)
           .eq('order_id', orderId)
-          .eq('processing_status', 'completed');
+          .eq('processing_status', 'complete');
 
         if (fetchError) throw fetchError;
 
