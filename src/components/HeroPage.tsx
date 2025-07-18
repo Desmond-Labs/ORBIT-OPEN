@@ -1,22 +1,25 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { ArrowRight, Sparkles, Zap, Download } from 'lucide-react';
-
 interface HeroPageProps {
   onGetStarted: () => void;
 }
-
-export const HeroPage: React.FC<HeroPageProps> = ({ onGetStarted }) => {
-  return (
-    <div className="min-h-screen relative overflow-hidden">
+export const HeroPage: React.FC<HeroPageProps> = ({
+  onGetStarted
+}) => {
+  return <div className="min-h-screen relative overflow-hidden">
       {/* Cosmic Background */}
       <div className="star-field absolute inset-0" />
       
       {/* Orbital Rings */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="orbital-ring absolute top-1/2 left-1/2 w-96 h-96 -translate-x-1/2 -translate-y-1/2 opacity-20" />
-        <div className="orbital-ring absolute top-1/2 left-1/2 w-[600px] h-[600px] -translate-x-1/2 -translate-y-1/2 opacity-10" style={{ animationDelay: '-10s' }} />
-        <div className="orbital-ring absolute top-1/2 left-1/2 w-[800px] h-[800px] -translate-x-1/2 -translate-y-1/2 opacity-5" style={{ animationDelay: '-5s' }} />
+        <div className="orbital-ring absolute top-1/2 left-1/2 w-[600px] h-[600px] -translate-x-1/2 -translate-y-1/2 opacity-10" style={{
+        animationDelay: '-10s'
+      }} />
+        <div className="orbital-ring absolute top-1/2 left-1/2 w-[800px] h-[800px] -translate-x-1/2 -translate-y-1/2 opacity-5" style={{
+        animationDelay: '-5s'
+      }} />
       </div>
 
       {/* Header */}
@@ -72,9 +75,7 @@ export const HeroPage: React.FC<HeroPageProps> = ({ onGetStarted }) => {
                   <Zap className="w-6 h-6 text-accent" />
                 </div>
                 <h3 className="text-lg font-semibold mb-2">Lightning Fast</h3>
-                <p className="text-muted-foreground text-sm">
-                  Process hundreds of images in minutes with our optimized AI pipeline.
-                </p>
+                <p className="text-muted-foreground text-sm">Process hundreds of images in 24 hours with our optimized AI pipeline.</p>
               </div>
             </div>
 
@@ -119,12 +120,7 @@ export const HeroPage: React.FC<HeroPageProps> = ({ onGetStarted }) => {
 
           {/* CTA */}
           <div className="space-y-4">
-            <Button 
-              variant="cosmic" 
-              size="xl" 
-              onClick={onGetStarted}
-              className="font-semibold"
-            >
+            <Button variant="cosmic" size="xl" onClick={onGetStarted} className="font-semibold">
               Start Your ORBIT Analysis
               <ArrowRight className="w-5 h-5" />
             </Button>
@@ -143,6 +139,5 @@ export const HeroPage: React.FC<HeroPageProps> = ({ onGetStarted }) => {
           </p>
         </div>
       </footer>
-    </div>
-  );
+    </div>;
 };
