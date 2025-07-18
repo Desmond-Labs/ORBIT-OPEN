@@ -98,10 +98,10 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onBack, onAuthenticated }) =
           }
 
           toast({
-            title: "Success",
-            description: "Account created successfully! Please check your email to verify your account.",
+            title: "Account created successfully!",
+            description: "Please sign in with your new account credentials.",
           });
-          onAuthenticated();
+          setIsSignUp(false); // Switch to sign-in mode
         }
       } else {
         const { error } = await supabase.auth.signInWithPassword({

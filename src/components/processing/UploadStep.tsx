@@ -3,8 +3,6 @@ import { Button } from '@/components/ui/button';
 import { Upload, CreditCard } from 'lucide-react';
 
 interface UploadStepProps {
-  analysisType: 'product' | 'lifestyle';
-  onAnalysisTypeChange: (type: 'product' | 'lifestyle') => void;
   onFileUpload: (event: React.ChangeEvent<HTMLInputElement>) => void;
   uploadedFiles: File[];
   totalCost: number;
@@ -13,8 +11,6 @@ interface UploadStepProps {
 }
 
 export const UploadStep: React.FC<UploadStepProps> = ({
-  analysisType,
-  onAnalysisTypeChange,
   onFileUpload,
   uploadedFiles,
   totalCost,
@@ -25,30 +21,6 @@ export const UploadStep: React.FC<UploadStepProps> = ({
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
       {/* Upload Section */}
       <div className="lg:col-span-2">
-        {/* Analysis Type Selection */}
-        <div className="mb-6">
-          <h3 className="text-lg font-semibold mb-4">Choose Analysis Type</h3>
-          <div className="flex gap-4">
-            <Button
-              variant={analysisType === 'product' ? 'cosmic' : 'outline'}
-              onClick={() => onAnalysisTypeChange('product')}
-            >
-              Product Analysis
-            </Button>
-            <Button
-              variant={analysisType === 'lifestyle' ? 'cosmic' : 'outline'}
-              onClick={() => onAnalysisTypeChange('lifestyle')}
-            >
-              Lifestyle Analysis
-            </Button>
-          </div>
-          <p className="text-sm text-muted-foreground mt-2">
-            {analysisType === 'product' 
-              ? 'Analyze product features, materials, and market positioning'
-              : 'Analyze lifestyle context, demographics, and social dynamics'
-            }
-          </p>
-        </div>
 
         <div className="border-2 border-dashed border-accent/50 rounded-xl p-8 mb-6 hover:border-accent transition-colors">
           <Upload className="w-12 h-12 text-accent mx-auto mb-4" />
@@ -114,7 +86,7 @@ export const UploadStep: React.FC<UploadStepProps> = ({
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-sm">Analysis type:</span>
-                <span className="font-semibold capitalize">{analysisType}</span>
+                <span className="font-semibold">AI-Determined</span>
               </div>
               <div className="border-t border-accent/20 pt-3">
                 <div className="flex justify-between items-center text-lg font-bold">

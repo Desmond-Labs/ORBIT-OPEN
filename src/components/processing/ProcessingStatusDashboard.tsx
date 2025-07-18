@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { ProcessingStatus } from '@/hooks/useOrderProcessingStatus';
 import { useDownloadProcessedImages } from '@/hooks/useDownloadProcessedImages';
+import { ProcessedImageGallery } from './ProcessedImageGallery';
 
 interface ProcessingStatusDashboardProps {
   status: ProcessingStatus;
@@ -274,6 +275,13 @@ export const ProcessingStatusDashboard: React.FC<ProcessingStatusDashboardProps>
           )}
         </div>
       </div>
+
+      {/* Image Gallery for completed orders */}
+      {status.orderStatus === 'completed' && (
+        <div className="mt-8">
+          <ProcessedImageGallery orderId={status.orderId} />
+        </div>
+      )}
     </div>
   );
 };

@@ -278,8 +278,6 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
 
             {currentStep === 'upload' && (
               <UploadStep
-                analysisType={analysisType}
-                onAnalysisTypeChange={setAnalysisType}
                 onFileUpload={handleFileUpload}
                 uploadedFiles={uploadedFiles}
                 totalCost={totalCost}
@@ -323,7 +321,6 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
                   />
                 ) : (
                   <CompleteStep
-                    analysisType={analysisType}
                     processingResults={processingResults}
                     uploadedFiles={uploadedFiles}
                     onProcessMore={handleProcessMore}

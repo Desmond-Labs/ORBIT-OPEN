@@ -2,9 +2,9 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { CheckCircle, Download, Loader2 } from 'lucide-react';
 import { useDownloadProcessedImages } from '@/hooks/useDownloadProcessedImages';
+import { ProcessedImageGallery } from './ProcessedImageGallery';
 
 interface CompleteStepProps {
-  analysisType: 'product' | 'lifestyle';
   processingResults: any;
   uploadedFiles: File[];
   onProcessMore: () => void;
@@ -12,7 +12,6 @@ interface CompleteStepProps {
 }
 
 export const CompleteStep: React.FC<CompleteStepProps> = ({
-  analysisType,
   processingResults,
   uploadedFiles,
   onProcessMore,
@@ -24,7 +23,7 @@ export const CompleteStep: React.FC<CompleteStepProps> = ({
       <CheckCircle className="w-16 h-16 text-success mx-auto mb-4" />
       <h3 className="text-xl font-semibold mb-2">Processing Complete!</h3>
       <p className="text-muted-foreground mb-6">
-        Your images have been analyzed with AI-powered {analysisType} analysis
+        Your images have been analyzed with AI-powered analysis
       </p>
       
       {/* Results Summary */}
@@ -41,7 +40,7 @@ export const CompleteStep: React.FC<CompleteStepProps> = ({
             </div>
             <div>
               <span className="font-semibold">Analysis Type:</span>
-              <span className="ml-2 capitalize">{analysisType}</span>
+              <span className="ml-2">AI-Determined</span>
             </div>
             <div>
               <span className="font-semibold">Errors:</span>
@@ -72,6 +71,13 @@ export const CompleteStep: React.FC<CompleteStepProps> = ({
           Process More Images
         </Button>
       </div>
+
+      {/* Image Gallery */}
+      {orderId && (
+        <div className="mt-8">
+          <ProcessedImageGallery orderId={orderId} />
+        </div>
+      )}
     </div>
   );
 };
