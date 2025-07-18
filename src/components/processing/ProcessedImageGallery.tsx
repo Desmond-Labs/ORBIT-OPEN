@@ -46,12 +46,17 @@ const getThumbnailUrl = (storagePath: string | null): string | null => {
   if (!storagePath) return null;
   
   try {
+    // Extract bucket and path from storage path
+    const pathParts = storagePath.split('/');
+    const bucket = pathParts[0] || 'orbit-images';
+    const filePath = pathParts.slice(1).join('/');
+    
     const { data } = supabase.storage
-      .from('processed_images')
-      .getPublicUrl(storagePath, {
+      .from(bucket)
+      .getPublicUrl(filePath, {
         transform: {
-          width: 64,
-          height: 64,
+          width: 128,
+          height: 128,
           quality: 80
         }
       });
@@ -67,15 +72,95 @@ const MetadataDisplay: React.FC<MetadataDisplayProps> = ({
   geminiAnalysis, 
   analysisType 
 }) => {
-  let parsedAnalysis: GeminiAnalysis = {};
+  let analysisData: any = {};
   
   try {
     if (geminiAnalysis) {
-      parsedAnalysis = JSON.parse(geminiAnalysis);
+      analysisData = JSON.parse(geminiAnalysis);
     }
   } catch (error) {
     console.error('Error parsing gemini analysis:', error);
+    return (
+      <div className="space-y-4 p-4 bg-secondary/20 rounded-lg">
+        <div className="text-destructive">Failed to parse analysis data</div>
+        <pre className="text-xs bg-muted p-2 rounded overflow-auto">
+          {geminiAnalysis || 'No data available'}
+        </pre>
+      </div>
+    );
   }
+
+  // Handle nested structure - extract the actual metadata
+  const metadata = analysisData.metadata || analysisData;
+  const securityScan = analysisData.security_scan;
+  const integrityInfo = analysisData.integrity_info;
+
+  const renderSection = (title: string, data: any, color: string = 'text-primary') => {
+    if (!data || typeof data !== 'object') return null;
+
+    return (
+      <div className="space-y-2">
+        <h4 className={`font-medium ${color} flex items-center gap-2`}>
+          <span className="text-sm">{title}</span>
+        </h4>
+        <div className="pl-4 space-y-2 text-sm">
+          {Object.entries(data).map(([key, value]) => {
+            if (!value) return null;
+            
+            const displayKey = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+            
+            if (Array.isArray(value)) {
+              return (
+                <div key={key}>
+                  <span className="font-medium">{displayKey}:</span>
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {value.map((item: any, index: number) => (
+                      <Badge key={index} variant="outline" className="text-xs">
+                        {typeof item === 'object' ? JSON.stringify(item) : String(item)}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              );
+            } else if (typeof value === 'object' && value !== null) {
+              return (
+                <div key={key}>
+                  <span className="font-medium">{displayKey}:</span>
+                  <div className="ml-4 mt-1 space-y-1">
+                    {Object.entries(value).map(([subKey, subValue]) => (
+                      <div key={subKey}>
+                        <span className="text-xs text-muted-foreground">
+                          {subKey.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}:
+                        </span>{' '}
+                        {Array.isArray(subValue) ? (
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {subValue.map((item: any, index: number) => (
+                              <Badge key={index} variant="outline" className="text-xs">
+                                {String(item)}
+                              </Badge>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-sm">{String(subValue)}</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            } else {
+              return (
+                <div key={key}>
+                  <span className="font-medium">{displayKey}:</span>
+                  <span className="ml-2">{String(value)}</span>
+                </div>
+              );
+            }
+          })}
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="space-y-4 p-4 bg-secondary/20 rounded-lg">
@@ -87,140 +172,30 @@ const MetadataDisplay: React.FC<MetadataDisplayProps> = ({
         </div>
       )}
       
-      {parsedAnalysis.product_identification && (
+      {/* Main Analysis Metadata */}
+      {metadata && renderSection('Product Analysis', metadata, 'text-primary')}
+      
+      {/* Security Scan Results */}
+      {securityScan && renderSection('Security Scan', securityScan, 'text-green-600')}
+      
+      {/* Integrity Information */}
+      {integrityInfo && renderSection('Integrity Information', integrityInfo, 'text-blue-600')}
+      
+      {/* If no structured data, show raw content */}
+      {!metadata && !securityScan && !integrityInfo && Object.keys(analysisData).length > 0 && (
         <div className="space-y-2">
-          <div className="flex items-center gap-2">
-            <Eye className="w-4 h-4 text-primary" />
-            <h4 className="font-medium text-primary">Product Identification</h4>
-          </div>
-          <div className="pl-6 space-y-1 text-sm">
-            {parsedAnalysis.product_identification.type && (
-              <div><span className="font-medium">Type:</span> <span className="ml-2">{parsedAnalysis.product_identification.type}</span></div>
-            )}
-            {parsedAnalysis.product_identification.category && (
-              <div><span className="font-medium">Category:</span> <span className="ml-2">{parsedAnalysis.product_identification.category}</span></div>
-            )}
-            {parsedAnalysis.product_identification.design_style && (
-              <div><span className="font-medium">Design Style:</span> <span className="ml-2">{parsedAnalysis.product_identification.design_style}</span></div>
-            )}
-          </div>
+          <h4 className="font-medium text-muted-foreground">Raw Analysis Data</h4>
+          <pre className="text-xs bg-muted p-3 rounded-md overflow-auto max-h-64">
+            {JSON.stringify(analysisData, null, 2)}
+          </pre>
         </div>
       )}
-
-      {parsedAnalysis.physical_characteristics && (
-        <div className="space-y-2">
-          <div className="flex items-center gap-2">
-            <Palette className="w-4 h-4 text-accent" />
-            <h4 className="font-medium text-accent">Physical Characteristics</h4>
-          </div>
-          <div className="pl-6 space-y-2 text-sm">
-            {parsedAnalysis.physical_characteristics.colors && (
-              <div>
-                <span className="font-medium">Colors:</span>
-                <div className="flex flex-wrap gap-1 mt-1">
-                  {parsedAnalysis.physical_characteristics.colors.map((color: string, index: number) => (
-                    <Badge key={index} variant="outline" className="text-xs">{color}</Badge>
-                  ))}
-                </div>
-              </div>
-            )}
-            {parsedAnalysis.physical_characteristics.materials && (
-              <div>
-                <span className="font-medium">Materials:</span>
-                <div className="flex flex-wrap gap-1 mt-1">
-                  {parsedAnalysis.physical_characteristics.materials.map((material: string, index: number) => (
-                    <Badge key={index} variant="secondary" className="text-xs">{material}</Badge>
-                  ))}
-                </div>
-              </div>
-            )}
-            {parsedAnalysis.physical_characteristics.patterns && (
-              <div>
-                <span className="font-medium">Patterns:</span>
-                <div className="flex flex-wrap gap-1 mt-1">
-                  {parsedAnalysis.physical_characteristics.patterns.map((pattern: string, index: number) => (
-                    <Badge key={index} variant="outline" className="text-xs">{pattern}</Badge>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
+      
+      {Object.keys(analysisData).length === 0 && (
+        <div className="text-muted-foreground text-center py-4">
+          No analysis data available
         </div>
       )}
-
-      {parsedAnalysis.commercial_analysis && (
-        <div className="space-y-2">
-          <div className="flex items-center gap-2">
-            <Target className="w-4 h-4 text-green-600" />
-            <h4 className="font-medium text-green-600">Commercial Analysis</h4>
-          </div>
-          <div className="pl-6 space-y-1 text-sm">
-            {parsedAnalysis.commercial_analysis.market_positioning && (
-              <div><span className="font-medium">Market Positioning:</span> <span className="ml-2">{parsedAnalysis.commercial_analysis.market_positioning}</span></div>
-            )}
-            {parsedAnalysis.commercial_analysis.target_market && (
-              <div><span className="font-medium">Target Market:</span> <span className="ml-2">{parsedAnalysis.commercial_analysis.target_market}</span></div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {parsedAnalysis.quality_assessment && (
-        <div className="space-y-2">
-          <div className="flex items-center gap-2">
-            <Layers className="w-4 h-4 text-blue-600" />
-            <h4 className="font-medium text-blue-600">Quality Assessment</h4>
-          </div>
-          <div className="pl-6 space-y-1 text-sm">
-            {parsedAnalysis.quality_assessment.construction && (
-              <div><span className="font-medium">Construction:</span> <span className="ml-2">{parsedAnalysis.quality_assessment.construction}</span></div>
-            )}
-            {parsedAnalysis.quality_assessment.materials && (
-              <div><span className="font-medium">Materials Quality:</span> <span className="ml-2">{parsedAnalysis.quality_assessment.materials}</span></div>
-            )}
-            {parsedAnalysis.quality_assessment.finish && (
-              <div><span className="font-medium">Finish:</span> <span className="ml-2">{parsedAnalysis.quality_assessment.finish}</span></div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {parsedAnalysis.design_attributes && (
-        <div className="space-y-2">
-          <div className="flex items-center gap-2">
-            <Tag className="w-4 h-4 text-purple-600" />
-            <h4 className="font-medium text-purple-600">Design Attributes</h4>
-          </div>
-          <div className="pl-6 space-y-1 text-sm">
-            {parsedAnalysis.design_attributes.aesthetic_category && (
-              <div><span className="font-medium">Aesthetic Category:</span> <span className="ml-2">{parsedAnalysis.design_attributes.aesthetic_category}</span></div>
-            )}
-            {parsedAnalysis.design_attributes.visual_weight && (
-              <div><span className="font-medium">Visual Weight:</span> <span className="ml-2">{parsedAnalysis.design_attributes.visual_weight}</span></div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Display any other analysis fields not covered above */}
-      {Object.entries(parsedAnalysis).map(([key, value]) => {
-        if (['product_identification', 'physical_characteristics', 'commercial_analysis', 'quality_assessment', 'design_attributes'].includes(key)) return null;
-        if (!value || typeof value !== 'object') return null;
-        
-        return (
-          <div key={key} className="space-y-2">
-            <h4 className="font-medium capitalize text-muted-foreground">{key.replace(/_/g, ' ')}</h4>
-            <div className="pl-6 space-y-1 text-sm">
-              {typeof value === 'object' && Object.entries(value).map(([subKey, subValue]) => (
-                <div key={subKey}>
-                  <span className="font-medium capitalize">{subKey.replace(/_/g, ' ')}:</span>
-                  <span className="ml-2">{Array.isArray(subValue) ? subValue.join(', ') : String(subValue)}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        );
-      })}
     </div>
   );
 };
