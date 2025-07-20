@@ -1,72 +1,20 @@
+
 import React, { useState } from 'react';
-import { ChevronDown, ChevronRight, Image as ImageIcon, Palette, Tag, Target, Sparkles, Eye, Layers } from 'lucide-react';
+import { ChevronDown, ChevronRight, Image as ImageIcon, Sparkles } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useProcessedImages } from '@/hooks/useProcessedImages';
-import { supabase } from '@/integrations/supabase/client';
+import { useThumbnails } from '@/hooks/useThumbnails';
 
 interface ProcessedImageGalleryProps {
   orderId: string;
-}
-
-interface GeminiAnalysis {
-  product_identification?: {
-    type?: string;
-    category?: string;
-    design_style?: string;
-  };
-  physical_characteristics?: {
-    colors?: string[];
-    materials?: string[];
-    patterns?: string[];
-  };
-  commercial_analysis?: {
-    market_positioning?: string;
-    target_market?: string;
-  };
-  quality_assessment?: {
-    construction?: string;
-    materials?: string;
-    finish?: string;
-  };
-  design_attributes?: {
-    aesthetic_category?: string;
-    visual_weight?: string;
-  };
-  [key: string]: any;
 }
 
 interface MetadataDisplayProps {
   geminiAnalysis: string | null;
   analysisType: string | null;
 }
-
-const getThumbnailUrl = (storagePath: string | null): string | null => {
-  if (!storagePath) return null;
-  
-  try {
-    // Extract bucket and path from storage path
-    const pathParts = storagePath.split('/');
-    const bucket = pathParts[0] || 'orbit-images';
-    const filePath = pathParts.slice(1).join('/');
-    
-    const { data } = supabase.storage
-      .from(bucket)
-      .getPublicUrl(filePath, {
-        transform: {
-          width: 128,
-          height: 128,
-          quality: 80
-        }
-      });
-    
-    return data.publicUrl;
-  } catch (error) {
-    console.error('Error generating thumbnail URL:', error);
-    return null;
-  }
-};
 
 const MetadataDisplay: React.FC<MetadataDisplayProps> = ({ 
   geminiAnalysis, 
@@ -83,17 +31,12 @@ const MetadataDisplay: React.FC<MetadataDisplayProps> = ({
     return (
       <div className="space-y-4 p-4 bg-secondary/20 rounded-lg">
         <div className="text-destructive">Failed to parse analysis data</div>
-        <pre className="text-xs bg-muted p-2 rounded overflow-auto">
+        <pre className="text-xs bg-muted p-2 rounded overflow-auto max-h-64">
           {geminiAnalysis || 'No data available'}
         </pre>
       </div>
     );
   }
-
-  // Handle nested structure - extract the actual metadata
-  const metadata = analysisData.metadata || analysisData;
-  const securityScan = analysisData.security_scan;
-  const integrityInfo = analysisData.integrity_info;
 
   const renderSection = (title: string, data: any, color: string = 'text-primary') => {
     if (!data || typeof data !== 'object') return null;
@@ -173,21 +116,22 @@ const MetadataDisplay: React.FC<MetadataDisplayProps> = ({
       )}
       
       {/* Main Analysis Metadata */}
-      {metadata && renderSection('Product Analysis', metadata, 'text-primary')}
+      {analysisData.metadata && renderSection('Product Analysis', analysisData.metadata, 'text-primary')}
       
       {/* Security Scan Results */}
-      {securityScan && renderSection('Security Scan', securityScan, 'text-green-600')}
+      {analysisData.security_scan && renderSection('Security Scan', analysisData.security_scan, 'text-green-600')}
       
       {/* Integrity Information */}
-      {integrityInfo && renderSection('Integrity Information', integrityInfo, 'text-blue-600')}
+      {analysisData.integrity_info && renderSection('Integrity Information', analysisData.integrity_info, 'text-blue-600')}
       
-      {/* If no structured data, show raw content */}
-      {!metadata && !securityScan && !integrityInfo && Object.keys(analysisData).length > 0 && (
+      {/* Structural Elements */}
+      {analysisData.structural_elements && renderSection('Structural Elements', analysisData.structural_elements, 'text-purple-600')}
+      
+      {/* Handle flat structure (backward compatibility) */}
+      {!analysisData.metadata && !analysisData.security_scan && !analysisData.integrity_info && Object.keys(analysisData).length > 0 && (
         <div className="space-y-2">
-          <h4 className="font-medium text-muted-foreground">Raw Analysis Data</h4>
-          <pre className="text-xs bg-muted p-3 rounded-md overflow-auto max-h-64">
-            {JSON.stringify(analysisData, null, 2)}
-          </pre>
+          <h4 className="font-medium text-muted-foreground">Analysis Data</h4>
+          {renderSection('Details', analysisData)}
         </div>
       )}
       
@@ -202,6 +146,7 @@ const MetadataDisplay: React.FC<MetadataDisplayProps> = ({
 
 export const ProcessedImageGallery: React.FC<ProcessedImageGalleryProps> = ({ orderId }) => {
   const { images, loading, error } = useProcessedImages(orderId);
+  const { thumbnails, loading: thumbnailsLoading } = useThumbnails(images);
   const [expandedImages, setExpandedImages] = useState<Set<string>>(new Set());
 
   const toggleImageExpanded = (imageId: string) => {
@@ -255,28 +200,31 @@ export const ProcessedImageGallery: React.FC<ProcessedImageGalleryProps> = ({ or
       <div className="space-y-4">
         {images.map((image) => {
           const isExpanded = expandedImages.has(image.id);
-          const thumbnailUrl = getThumbnailUrl(image.storage_path_processed);
+          const thumbnailUrl = thumbnails[image.id];
           
           return (
             <Card key={image.id} className="p-4 bg-card/30 backdrop-blur-sm border-accent/20">
               <div className="flex items-center gap-4">
                 {/* Thumbnail */}
                 <div className="w-16 h-16 bg-secondary/50 rounded-lg flex items-center justify-center flex-shrink-0">
-                  {thumbnailUrl ? (
+                  {thumbnailsLoading ? (
+                    <div className="animate-pulse w-8 h-8 bg-muted rounded"></div>
+                  ) : thumbnailUrl ? (
                     <img 
                       src={thumbnailUrl} 
                       alt={image.original_filename}
                       className="w-full h-full object-cover rounded-lg"
                       onError={(e) => {
+                        console.error('Failed to load thumbnail:', thumbnailUrl);
                         (e.target as HTMLImageElement).style.display = 'none';
-                        const iconDiv = document.createElement('div');
-                        iconDiv.className = 'w-8 h-8 text-muted-foreground';
-                        e.currentTarget.parentElement?.appendChild(iconDiv);
+                        const iconDiv = e.currentTarget.parentElement?.querySelector('.fallback-icon');
+                        if (iconDiv) {
+                          iconDiv.classList.remove('hidden');
+                        }
                       }}
                     />
-                  ) : (
-                    <ImageIcon className="w-8 h-8 text-muted-foreground" />
-                  )}
+                  ) : null}
+                  <ImageIcon className={`w-8 h-8 text-muted-foreground fallback-icon ${thumbnailUrl ? 'hidden' : ''}`} />
                 </div>
                 
                 {/* File info */}
