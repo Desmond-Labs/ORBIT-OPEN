@@ -24,34 +24,40 @@ export const useThumbnails = (images: Array<{ id: string; storage_path_processed
         }
 
         try {
-          // Extract bucket and path from storage path
-          // Format is typically: bucket/path/to/file.jpg
-          const pathParts = image.storage_path_processed.split('/');
-          const bucket = pathParts[0] || 'orbit-images';
-          const filePath = pathParts.slice(1).join('/');
+          console.log('Processing image:', image.id, 'Path:', image.storage_path_processed);
+          
+          // Try different bucket configurations
+          const bucketsToTry = ['orbit-exports', 'processed_images', 'orbit-images'];
+          let signedUrl = null;
 
-          if (!filePath) {
-            newThumbnails[image.id] = null;
-            continue;
-          }
+          for (const bucket of bucketsToTry) {
+            try {
+              console.log(`Trying bucket: ${bucket} with path: ${image.storage_path_processed}`);
+              
+              const { data, error } = await supabase.storage
+                .from(bucket)
+                .createSignedUrl(image.storage_path_processed, 3600, {
+                  transform: {
+                    width: 128,
+                    height: 128,
+                    quality: 80
+                  }
+                });
 
-          // Create signed URL for thumbnail with transform
-          const { data, error } = await supabase.storage
-            .from(bucket)
-            .createSignedUrl(filePath, 3600, {
-              transform: {
-                width: 128,
-                height: 128,
-                quality: 80
+              if (!error && data?.signedUrl) {
+                signedUrl = data.signedUrl;
+                console.log(`Success with bucket: ${bucket}`);
+                break;
+              } else {
+                console.log(`Failed with bucket: ${bucket}`, error?.message);
               }
-            });
-
-          if (error) {
-            console.error('Error creating signed URL for thumbnail:', error);
-            newThumbnails[image.id] = null;
-          } else {
-            newThumbnails[image.id] = data.signedUrl;
+            } catch (bucketError) {
+              console.log(`Error with bucket: ${bucket}`, bucketError);
+              continue;
+            }
           }
+
+          newThumbnails[image.id] = signedUrl;
         } catch (error) {
           console.error('Error generating thumbnail for image:', image.id, error);
           newThumbnails[image.id] = null;
