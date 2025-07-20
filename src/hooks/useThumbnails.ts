@@ -15,57 +15,51 @@ export const useThumbnails = (images: Array<{ id: string; storage_path_processed
       if (!images.length) return;
 
       setLoading(true);
-      const newThumbnails: ThumbnailCache = {};
 
-      for (const image of images) {
-        if (!image.storage_path_processed) {
-          newThumbnails[image.id] = null;
-          continue;
+      try {
+        console.log('Calling get-thumbnails edge function for', images.length, 'images');
+
+        // Get the auth session to get the access token
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (!session?.access_token) {
+          console.error('Not authenticated - cannot get thumbnails');
+          setLoading(false);
+          return;
         }
 
-        try {
-          console.log('Processing image:', image.id, 'Path:', image.storage_path_processed);
-          
-          // Try different bucket configurations
-          const bucketsToTry = ['orbit-exports', 'processed_images', 'orbit-images'];
-          let signedUrl = null;
+        // Call the edge function to get thumbnails
+        const response = await fetch(`https://ufdcvxmizlzlnyyqpfck.supabase.co/functions/v1/get-thumbnails`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+            'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVmZGN2eG1pemx6bG55eXFwZmNrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDYyMzM1NzMsImV4cCI6MjA2MTgwOTU3M30.bpYLwFpQxq5tAw4uvRrHPi9WeFmxHnLjQaZraZqa3Bs'
+          },
+          body: JSON.stringify({ images })
+        });
 
-          for (const bucket of bucketsToTry) {
-            try {
-              console.log(`Trying bucket: ${bucket} with path: ${image.storage_path_processed}`);
-              
-              const { data, error } = await supabase.storage
-                .from(bucket)
-                .createSignedUrl(image.storage_path_processed, 3600, {
-                  transform: {
-                    width: 128,
-                    height: 128,
-                    quality: 80
-                  }
-                });
-
-              if (!error && data?.signedUrl) {
-                signedUrl = data.signedUrl;
-                console.log(`Success with bucket: ${bucket}`);
-                break;
-              } else {
-                console.log(`Failed with bucket: ${bucket}`, error?.message);
-              }
-            } catch (bucketError) {
-              console.log(`Error with bucket: ${bucket}`, bucketError);
-              continue;
-            }
-          }
-
-          newThumbnails[image.id] = signedUrl;
-        } catch (error) {
-          console.error('Error generating thumbnail for image:', image.id, error);
-          newThumbnails[image.id] = null;
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('Edge function response error:', errorText);
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
+
+        const { thumbnails: newThumbnails } = await response.json();
+        console.log('Received thumbnails from edge function:', Object.keys(newThumbnails).length);
+        
+        setThumbnails(newThumbnails);
+      } catch (error) {
+        console.error('Error calling get-thumbnails edge function:', error);
+        // Set empty thumbnails on error
+        const emptyThumbnails: ThumbnailCache = {};
+        images.forEach(image => {
+          emptyThumbnails[image.id] = null;
+        });
+        setThumbnails(emptyThumbnails);
+      } finally {
+        setLoading(false);
       }
-
-      setThumbnails(newThumbnails);
-      setLoading(false);
     };
 
     generateThumbnails();

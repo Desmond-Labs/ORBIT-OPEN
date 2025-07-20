@@ -1,3 +1,4 @@
+
 project_id = "ufdcvxmizlzlnyyqpfck"
 
 [functions.orbit-gemini-analysis]
@@ -16,4 +17,7 @@ verify_jwt = false
 verify_jwt = true
 
 [functions.upload-order-images]
+verify_jwt = true
+
+[functions.get-thumbnails]
 verify_jwt = true
