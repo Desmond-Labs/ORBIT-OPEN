@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -48,11 +49,19 @@ export const useOrderProcessingStatus = (orderId: string | null) => {
 
       if (imagesError) throw new Error(`Error fetching images: ${imagesError.message}`);
 
-      // Calculate processing status
+      // Calculate processing status - fix the status value to match database
       const totalImages = images?.length || 0;
-      const processedImages = images?.filter(img => img.processing_status === 'completed').length || 0;
+      const processedImages = images?.filter(img => img.processing_status === 'complete').length || 0;
       const failedImages = images?.filter(img => img.processing_status === 'failed' || img.processing_status === 'error').length || 0;
       const processingImages = images?.filter(img => img.processing_status === 'processing').length || 0;
+
+      console.log('Processing status debug:', {
+        totalImages,
+        processedImages,
+        failedImages,
+        processingImages,
+        imageStatuses: images?.map(img => ({ id: img.id, status: img.processing_status }))
+      });
 
       // Determine overall order status
       let orderStatus: ProcessingStatus['orderStatus'] = 'pending';
