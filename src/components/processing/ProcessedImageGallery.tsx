@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { ChevronDown, ChevronRight, Image as ImageIcon, Sparkles } from 'lucide-react';
 import { Card } from '@/components/ui/card';
@@ -38,7 +37,7 @@ const MetadataDisplay: React.FC<MetadataDisplayProps> = ({
     );
   }
 
-  const renderSection = (title: string, data: any, color: string = 'text-primary') => {
+  const renderSection = (title: string, data: any, color: string = 'text-primary', useBadges: boolean = true) => {
     if (!data || typeof data !== 'object') return null;
 
     return (
@@ -83,6 +82,10 @@ const MetadataDisplay: React.FC<MetadataDisplayProps> = ({
                               </Badge>
                             ))}
                           </div>
+                        ) : useBadges ? (
+                          <Badge variant="outline" className="text-xs ml-1">
+                            {String(subValue)}
+                          </Badge>
                         ) : (
                           <span className="text-sm">{String(subValue)}</span>
                         )}
@@ -95,7 +98,13 @@ const MetadataDisplay: React.FC<MetadataDisplayProps> = ({
               return (
                 <div key={key}>
                   <span className="font-medium">{displayKey}:</span>
-                  <span className="ml-2">{String(value)}</span>
+                  {useBadges ? (
+                    <Badge variant="outline" className="text-xs ml-2">
+                      {String(value)}
+                    </Badge>
+                  ) : (
+                    <span className="ml-2">{String(value)}</span>
+                  )}
                 </div>
               );
             }
@@ -115,23 +124,23 @@ const MetadataDisplay: React.FC<MetadataDisplayProps> = ({
         </div>
       )}
       
-      {/* Main Analysis Metadata */}
-      {analysisData.metadata && renderSection('Product Analysis', analysisData.metadata, 'text-primary')}
+      {/* Main Analysis Metadata - USE BADGES */}
+      {analysisData.metadata && renderSection('Product Analysis', analysisData.metadata, 'text-primary', true)}
       
-      {/* Security Scan Results */}
-      {analysisData.security_scan && renderSection('Security Scan', analysisData.security_scan, 'text-green-600')}
+      {/* Security Scan Results - NO BADGES */}
+      {analysisData.security_scan && renderSection('Security Scan', analysisData.security_scan, 'text-green-600', false)}
       
-      {/* Integrity Information */}
-      {analysisData.integrity_info && renderSection('Integrity Information', analysisData.integrity_info, 'text-blue-600')}
+      {/* Integrity Information - NO BADGES */}
+      {analysisData.integrity_info && renderSection('Integrity Information', analysisData.integrity_info, 'text-blue-600', false)}
       
-      {/* Structural Elements */}
-      {analysisData.structural_elements && renderSection('Structural Elements', analysisData.structural_elements, 'text-purple-600')}
+      {/* Structural Elements - USE BADGES */}
+      {analysisData.structural_elements && renderSection('Structural Elements', analysisData.structural_elements, 'text-purple-600', true)}
       
-      {/* Handle flat structure (backward compatibility) */}
+      {/* Handle flat structure (backward compatibility) - USE BADGES */}
       {!analysisData.metadata && !analysisData.security_scan && !analysisData.integrity_info && Object.keys(analysisData).length > 0 && (
         <div className="space-y-2">
           <h4 className="font-medium text-muted-foreground">Analysis Data</h4>
-          {renderSection('Details', analysisData)}
+          {renderSection('Details', analysisData, 'text-primary', true)}
         </div>
       )}
       
