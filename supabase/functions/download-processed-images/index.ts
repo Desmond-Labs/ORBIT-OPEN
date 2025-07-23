@@ -104,27 +104,60 @@ serve(async (req) => {
     // Create a ZIP file using the static import
     const zip = new JSZip();
 
-    // Add each processed image to the ZIP
+    // Download all processed files for each image (including .txt, .xmp, .jpg)
     for (const image of images) {
       try {
         if (!image.storage_path_processed) continue;
 
-        // Download the file from Supabase storage
-        console.log(`Downloading image from orbit-images bucket: ${image.storage_path_processed}`);
-        const { data: fileData, error: downloadError } = await supabaseClient.storage
+        // Extract folder path from storage_path_processed
+        const folderPath = image.storage_path_processed.substring(0, image.storage_path_processed.lastIndexOf('/'));
+        console.log(`Processing folder: ${folderPath} from orbit-images bucket`);
+        
+        // List all files in the processed folder
+        const { data: folderFiles, error: listError } = await supabaseClient.storage
           .from('orbit-images')
-          .download(image.storage_path_processed);
+          .list(folderPath);
 
-        if (downloadError) {
-          console.error(`Error downloading image ${image.original_filename}:`, downloadError);
+        if (listError || !folderFiles) {
+          console.error(`Failed to list files in folder ${folderPath}:`, listError);
           continue;
         }
 
-        if (fileData) {
-          // Add file to ZIP with original filename
-          const arrayBuffer = await fileData.arrayBuffer();
-          zip.file(image.original_filename, arrayBuffer);
-          console.log(`Added ${image.original_filename} to ZIP`);
+        // Filter for relevant file types and download each
+        const relevantFiles = folderFiles.filter(file => 
+          file.name.endsWith('.jpg') || 
+          file.name.endsWith('.txt') || 
+          file.name.endsWith('.xmp')
+        );
+
+        console.log(`Found ${relevantFiles.length} relevant files in ${folderPath}`);
+
+        for (const file of relevantFiles) {
+          try {
+            const filePath = `${folderPath}/${file.name}`;
+            console.log(`Downloading file: ${filePath}`);
+            
+            const { data: fileData, error: downloadError } = await supabaseClient.storage
+              .from('orbit-images')
+              .download(filePath);
+
+            if (downloadError || !fileData) {
+              console.error(`Failed to download file ${filePath}:`, downloadError);
+              continue;
+            }
+
+            const arrayBuffer = await fileData.arrayBuffer();
+            
+            // Create organized folder structure in ZIP
+            const baseFilename = image.original_filename || `image_${Date.now()}`;
+            const folderName = baseFilename.replace(/\.[^/.]+$/, ""); // Remove extension
+            const zipPath = `${folderName}/${file.name}`;
+            
+            zip.file(zipPath, arrayBuffer);
+            console.log(`Added ${zipPath} to ZIP`);
+          } catch (error) {
+            console.error(`Error processing file ${file.name}:`, error);
+          }
         }
       } catch (error) {
         console.error(`Error processing image ${image.original_filename}:`, error);

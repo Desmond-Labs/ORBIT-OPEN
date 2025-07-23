@@ -70,7 +70,7 @@ export const useDownloadProcessedImages = () => {
 
       toast({
         title: "Download Started",
-        description: "Your processed images are being downloaded as a ZIP file.",
+        description: "Your complete processed files package (images, reports, and metadata) is being downloaded as a ZIP file.",
         variant: "default"
       });
 
