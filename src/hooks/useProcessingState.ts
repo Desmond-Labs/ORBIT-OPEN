@@ -14,6 +14,7 @@ export const useProcessingState = () => {
   const [isAuthenticating, setIsAuthenticating] = useState(true);
   const [showAuthPage, setShowAuthPage] = useState(false);
   const [paymentLoading, setPaymentLoading] = useState(false);
+  const [connectingToStripe, setConnectingToStripe] = useState(false);
   const [orderId, setOrderId] = useState<string | null>(null);
   const [analysisType, setAnalysisType] = useState<'product' | 'lifestyle'>('product');
   const [processingResults, setProcessingResults] = useState<any>(null);
@@ -95,6 +96,8 @@ export const useProcessingState = () => {
     setShowAuthPage,
     paymentLoading,
     setPaymentLoading,
+    connectingToStripe,
+    setConnectingToStripe,
     orderId,
     setOrderId,
     analysisType,

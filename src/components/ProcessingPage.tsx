@@ -8,6 +8,7 @@ import { AuthPage } from './AuthPage';
 import { ProcessingSteps } from './processing/ProcessingSteps';
 import { AuthStep } from './processing/AuthStep';
 import { UploadStep } from './processing/UploadStep';
+import { StripeConnectionOverlay } from './processing/StripeConnectionOverlay';
 
 import { ProcessingStep } from './processing/ProcessingStep';
 import { CompleteStep } from './processing/CompleteStep';
@@ -48,6 +49,8 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
     processingStage,
     setProcessingStage,
   } = useProcessingState();
+
+  const [connectingToStripe, setConnectingToStripe] = React.useState(false);
 
   const { setupRealTimeSubscription } = useRealTimeOrderUpdates(
     setRealTimeOrderData,
@@ -172,7 +175,7 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
   };
 
   const handlePayment = async () => {
-    if (!user || uploadedFiles.length === 0 || paymentLoading) return;
+    if (!user || uploadedFiles.length === 0 || paymentLoading || connectingToStripe) return;
 
     setPaymentLoading(true);
     try {
@@ -197,12 +200,19 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
       // Store only the order ID (not file data) in localStorage
       localStorage.setItem('orbit_pending_order_id', paymentData.order_id);
 
-      // Redirect to Stripe Checkout
-      if (paymentData.checkout_url) {
-        window.location.href = paymentData.checkout_url;
-      } else {
-        throw new Error('No checkout URL received');
-      }
+      // Show connecting to Stripe overlay
+      setPaymentLoading(false);
+      setConnectingToStripe(true);
+
+      // Brief delay before redirecting to Stripe for better UX
+      setTimeout(() => {
+        if (paymentData.checkout_url) {
+          window.location.href = paymentData.checkout_url;
+        } else {
+          setConnectingToStripe(false);
+          throw new Error('No checkout URL received');
+        }
+      }, 1500);
 
     } catch (error: any) {
       console.error('❌ Payment error:', error);
@@ -212,6 +222,7 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
         variant: "destructive"
       });
       setPaymentLoading(false);
+      setConnectingToStripe(false);
     }
   };
 
@@ -242,6 +253,9 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
     <div className="min-h-screen relative overflow-hidden">
       {/* Cosmic Background */}
       <div className="star-field absolute inset-0" />
+
+      {/* Stripe Connection Overlay */}
+      {connectingToStripe && <StripeConnectionOverlay />}
 
       {/* Header */}
       <header className="relative z-20 px-6 py-6">
@@ -282,6 +296,7 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
                 uploadedFiles={uploadedFiles}
                 totalCost={totalCost}
                 paymentLoading={paymentLoading}
+                connectingToStripe={connectingToStripe}
                 onPayment={handlePayment}
               />
             )}

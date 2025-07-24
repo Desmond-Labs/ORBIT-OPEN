@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Upload, CreditCard } from 'lucide-react';
@@ -7,6 +8,7 @@ interface UploadStepProps {
   uploadedFiles: File[];
   totalCost: number;
   paymentLoading: boolean;
+  connectingToStripe: boolean;
   onPayment: () => void;
 }
 
@@ -15,8 +17,17 @@ export const UploadStep: React.FC<UploadStepProps> = ({
   uploadedFiles,
   totalCost,
   paymentLoading,
+  connectingToStripe,
   onPayment
 }) => {
+  const isProcessing = paymentLoading || connectingToStripe;
+  
+  const getButtonText = () => {
+    if (paymentLoading) return 'Processing...';
+    if (connectingToStripe) return 'Connecting to Stripe...';
+    return 'Pay with Stripe';
+  };
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
       {/* Upload Section */}
@@ -35,8 +46,9 @@ export const UploadStep: React.FC<UploadStepProps> = ({
             onChange={onFileUpload}
             className="hidden"
             id="file-upload"
+            disabled={isProcessing}
           />
-          <Button variant="cosmic" size="lg" className="cursor-pointer" asChild>
+          <Button variant="cosmic" size="lg" className="cursor-pointer" asChild disabled={isProcessing}>
             <label htmlFor="file-upload">
               Choose Images
             </label>
@@ -101,9 +113,9 @@ export const UploadStep: React.FC<UploadStepProps> = ({
               size="lg" 
               onClick={onPayment} 
               className="w-full"
-              disabled={paymentLoading}
+              disabled={isProcessing}
             >
-              {paymentLoading ? 'Processing...' : 'Pay with Stripe'}
+              {getButtonText()}
             </Button>
             
             <p className="text-xs text-muted-foreground text-center mt-4">
