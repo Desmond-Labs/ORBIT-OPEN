@@ -199,6 +199,42 @@ serve(async (req) => {
       })
       .eq('id', orderId);
 
+    // 7.5. Send completion email if order is successfully completed
+    if (finalStatus === 'completed') {
+      try {
+        // Get user email from orbit_users table
+        const { data: userProfile, error: userError } = await supabase
+          .from('orbit_users')
+          .select('email')
+          .eq('id', user.id)
+          .single();
+
+        if (!userError && userProfile?.email) {
+          console.log(`Sending completion email to: ${userProfile.email}`);
+          
+          const emailResult = await supabase.functions.invoke('send-order-completion-email', {
+            body: {
+              orderId: orderId,
+              userEmail: userProfile.email,
+              imageCount: successCount,
+              downloadUrl: downloadInfo ? `${Deno.env.get('FRONTEND_URL') || 'https://ufdcvxmizlzlnyyqpfck.supabase.co'}/processing?order=${orderId}&step=processing` : undefined
+            }
+          });
+
+          if (emailResult.error) {
+            console.error('Failed to send completion email:', emailResult.error);
+          } else {
+            console.log('Completion email sent successfully');
+          }
+        } else {
+          console.warn('Could not find user email for completion notification');
+        }
+      } catch (emailError) {
+        console.error('Error sending completion email:', emailError);
+        // Don't fail the entire process if email fails
+      }
+    }
+
     // 8. Create download link if successful
     let downloadInfo = null;
     if (successCount > 0) {
