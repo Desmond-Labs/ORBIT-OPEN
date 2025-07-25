@@ -38,6 +38,8 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
     setShowAuthPage,
     paymentLoading,
     setPaymentLoading,
+    connectingToStripe,
+    setConnectingToStripe,
     orderId,
     setOrderId,
     analysisType,
@@ -49,8 +51,6 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
     processingStage,
     setProcessingStage,
   } = useProcessingState();
-
-  const [connectingToStripe, setConnectingToStripe] = React.useState(false);
 
   const { setupRealTimeSubscription } = useRealTimeOrderUpdates(
     setRealTimeOrderData,
