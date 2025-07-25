@@ -56,6 +56,113 @@ const handler = async (req: Request): Promise<Response> => {
     const orderNumber = order.order_number;
     const totalCost = order.total_cost;
 
+    // Get processed images with analysis reports
+    const { data: processedImages, error: imagesError } = await supabase
+      .from('images')
+      .select('id, original_filename, storage_path_processed, gemini_analysis_raw')
+      .eq('order_id', orderId)
+      .eq('processing_status', 'complete')
+      .limit(5); // Limit to 5 images to avoid email size issues
+
+    // Fetch .txt report files from storage
+    let analysisReportsHtml = '';
+    if (processedImages && processedImages.length > 0) {
+      console.log(`Found ${processedImages.length} processed images for analysis reports`);
+      
+      const reportPromises = processedImages.map(async (image, index) => {
+        try {
+          // Construct the expected .txt file path
+          // Pattern: {timestamp}_{index}_{filename}_report.txt
+          // Storage path format: {order_id}_{user_id}/processed/
+          if (!image.storage_path_processed) return null;
+          
+          const pathParts = image.storage_path_processed.split('/');
+          if (pathParts.length < 2) return null;
+          
+          const folderPath = pathParts[0]; // e.g., "7e661994-ecbf-4d8a-943c-f7511e824798_7e55b358-63be-4d24-9cc7-c90cff52b0c6"
+          const filename = pathParts[1];
+          const baseFilename = filename.split('.')[0]; // Remove extension
+          
+          // Try to find the corresponding .txt report file
+          // Pattern: {timestamp}_{index}_{baseFilename}_report.txt
+          const reportFilePath = `${folderPath}/processed/`;
+          
+          // List files in the processed folder to find the matching report
+          const { data: files, error: listError } = await supabase.storage
+            .from('processed_images')
+            .list(reportFilePath);
+          
+          if (listError || !files) {
+            console.warn(`Could not list files in ${reportFilePath}:`, listError);
+            return null;
+          }
+          
+          // Find the .txt file that contains the base filename
+          const reportFile = files.find(file => 
+            file.name.endsWith('_report.txt') && 
+            file.name.includes(baseFilename)
+          );
+          
+          if (!reportFile) {
+            console.warn(`No report file found for ${baseFilename}`);
+            return null;
+          }
+          
+          // Download the .txt file content
+          const { data: fileData, error: downloadError } = await supabase.storage
+            .from('processed_images')
+            .download(`${reportFilePath}${reportFile.name}`);
+          
+          if (downloadError || !fileData) {
+            console.warn(`Could not download ${reportFile.name}:`, downloadError);
+            return null;
+          }
+          
+          const reportContent = await fileData.text();
+          
+          return {
+            filename: image.original_filename,
+            content: reportContent,
+            index: index + 1
+          };
+        } catch (error) {
+          console.warn(`Error processing report for ${image.original_filename}:`, error);
+          return null;
+        }
+      });
+      
+      const reports = await Promise.all(reportPromises);
+      const validReports = reports.filter(report => report !== null);
+      
+      if (validReports.length > 0) {
+        analysisReportsHtml = `
+          <!-- Analysis Reports Section -->
+          <div style="background: white; border-radius: 8px; padding: 24px; margin: 24px 0; border: 1px solid #e2e8f0;">
+            <h3 style="margin-top: 0; color: #475569; font-size: 18px;">📊 AI Analysis Reports</h3>
+            <p style="color: #64748b; margin-bottom: 20px;">Detailed analysis for each processed image:</p>
+            
+            ${validReports.map(report => `
+              <div style="border: 1px solid #e2e8f0; border-radius: 6px; padding: 16px; margin-bottom: 16px; background: #f8fafc;">
+                <h4 style="margin-top: 0; margin-bottom: 12px; color: #334155; font-size: 14px; font-weight: 600;">
+                  ${report.index}. ${report.filename}
+                </h4>
+                <div style="background: white; border-radius: 4px; padding: 12px; font-family: monospace; font-size: 12px; line-height: 1.4; color: #475569; max-height: 200px; overflow-y: auto; border: 1px solid #e2e8f0;">
+                  ${report.content.replace(/\n/g, '<br>').substring(0, 1000)}${report.content.length > 1000 ? '...<br><em>[Content truncated for email]</em>' : ''}
+                </div>
+              </div>
+            `).join('')}
+            
+            ${validReports.length < processedImages.length ? `
+              <p style="color: #64748b; font-size: 12px; font-style: italic;">
+                Note: Showing ${validReports.length} of ${processedImages.length} analysis reports. 
+                Download your files to view all reports.
+              </p>
+            ` : ''}
+          </div>
+        `;
+      }
+    }
+
     const emailResponse = await resend.emails.send({
       from: "ORBIT <noreply@resend.dev>",
       to: [userEmail],
@@ -112,6 +219,8 @@ const handler = async (req: Request): Promise<Response> => {
                 </tr>
               </table>
             </div>
+
+            ${analysisReportsHtml}
 
             ${downloadUrl ? `
             <!-- Download Button -->
