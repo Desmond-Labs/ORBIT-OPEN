@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { ArrowLeft, Loader2 } from 'lucide-react';
@@ -255,7 +256,7 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
       // Store only the order ID in localStorage
       localStorage.setItem('orbit_pending_order_id', paymentData.order_id);
 
-      // Phase 4: Connecting to Stripe
+      // Phase 4: Connecting to Stripe - Navigate to payment waiting page
       console.log('🔗 Phase 4: Connecting to Stripe');
       setPaymentPhase('connecting-stripe');
       setCheckoutUrl(paymentData.checkout_url);
@@ -263,11 +264,19 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
       
       console.log('🎯 Checkout URL received:', paymentData.checkout_url);
       
-      // Immediate redirect without artificial delay
+      // Store payment data in localStorage for the payment waiting page
       if (paymentData.checkout_url && !redirectAttempted) {
-        console.log('🚀 Redirecting to Stripe checkout now');
+        console.log('🚀 Storing payment data and navigating to payment waiting page');
         setRedirectAttempted(true);
-        window.location.href = paymentData.checkout_url;
+        
+        // Store data for the payment waiting page
+        localStorage.setItem('orbit-checkout-url', paymentData.checkout_url);
+        localStorage.setItem('orbit-total-cost', totalCost.toString());
+        localStorage.setItem('orbit-file-count', uploadedFiles.length.toString());
+        localStorage.setItem('orbit-order-id', paymentData.order_id);
+        
+        // Navigate to payment waiting page
+        window.location.href = `/payment-waiting?checkoutUrl=${encodeURIComponent(paymentData.checkout_url)}&totalCost=${totalCost}&fileCount=${uploadedFiles.length}&orderId=${paymentData.order_id}`;
       } else {
         console.error('❌ No checkout URL available for redirect');
         setPaymentError('Failed to get checkout URL. Please try again.');
