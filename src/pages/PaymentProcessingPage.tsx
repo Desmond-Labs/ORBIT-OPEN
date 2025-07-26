@@ -75,13 +75,13 @@ export default function PaymentProcessingPage() {
       const fileData = await Promise.all(
         uploadedFiles.map((file, index) => {
           setUploadProgress({ current: index + 1, total: uploadedFiles.length });
-          return new Promise<{ name: string; content: string; type: string }>((resolve) => {
+          return new Promise<{ name: string; data: string; type: string }>((resolve) => {
             const reader = new FileReader();
             reader.onload = () => {
               const base64 = reader.result as string;
               resolve({
                 name: file.name,
-                content: base64.split(',')[1],
+                data: base64.split(',')[1],
                 type: file.type
               });
             };
