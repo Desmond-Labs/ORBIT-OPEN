@@ -260,7 +260,7 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
       
       console.log('🎯 Checkout URL received:', paymentData.checkout_url);
       
-      // Attempt immediate redirect with small delay to show connecting phase
+      // Attempt immediate redirect with delay to show connecting phase
       setTimeout(() => {
         if (paymentData.checkout_url) {
           console.log('🚀 Redirecting to Stripe checkout now');
@@ -268,7 +268,7 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
         } else {
           console.error('❌ No checkout URL available for redirect');
         }
-      }, 800);
+      }, 2000);
 
     } catch (error: any) {
       console.error('❌ Payment error:', error);
