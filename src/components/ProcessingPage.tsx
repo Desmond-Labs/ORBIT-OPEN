@@ -8,7 +8,7 @@ import { AuthPage } from './AuthPage';
 import { ProcessingSteps } from './processing/ProcessingSteps';
 import { AuthStep } from './processing/AuthStep';
 import { UploadStep } from './processing/UploadStep';
-import { StripeConnectionOverlay } from './processing/StripeConnectionOverlay';
+import { PaymentProgressOverlay } from './processing/PaymentProgressOverlay';
 
 import { ProcessingStep } from './processing/ProcessingStep';
 import { CompleteStep } from './processing/CompleteStep';
@@ -50,6 +50,12 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
     setRealTimeOrderData,
     processingStage,
     setProcessingStage,
+    paymentPhase,
+    setPaymentPhase,
+    uploadProgress,
+    setUploadProgress,
+    paymentError,
+    setPaymentError,
   } = useProcessingState();
 
   const { setupRealTimeSubscription } = useRealTimeOrderUpdates(
@@ -136,15 +142,18 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
   const uploadFilesToStorage = async (orderId: string) => {
     try {
       console.log('📤 Uploading files to storage for order:', orderId);
+      setPaymentPhase('uploading');
+      setUploadProgress({ current: 0, total: uploadedFiles.length });
       
       // Convert files to the format expected by upload-order-images
       const filesData = await Promise.all(
-        uploadedFiles.map(async (file) => {
+        uploadedFiles.map(async (file, index) => {
           return new Promise<{name: string, data: string, type: string}>((resolve, reject) => {
             const reader = new FileReader();
             reader.onload = () => {
               const base64 = reader.result as string;
               const data = base64.split(',')[1]; // Remove data:image/jpeg;base64, prefix
+              setUploadProgress(prev => ({ ...prev, current: index + 1 }));
               resolve({
                 name: file.name,
                 data,
@@ -175,13 +184,20 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
   };
 
   const handlePayment = async () => {
-    if (!user || uploadedFiles.length === 0 || paymentLoading || connectingToStripe) return;
+    if (!user || uploadedFiles.length === 0 || paymentPhase) return;
 
-    setPaymentLoading(true);
+    // Clear any previous errors
+    setPaymentError(null);
+    
     try {
       console.log('🚀 Starting payment process with', uploadedFiles.length, 'files');
       
-      // Create checkout session first
+      // Phase 1: Preparing order
+      setPaymentPhase('preparing');
+      await new Promise(resolve => setTimeout(resolve, 1500)); // Minimum display time
+      
+      // Phase 2: Create checkout session
+      setPaymentPhase('creating-order');
       const { data: paymentData, error: paymentError } = await supabase.functions.invoke('create-payment-intent', {
         body: {
           imageCount: uploadedFiles.length,
@@ -194,36 +210,39 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
       console.log('💳 Order created:', paymentData.order_id);
       setOrderId(paymentData.order_id);
       
-      // Upload files immediately to storage (before payment)
+      // Phase 3: Upload files to storage
       await uploadFilesToStorage(paymentData.order_id);
       
       // Store only the order ID (not file data) in localStorage
       localStorage.setItem('orbit_pending_order_id', paymentData.order_id);
 
-      // Show connecting to Stripe overlay
-      setPaymentLoading(false);
-      setConnectingToStripe(true);
+      // Phase 4: Connecting to Stripe
+      setPaymentPhase('connecting-stripe');
+      await new Promise(resolve => setTimeout(resolve, 2000)); // Minimum display time
 
-      // Brief delay before redirecting to Stripe for better UX
-      setTimeout(() => {
-        if (paymentData.checkout_url) {
-          window.location.href = paymentData.checkout_url;
-        } else {
-          setConnectingToStripe(false);
-          throw new Error('No checkout URL received');
-        }
-      }, 3000);
+      // Redirect to Stripe
+      if (paymentData.checkout_url) {
+        window.location.href = paymentData.checkout_url;
+      } else {
+        throw new Error('No checkout URL received');
+      }
 
     } catch (error: any) {
       console.error('❌ Payment error:', error);
-      toast({
-        title: "Payment Failed",
-        description: error.message || "There was an error processing your payment. Please try again.",
-        variant: "destructive"
-      });
-      setPaymentLoading(false);
-      setConnectingToStripe(false);
+      setPaymentError(error.message || "There was an error processing your payment. Please try again.");
     }
+  };
+
+  const handlePaymentRetry = () => {
+    setPaymentError(null);
+    setPaymentPhase(null);
+    handlePayment();
+  };
+
+  const handlePaymentCancel = () => {
+    setPaymentError(null);
+    setPaymentPhase(null);
+    setUploadProgress({ current: 0, total: 0 });
   };
 
   const handleProcessMore = () => {
@@ -254,8 +273,16 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
       {/* Cosmic Background */}
       <div className="star-field absolute inset-0" />
 
-      {/* Stripe Connection Overlay */}
-      {connectingToStripe && <StripeConnectionOverlay />}
+      {/* Payment Progress Overlay */}
+      {paymentPhase && (
+        <PaymentProgressOverlay 
+          phase={paymentPhase}
+          uploadProgress={uploadProgress}
+          error={paymentError}
+          onRetry={handlePaymentRetry}
+          onCancel={handlePaymentCancel}
+        />
+      )}
 
       {/* Header */}
       <header className="relative z-20 px-6 py-6">
@@ -295,8 +322,7 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
                 onFileUpload={handleFileUpload}
                 uploadedFiles={uploadedFiles}
                 totalCost={totalCost}
-                paymentLoading={paymentLoading}
-                connectingToStripe={connectingToStripe}
+                isProcessing={!!paymentPhase}
                 onPayment={handlePayment}
               />
             )}

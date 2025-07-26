@@ -7,8 +7,7 @@ interface UploadStepProps {
   onFileUpload: (event: React.ChangeEvent<HTMLInputElement>) => void;
   uploadedFiles: File[];
   totalCost: number;
-  paymentLoading: boolean;
-  connectingToStripe: boolean;
+  isProcessing: boolean;
   onPayment: () => void;
 }
 
@@ -16,15 +15,11 @@ export const UploadStep: React.FC<UploadStepProps> = ({
   onFileUpload,
   uploadedFiles,
   totalCost,
-  paymentLoading,
-  connectingToStripe,
+  isProcessing,
   onPayment
 }) => {
-  const isProcessing = paymentLoading || connectingToStripe;
-  
   const getButtonText = () => {
-    if (paymentLoading) return 'Processing...';
-    if (connectingToStripe) return 'Connecting to Stripe...';
+    if (isProcessing) return 'Processing Payment...';
     return 'Pay with Stripe';
   };
 

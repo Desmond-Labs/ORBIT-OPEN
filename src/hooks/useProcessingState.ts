@@ -21,6 +21,11 @@ export const useProcessingState = () => {
   const [uploadingFiles, setUploadingFiles] = useState(false);
   const [realTimeOrderData, setRealTimeOrderData] = useState<any>(null);
   const [processingStage, setProcessingStage] = useState<string>('pending');
+  
+  // Progressive payment states
+  const [paymentPhase, setPaymentPhase] = useState<'preparing' | 'uploading' | 'creating-order' | 'connecting-stripe' | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<{current: number, total: number}>({current: 0, total: 0});
+  const [paymentError, setPaymentError] = useState<string | null>(null);
 
   // Check authentication status on component mount
   useEffect(() => {
@@ -110,5 +115,11 @@ export const useProcessingState = () => {
     setRealTimeOrderData,
     processingStage,
     setProcessingStage,
+    paymentPhase,
+    setPaymentPhase,
+    uploadProgress,
+    setUploadProgress,
+    paymentError,
+    setPaymentError,
   };
 };
