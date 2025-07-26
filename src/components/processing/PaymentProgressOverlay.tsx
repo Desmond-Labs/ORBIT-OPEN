@@ -4,9 +4,8 @@ import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 
 interface PaymentProgressOverlayProps {
-  phase: 'processing' | 'uploading' | 'payment-ready' | 'redirecting' | 'payment-fallback';
+  phase: 'preparing' | 'uploading' | 'creating-order' | 'connecting-stripe' | 'connecting-stripe-fallback';
   uploadProgress?: { current: number; total: number };
-  operationStatus?: string;
   error?: string | null;
   checkoutUrl?: string;
   onRetry?: () => void;
@@ -16,7 +15,6 @@ interface PaymentProgressOverlayProps {
 export const PaymentProgressOverlay: React.FC<PaymentProgressOverlayProps> = ({
   phase,
   uploadProgress,
-  operationStatus,
   error,
   checkoutUrl,
   onRetry,
@@ -24,11 +22,11 @@ export const PaymentProgressOverlay: React.FC<PaymentProgressOverlayProps> = ({
 }) => {
   const getPhaseConfig = () => {
     switch (phase) {
-      case 'processing':
+      case 'preparing':
         return {
           icon: Settings,
-          title: 'Processing Order',
-          description: operationStatus || 'Setting up your payment...',
+          title: 'Preparing Your Order',
+          description: 'Setting up your image processing request...',
           showProgress: false
         };
       case 'uploading':
@@ -38,25 +36,25 @@ export const PaymentProgressOverlay: React.FC<PaymentProgressOverlayProps> = ({
           description: `Uploading ${uploadProgress?.current || 0} of ${uploadProgress?.total || 0} images...`,
           showProgress: true
         };
-      case 'payment-ready':
+      case 'creating-order':
         return {
           icon: CreditCard,
-          title: 'Payment Ready',
-          description: 'Opening secure payment window...',
+          title: 'Creating Payment',
+          description: 'Setting up your payment with Stripe...',
           showProgress: false
         };
-      case 'redirecting':
+      case 'connecting-stripe':
         return {
           icon: CreditCard,
-          title: 'Redirecting to Payment',
-          description: 'Taking you to Stripe checkout...',
+          title: 'Connecting to Stripe',
+          description: 'Redirecting you to secure payment processing...',
           showProgress: false
         };
-      case 'payment-fallback':
+      case 'connecting-stripe-fallback':
         return {
           icon: CreditCard,
-          title: 'Complete Payment',
-          description: 'Click below to open the payment window if it didn\'t open automatically.',
+          title: 'Payment Window',
+          description: 'If the payment window didn\'t open automatically, click the button below to continue.',
           showProgress: false
         };
     }
@@ -103,7 +101,7 @@ export const PaymentProgressOverlay: React.FC<PaymentProgressOverlayProps> = ({
       <div className="bg-card/90 backdrop-blur-sm border border-accent/20 rounded-xl p-8 max-w-md mx-4 text-center">
         <div className="mb-6">
           <Icon className="w-16 h-16 text-accent mx-auto mb-4" />
-          {phase !== 'payment-fallback' && (
+          {phase !== 'connecting-stripe-fallback' && (
             <Loader2 className="w-8 h-8 text-accent mx-auto animate-spin mb-4" />
           )}
         </div>
@@ -122,7 +120,7 @@ export const PaymentProgressOverlay: React.FC<PaymentProgressOverlayProps> = ({
           </div>
         )}
 
-        {phase === 'payment-fallback' && checkoutUrl && (
+        {phase === 'connecting-stripe-fallback' && checkoutUrl && (
           <div className="mb-4">
             <Button 
               onClick={() => window.open(checkoutUrl, '_blank')}
@@ -135,7 +133,7 @@ export const PaymentProgressOverlay: React.FC<PaymentProgressOverlayProps> = ({
           </div>
         )}
         
-        {phase !== 'payment-fallback' && phase !== 'redirecting' && (
+        {phase !== 'connecting-stripe-fallback' && (
           <div className="flex items-center justify-center space-x-2 text-sm text-muted-foreground">
             <div className="w-2 h-2 bg-accent rounded-full animate-bounce" />
             <div className="w-2 h-2 bg-accent rounded-full animate-bounce" style={{ animationDelay: '0.1s' }} />
@@ -143,7 +141,7 @@ export const PaymentProgressOverlay: React.FC<PaymentProgressOverlayProps> = ({
           </div>
         )}
 
-        {onCancel && phase !== 'redirecting' && phase !== 'payment-fallback' && (
+        {onCancel && phase !== 'connecting-stripe' && phase !== 'connecting-stripe-fallback' && (
           <Button 
             onClick={onCancel} 
             variant="ghost" 

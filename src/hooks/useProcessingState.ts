@@ -22,14 +22,14 @@ export const useProcessingState = () => {
   const [realTimeOrderData, setRealTimeOrderData] = useState<any>(null);
   const [processingStage, setProcessingStage] = useState<string>('pending');
   
-  // Streamlined payment states
-  const [paymentPhase, setPaymentPhase] = useState<'processing' | 'uploading' | 'payment-ready' | 'redirecting' | 'payment-fallback' | null>(null);
+  // Progressive payment states
+  const [paymentPhase, setPaymentPhase] = useState<'preparing' | 'uploading' | 'creating-order' | 'connecting-stripe' | 'connecting-stripe-fallback' | null>(null);
   const [uploadProgress, setUploadProgress] = useState<{current: number, total: number}>({current: 0, total: 0});
-  const [operationStatus, setOperationStatus] = useState<string>('');
   const [paymentError, setPaymentError] = useState<string | null>(null);
   const [checkoutUrl, setCheckoutUrl] = useState<string | null>(null);
   
-  // Payment flow control
+  // State locking for minimum display times
+  const [phaseLocked, setPhaseLocked] = useState(false);
   const [lastPaymentAttempt, setLastPaymentAttempt] = useState<number>(0);
 
   // Comprehensive state cleanup function
@@ -37,25 +37,26 @@ export const useProcessingState = () => {
     console.log('🧹 Resetting payment state for fresh attempt');
     setPaymentPhase(null);
     setUploadProgress({current: 0, total: 0});
-    setOperationStatus('');
     setPaymentError(null);
     setCheckoutUrl(null);
     setPaymentLoading(false);
     setConnectingToStripe(false);
     setUploadingFiles(false);
+    setPhaseLocked(false);
   };
 
-  // Status updater for operations
-  const updateOperationStatus = (status: string) => {
-    console.log('📊 Operation status:', status);
-    setOperationStatus(status);
+  // Calculate file size-aware timing
+  const calculatePhaseDuration = (files: File[], baseMs: number): number => {
+    const totalSizeMB = files.reduce((sum, file) => sum + file.size, 0) / (1024 * 1024);
+    const multiplier = totalSizeMB < 2 ? 1.5 : totalSizeMB < 10 ? 1.2 : 1.0;
+    return Math.max(baseMs * multiplier, 2000); // Minimum 2 seconds
   };
 
   // Debounced payment handler
   const canInitiatePayment = () => {
     const now = Date.now();
     const timeSinceLastAttempt = now - lastPaymentAttempt;
-    return !paymentLoading && timeSinceLastAttempt > 1000; // Prevent double-clicks
+    return !paymentLoading && !phaseLocked && timeSinceLastAttempt > 500;
   };
 
   // Check authentication status on component mount
@@ -150,16 +151,16 @@ export const useProcessingState = () => {
     setPaymentPhase,
     uploadProgress,
     setUploadProgress,
-    operationStatus,
-    setOperationStatus,
     paymentError,
     setPaymentError,
     checkoutUrl,
     setCheckoutUrl,
-    // Helper functions
+    // New helper functions
     resetPaymentState,
-    updateOperationStatus,
+    calculatePhaseDuration,
     canInitiatePayment,
+    phaseLocked,
+    setPhaseLocked,
     setLastPaymentAttempt,
   };
 };

@@ -54,16 +54,16 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
     setPaymentPhase,
     uploadProgress,
     setUploadProgress,
-    operationStatus,
-    setOperationStatus,
     paymentError,
     setPaymentError,
     checkoutUrl,
     setCheckoutUrl,
-    // Helper functions
+    // New helper functions
     resetPaymentState,
-    updateOperationStatus,
+    calculatePhaseDuration,
     canInitiatePayment,
+    phaseLocked,
+    setPhaseLocked,
     setLastPaymentAttempt,
   } = useProcessingState();
 
@@ -150,20 +150,24 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
 
   const uploadFilesToStorage = async (orderId: string) => {
     try {
-      console.log('📤 Starting file upload for order:', orderId);
+      console.log('📤 Uploading files to storage for order:', orderId);
       setPaymentPhase('uploading');
       setUploadProgress({ current: 0, total: uploadedFiles.length });
       
-      // Convert files to base64 with progress tracking
+      // Convert files to the format expected by upload-order-images
       const filesData = await Promise.all(
         uploadedFiles.map(async (file, index) => {
           return new Promise<{name: string, data: string, type: string}>((resolve, reject) => {
             const reader = new FileReader();
             reader.onload = () => {
               const base64 = reader.result as string;
-              const data = base64.split(',')[1];
+              const data = base64.split(',')[1]; // Remove data:image/jpeg;base64, prefix
               setUploadProgress(prev => ({ ...prev, current: index + 1 }));
-              resolve({ name: file.name, data, type: file.type });
+              resolve({
+                name: file.name,
+                data,
+                type: file.type
+              });
             };
             reader.onerror = reject;
             reader.readAsDataURL(file);
@@ -171,13 +175,16 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
         })
       );
 
-      // Upload to storage
       const { data, error } = await supabase.functions.invoke('upload-order-images', {
-        body: { orderId, files: filesData }
+        body: {
+          orderId: orderId,
+          files: filesData
+        }
       });
 
       if (error) throw error;
-      console.log('✅ Files uploaded successfully');
+      
+      console.log('✅ Files uploaded successfully:', data);
       return data;
     } catch (error) {
       console.error('❌ File upload failed:', error);
@@ -186,83 +193,89 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
   };
 
   const handlePayment = async () => {
-    // Prevent double-clicks and ensure prerequisites
+    // Debouncing check - prevent multiple rapid clicks
     if (!canInitiatePayment() || !user || uploadedFiles.length === 0) {
       console.log('🚫 Payment blocked:', { canInitiate: canInitiatePayment(), user: !!user, files: uploadedFiles.length });
       return;
     }
 
-    // Reset state and prevent rapid successive calls
+    // Reset all payment state for fresh attempt
     resetPaymentState();
     setLastPaymentAttempt(Date.now());
-    setPaymentLoading(true);
     
     try {
-      console.log('🚀 Starting streamlined payment process:', uploadedFiles.length, 'files');
+      console.log('🚀 Starting payment process with', uploadedFiles.length, 'files, total size:', 
+        (uploadedFiles.reduce((sum, f) => sum + f.size, 0) / (1024 * 1024)).toFixed(1) + 'MB');
       
-      // Step 1: Initialize processing
-      setPaymentPhase('processing');
-      updateOperationStatus('Creating payment session...');
+      // Phase 1: Preparing order with file-size-aware timing
+      setPhaseLocked(true);
+      setPaymentPhase('preparing');
+      const preparingDuration = calculatePhaseDuration(uploadedFiles, 2000);
+      console.log('⏱️ Preparing phase duration:', preparingDuration + 'ms');
+      await new Promise(resolve => setTimeout(resolve, preparingDuration));
       
-      // Step 2: Create payment intent and upload files in parallel
-      const [paymentResult, ] = await Promise.all([
-        // Create payment session
-        supabase.functions.invoke('create-payment-intent', {
-          body: {
-            imageCount: uploadedFiles.length,
-            batchName: `Batch ${new Date().toISOString()}`
-          }
-        }),
-        // Start file upload process (will be completed after payment session is ready)
-        Promise.resolve() // Placeholder for now, will upload after getting order ID
-      ]);
+      // Phase 2: Create checkout session
+      setPaymentPhase('creating-order');
+      const creatingDuration = calculatePhaseDuration(uploadedFiles, 1500);
+      
+      const { data: paymentData, error: paymentError } = await supabase.functions.invoke('create-payment-intent', {
+        body: {
+          imageCount: uploadedFiles.length,
+          batchName: `Batch ${new Date().toISOString()}`
+        }
+      });
 
-      if (paymentResult.error) throw paymentResult.error;
+      if (paymentError) throw paymentError;
 
-      const { data: paymentData } = paymentResult;
-      console.log('💳 Payment session created for order:', paymentData.order_id);
+      // Ensure minimum display time for creating phase
+      await new Promise(resolve => setTimeout(resolve, creatingDuration));
+
+      console.log('💳 Order created:', paymentData.order_id);
       setOrderId(paymentData.order_id);
       
-      // Step 3: Upload files to storage
-      updateOperationStatus('Uploading images...');
+      // Phase 3: Upload files to storage
       await uploadFilesToStorage(paymentData.order_id);
       
-      // Store order ID for recovery
+      // Store only the order ID (not file data) in localStorage
       localStorage.setItem('orbit_pending_order_id', paymentData.order_id);
 
-      // Step 4: Prepare for Stripe redirect
-      setPaymentPhase('payment-ready');
+      // Phase 4: Connecting to Stripe with enhanced timing
+      setPaymentPhase('connecting-stripe');
       setCheckoutUrl(paymentData.checkout_url);
-      updateOperationStatus('Payment ready');
       
-      // Small delay to show status, then redirect
+      const stripeDuration = calculatePhaseDuration(uploadedFiles, 3000);
+      console.log('⏱️ Stripe connection phase duration:', stripeDuration + 'ms');
+      
+      // Extended display time for stripe connection
       setTimeout(() => {
-        setPaymentPhase('redirecting');
-        window.open(paymentData.checkout_url, '_blank');
-        
-        // Show fallback after short delay
-        setTimeout(() => {
-          setPaymentPhase('payment-fallback');
-        }, 2000);
-      }, 1000);
+        setPaymentPhase('connecting-stripe-fallback');
+      }, stripeDuration);
+
+      // Attempt automatic redirect after minimum display
+      setTimeout(() => {
+        if (paymentData.checkout_url) {
+          console.log('🔗 Redirecting to Stripe checkout');
+          window.location.href = paymentData.checkout_url;
+        }
+      }, Math.min(stripeDuration / 3, 1500));
 
     } catch (error: any) {
       console.error('❌ Payment error:', error);
-      setPaymentError(error.message || "Payment processing failed. Please try again.");
+      setPaymentError(error.message || "There was an error processing your payment. Please try again.");
     } finally {
-      setPaymentLoading(false);
+      setPhaseLocked(false);
     }
   };
 
   const handlePaymentRetry = () => {
-    console.log('🔄 Retrying payment');
-    resetPaymentState();
+    console.log('🔄 Payment retry initiated');
+    resetPaymentState(); // Use comprehensive cleanup
     handlePayment();
   };
 
   const handlePaymentCancel = () => {
     console.log('❌ Payment cancelled');
-    resetPaymentState();
+    resetPaymentState(); // Use comprehensive cleanup
   };
 
   const handleProcessMore = () => {
@@ -298,7 +311,6 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
         <PaymentProgressOverlay 
           phase={paymentPhase}
           uploadProgress={uploadProgress}
-          operationStatus={operationStatus}
           error={paymentError}
           checkoutUrl={checkoutUrl}
           onRetry={handlePaymentRetry}
