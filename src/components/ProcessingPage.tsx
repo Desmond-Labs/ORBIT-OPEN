@@ -212,7 +212,7 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
           setConnectingToStripe(false);
           throw new Error('No checkout URL received');
         }
-      }, 1500);
+      }, 3000);
 
     } catch (error: any) {
       console.error('❌ Payment error:', error);
