@@ -9,6 +9,7 @@ interface UploadStepProps {
   totalCost: number;
   isProcessing: boolean;
   onPayment: () => void;
+  canInitiatePayment?: boolean;
 }
 
 export const UploadStep: React.FC<UploadStepProps> = ({
@@ -16,7 +17,8 @@ export const UploadStep: React.FC<UploadStepProps> = ({
   uploadedFiles,
   totalCost,
   isProcessing,
-  onPayment
+  onPayment,
+  canInitiatePayment = true
 }) => {
   const getButtonText = () => {
     if (isProcessing) return 'Processing Payment...';
@@ -108,7 +110,7 @@ export const UploadStep: React.FC<UploadStepProps> = ({
               size="lg" 
               onClick={onPayment} 
               className="w-full"
-              disabled={isProcessing}
+              disabled={isProcessing || !canInitiatePayment}
             >
               {getButtonText()}
             </Button>

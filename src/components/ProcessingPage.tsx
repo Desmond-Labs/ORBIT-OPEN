@@ -58,6 +58,13 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
     setPaymentError,
     checkoutUrl,
     setCheckoutUrl,
+    // New helper functions
+    resetPaymentState,
+    calculatePhaseDuration,
+    canInitiatePayment,
+    phaseLocked,
+    setPhaseLocked,
+    setLastPaymentAttempt,
   } = useProcessingState();
 
   const { setupRealTimeSubscription } = useRealTimeOrderUpdates(
@@ -186,20 +193,31 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
   };
 
   const handlePayment = async () => {
-    if (!user || uploadedFiles.length === 0 || paymentPhase) return;
+    // Debouncing check - prevent multiple rapid clicks
+    if (!canInitiatePayment() || !user || uploadedFiles.length === 0) {
+      console.log('🚫 Payment blocked:', { canInitiate: canInitiatePayment(), user: !!user, files: uploadedFiles.length });
+      return;
+    }
 
-    // Clear any previous errors
-    setPaymentError(null);
+    // Reset all payment state for fresh attempt
+    resetPaymentState();
+    setLastPaymentAttempt(Date.now());
     
     try {
-      console.log('🚀 Starting payment process with', uploadedFiles.length, 'files');
+      console.log('🚀 Starting payment process with', uploadedFiles.length, 'files, total size:', 
+        (uploadedFiles.reduce((sum, f) => sum + f.size, 0) / (1024 * 1024)).toFixed(1) + 'MB');
       
-      // Phase 1: Preparing order
+      // Phase 1: Preparing order with file-size-aware timing
+      setPhaseLocked(true);
       setPaymentPhase('preparing');
-      await new Promise(resolve => setTimeout(resolve, 1500)); // Minimum display time
+      const preparingDuration = calculatePhaseDuration(uploadedFiles, 2000);
+      console.log('⏱️ Preparing phase duration:', preparingDuration + 'ms');
+      await new Promise(resolve => setTimeout(resolve, preparingDuration));
       
       // Phase 2: Create checkout session
       setPaymentPhase('creating-order');
+      const creatingDuration = calculatePhaseDuration(uploadedFiles, 1500);
+      
       const { data: paymentData, error: paymentError } = await supabase.functions.invoke('create-payment-intent', {
         body: {
           imageCount: uploadedFiles.length,
@@ -208,6 +226,9 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
       });
 
       if (paymentError) throw paymentError;
+
+      // Ensure minimum display time for creating phase
+      await new Promise(resolve => setTimeout(resolve, creatingDuration));
 
       console.log('💳 Order created:', paymentData.order_id);
       setOrderId(paymentData.order_id);
@@ -218,38 +239,43 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
       // Store only the order ID (not file data) in localStorage
       localStorage.setItem('orbit_pending_order_id', paymentData.order_id);
 
-      // Phase 4: Connecting to Stripe
+      // Phase 4: Connecting to Stripe with enhanced timing
       setPaymentPhase('connecting-stripe');
       setCheckoutUrl(paymentData.checkout_url);
+      
+      const stripeDuration = calculatePhaseDuration(uploadedFiles, 3000);
+      console.log('⏱️ Stripe connection phase duration:', stripeDuration + 'ms');
       
       // Extended display time for stripe connection
       setTimeout(() => {
         setPaymentPhase('connecting-stripe-fallback');
-      }, 3000);
+      }, stripeDuration);
 
-      // Attempt automatic redirect
+      // Attempt automatic redirect after minimum display
       setTimeout(() => {
         if (paymentData.checkout_url) {
+          console.log('🔗 Redirecting to Stripe checkout');
           window.location.href = paymentData.checkout_url;
         }
-      }, 1000);
+      }, Math.min(stripeDuration / 3, 1500));
 
     } catch (error: any) {
       console.error('❌ Payment error:', error);
       setPaymentError(error.message || "There was an error processing your payment. Please try again.");
+    } finally {
+      setPhaseLocked(false);
     }
   };
 
   const handlePaymentRetry = () => {
-    setPaymentError(null);
-    setPaymentPhase(null);
+    console.log('🔄 Payment retry initiated');
+    resetPaymentState(); // Use comprehensive cleanup
     handlePayment();
   };
 
   const handlePaymentCancel = () => {
-    setPaymentError(null);
-    setPaymentPhase(null);
-    setUploadProgress({ current: 0, total: 0 });
+    console.log('❌ Payment cancelled');
+    resetPaymentState(); // Use comprehensive cleanup
   };
 
   const handleProcessMore = () => {
@@ -332,6 +358,7 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
                 totalCost={totalCost}
                 isProcessing={!!paymentPhase}
                 onPayment={handlePayment}
+                canInitiatePayment={canInitiatePayment()}
               />
             )}
 
