@@ -56,6 +56,8 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
     setUploadProgress,
     paymentError,
     setPaymentError,
+    checkoutUrl,
+    setCheckoutUrl,
   } = useProcessingState();
 
   const { setupRealTimeSubscription } = useRealTimeOrderUpdates(
@@ -218,14 +220,19 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
 
       // Phase 4: Connecting to Stripe
       setPaymentPhase('connecting-stripe');
-      await new Promise(resolve => setTimeout(resolve, 2000)); // Minimum display time
+      setCheckoutUrl(paymentData.checkout_url);
+      
+      // Extended display time for stripe connection
+      setTimeout(() => {
+        setPaymentPhase('connecting-stripe-fallback');
+      }, 8000);
 
-      // Redirect to Stripe
-      if (paymentData.checkout_url) {
-        window.location.href = paymentData.checkout_url;
-      } else {
-        throw new Error('No checkout URL received');
-      }
+      // Attempt automatic redirect
+      setTimeout(() => {
+        if (paymentData.checkout_url) {
+          window.location.href = paymentData.checkout_url;
+        }
+      }, 2000);
 
     } catch (error: any) {
       console.error('❌ Payment error:', error);
@@ -279,6 +286,7 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
           phase={paymentPhase}
           uploadProgress={uploadProgress}
           error={paymentError}
+          checkoutUrl={checkoutUrl}
           onRetry={handlePaymentRetry}
           onCancel={handlePaymentCancel}
         />

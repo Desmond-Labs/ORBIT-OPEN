@@ -4,9 +4,10 @@ import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 
 interface PaymentProgressOverlayProps {
-  phase: 'preparing' | 'uploading' | 'creating-order' | 'connecting-stripe';
+  phase: 'preparing' | 'uploading' | 'creating-order' | 'connecting-stripe' | 'connecting-stripe-fallback';
   uploadProgress?: { current: number; total: number };
   error?: string | null;
+  checkoutUrl?: string;
   onRetry?: () => void;
   onCancel?: () => void;
 }
@@ -15,6 +16,7 @@ export const PaymentProgressOverlay: React.FC<PaymentProgressOverlayProps> = ({
   phase,
   uploadProgress,
   error,
+  checkoutUrl,
   onRetry,
   onCancel
 }) => {
@@ -46,6 +48,13 @@ export const PaymentProgressOverlay: React.FC<PaymentProgressOverlayProps> = ({
           icon: CreditCard,
           title: 'Connecting to Stripe',
           description: 'Redirecting you to secure payment processing...',
+          showProgress: false
+        };
+      case 'connecting-stripe-fallback':
+        return {
+          icon: CreditCard,
+          title: 'Payment Window',
+          description: 'If the payment window didn\'t open automatically, click the button below to continue.',
           showProgress: false
         };
     }
@@ -92,7 +101,9 @@ export const PaymentProgressOverlay: React.FC<PaymentProgressOverlayProps> = ({
       <div className="bg-card/90 backdrop-blur-sm border border-accent/20 rounded-xl p-8 max-w-md mx-4 text-center">
         <div className="mb-6">
           <Icon className="w-16 h-16 text-accent mx-auto mb-4" />
-          <Loader2 className="w-8 h-8 text-accent mx-auto animate-spin mb-4" />
+          {phase !== 'connecting-stripe-fallback' && (
+            <Loader2 className="w-8 h-8 text-accent mx-auto animate-spin mb-4" />
+          )}
         </div>
         
         <h3 className="text-xl font-semibold mb-2">{config.title}</h3>
@@ -108,14 +119,29 @@ export const PaymentProgressOverlay: React.FC<PaymentProgressOverlayProps> = ({
             </p>
           </div>
         )}
-        
-        <div className="flex items-center justify-center space-x-2 text-sm text-muted-foreground">
-          <div className="w-2 h-2 bg-accent rounded-full animate-bounce" />
-          <div className="w-2 h-2 bg-accent rounded-full animate-bounce" style={{ animationDelay: '0.1s' }} />
-          <div className="w-2 h-2 bg-accent rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
-        </div>
 
-        {onCancel && phase !== 'connecting-stripe' && (
+        {phase === 'connecting-stripe-fallback' && checkoutUrl && (
+          <div className="mb-4">
+            <Button 
+              onClick={() => window.open(checkoutUrl, '_blank')}
+              variant="cosmic" 
+              size="lg" 
+              className="w-full"
+            >
+              Open Payment Window
+            </Button>
+          </div>
+        )}
+        
+        {phase !== 'connecting-stripe-fallback' && (
+          <div className="flex items-center justify-center space-x-2 text-sm text-muted-foreground">
+            <div className="w-2 h-2 bg-accent rounded-full animate-bounce" />
+            <div className="w-2 h-2 bg-accent rounded-full animate-bounce" style={{ animationDelay: '0.1s' }} />
+            <div className="w-2 h-2 bg-accent rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
+          </div>
+        )}
+
+        {onCancel && phase !== 'connecting-stripe' && phase !== 'connecting-stripe-fallback' && (
           <Button 
             onClick={onCancel} 
             variant="ghost" 
