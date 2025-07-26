@@ -268,7 +268,7 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
         } else {
           console.error('❌ No checkout URL available for redirect');
         }
-      }, 2000);
+      }, 50);
 
     } catch (error: any) {
       console.error('❌ Payment error:', error);
