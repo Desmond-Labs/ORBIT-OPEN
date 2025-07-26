@@ -248,13 +248,35 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
       console.log('✅ Payment intent created successfully:', paymentData);
       setOrderId(paymentData.order_id);
       
-      // Phase 3: Upload files to storage
-      console.log('📤 Phase 3: Uploading files');
-      setOperationStatus('Uploading files...');
-      await uploadFilesToStorage(paymentData.order_id);
+      // Phase 3: Prepare files for upload after payment (optimized approach)
+      console.log('📤 Phase 3: Preparing files for post-payment upload');
+      setOperationStatus('Preparing files...');
+      setPaymentPhase('uploading');
       
-      // Store only the order ID in localStorage
+      // Store files data in localStorage for upload after payment
+      const filesData = await Promise.all(
+        uploadedFiles.map(async (file) => {
+          return new Promise<{name: string, data: string, type: string, size: number}>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => {
+              const base64 = reader.result as string;
+              const data = base64.split(',')[1]; // Remove data:image/jpeg;base64, prefix
+              resolve({
+                name: file.name,
+                data,
+                type: file.type,
+                size: file.size
+              });
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+          });
+        })
+      );
+
+      // Store order ID and file data in localStorage
       localStorage.setItem('orbit_pending_order_id', paymentData.order_id);
+      localStorage.setItem('orbit_pending_files', JSON.stringify(filesData));
 
       // Phase 4: Connecting to Stripe - Navigate to payment waiting page
       console.log('🔗 Phase 4: Connecting to Stripe');
@@ -277,6 +299,9 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
         
         // Navigate to payment waiting page
         window.location.href = `/payment-waiting?checkoutUrl=${encodeURIComponent(paymentData.checkout_url)}&totalCost=${totalCost}&fileCount=${uploadedFiles.length}&orderId=${paymentData.order_id}`;
+      } else if (paymentData.checkout_url) {
+        // Fallback to direct Stripe redirect if payment waiting page not available
+        window.location.href = paymentData.checkout_url;
       } else {
         console.error('❌ No checkout URL available for redirect');
         setPaymentError('Failed to get checkout URL. Please try again.');

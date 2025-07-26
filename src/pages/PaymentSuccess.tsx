@@ -104,24 +104,59 @@ const PaymentSuccess: React.FC = () => {
 
   const handleFileUploadAfterPayment = async (order: any) => {
     try {
-      // Files are already uploaded during the payment process
-      console.log('✅ Files were already uploaded during payment process for order:', order.id);
+      console.log('📤 Starting file upload after successful payment for order:', order.id);
       
-      // Just clean up localStorage
+      // Retrieve stored files from localStorage
+      const storedFiles = localStorage.getItem('orbit_pending_files');
+      if (!storedFiles) {
+        console.log('⚠️ No files found in localStorage, files may have been uploaded already');
+        localStorage.removeItem('orbit_pending_order_id');
+        toast({
+          title: "Order Complete!",
+          description: "Your images are ready for processing",
+          variant: "default"
+        });
+        return;
+      }
+
+      const filesData = JSON.parse(storedFiles);
+      console.log(`📋 Found ${filesData.length} files to upload`);
+
+      // Upload files to storage using existing function logic
+      const { data, error } = await supabase.functions.invoke('upload-order-images', {
+        body: {
+          orderId: order.id,
+          files: filesData.map((file: any) => ({
+            name: file.name,
+            data: file.data,
+            type: file.type
+          }))
+        }
+      });
+
+      if (error) {
+        console.error('❌ File upload failed:', error);
+        throw new Error(`File upload failed: ${error.message}`);
+      }
+      
+      console.log('✅ Files uploaded successfully:', data);
+      
+      // Clean up localStorage after successful upload
       localStorage.removeItem('orbit_pending_order_id');
+      localStorage.removeItem('orbit_pending_files');
       
       // Show success message
       toast({
         title: "Order Complete!",
-        description: "Your images are ready for processing",
+        description: "Your images have been uploaded and are ready for processing",
         variant: "default"
       });
 
     } catch (error: any) {
       console.error('Order completion error:', error);
       toast({
-        title: "Order Processing Error",
-        description: "There was an error with your order. Please contact support.",
+        title: "File Upload Error",
+        description: error.message || "There was an error uploading your files. Please contact support.",
         variant: "destructive"
       });
     }
