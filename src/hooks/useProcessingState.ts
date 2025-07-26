@@ -32,8 +32,9 @@ export const useProcessingState = () => {
   // State locking for minimum display times
   const [phaseLocked, setPhaseLocked] = useState(false);
   const [lastPaymentAttempt, setLastPaymentAttempt] = useState<number>(0);
+  const [redirectAttempted, setRedirectAttempted] = useState(false);
 
-  // Comprehensive state cleanup function
+  // Comprehensive state cleanup function - only for explicit user actions
   const resetPaymentState = () => {
     console.log('🧹 Resetting payment state for fresh attempt');
     setPaymentPhase(null);
@@ -44,6 +45,14 @@ export const useProcessingState = () => {
     setPaymentLoading(false);
     setConnectingToStripe(false);
     setUploadingFiles(false);
+    setRedirectAttempted(false);
+  };
+
+  // Limited reset for redirect preservation
+  const resetPaymentStateForRetry = () => {
+    console.log('🔄 Resetting payment state while preserving redirect state');
+    setPaymentError(null);
+    setOperationStatus('');
   };
 
   // Calculate file size-aware timing
@@ -160,10 +169,13 @@ export const useProcessingState = () => {
     setOperationStatus,
     // New helper functions
     resetPaymentState,
+    resetPaymentStateForRetry,
     calculatePhaseDuration,
     canInitiatePayment,
     phaseLocked,
     setPhaseLocked,
     setLastPaymentAttempt,
+    redirectAttempted,
+    setRedirectAttempted,
   };
 };

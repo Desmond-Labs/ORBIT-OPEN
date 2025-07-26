@@ -62,11 +62,14 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
     setOperationStatus,
     // New helper functions
     resetPaymentState,
+    resetPaymentStateForRetry,
     calculatePhaseDuration,
     canInitiatePayment,
     phaseLocked,
     setPhaseLocked,
     setLastPaymentAttempt,
+    redirectAttempted,
+    setRedirectAttempted,
   } = useProcessingState();
 
   const { setupRealTimeSubscription } = useRealTimeOrderUpdates(
@@ -260,31 +263,35 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
       
       console.log('🎯 Checkout URL received:', paymentData.checkout_url);
       
-      // Attempt immediate redirect with delay to show connecting phase
-      setTimeout(() => {
-        if (paymentData.checkout_url) {
-          console.log('🚀 Redirecting to Stripe checkout now');
-          window.location.href = paymentData.checkout_url;
-        } else {
-          console.error('❌ No checkout URL available for redirect');
-        }
-      }, 0);
+      // Immediate redirect without artificial delay
+      if (paymentData.checkout_url && !redirectAttempted) {
+        console.log('🚀 Redirecting to Stripe checkout now');
+        setRedirectAttempted(true);
+        window.location.href = paymentData.checkout_url;
+      } else {
+        console.error('❌ No checkout URL available for redirect');
+        setPaymentError('Failed to get checkout URL. Please try again.');
+      }
 
     } catch (error: any) {
       console.error('❌ Payment error:', error);
-      setPaymentError(error.message || "There was an error processing your payment. Please try again.");
+      // Only reset payment state on explicit errors, not during redirect
+      if (!redirectAttempted) {
+        setPaymentError(error.message || "There was an error processing your payment. Please try again.");
+      }
     }
   };
 
   const handlePaymentRetry = () => {
     console.log('🔄 Payment retry initiated');
-    resetPaymentState(); // Use comprehensive cleanup
+    resetPaymentState(); // Full reset for explicit retry
     handlePayment();
   };
 
   const handlePaymentCancel = () => {
-    console.log('❌ Payment cancelled');
-    resetPaymentState(); // Use comprehensive cleanup
+    console.log('❌ Payment cancelled by user');
+    resetPaymentState(); // Full reset for explicit cancel
+    setCurrentStep('upload'); // Return to upload step
   };
 
   const handleProcessMore = () => {
