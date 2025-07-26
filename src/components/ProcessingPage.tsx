@@ -4,11 +4,11 @@ import { Card } from '@/components/ui/card';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { useNavigate } from 'react-router-dom';
 import { AuthPage } from './AuthPage';
 import { ProcessingSteps } from './processing/ProcessingSteps';
 import { AuthStep } from './processing/AuthStep';
 import { UploadStep } from './processing/UploadStep';
+import { PaymentProcessingPage } from './processing/PaymentProcessingPage';
 
 import { ProcessingStep } from './processing/ProcessingStep';
 import { CompleteStep } from './processing/CompleteStep';
@@ -23,7 +23,6 @@ interface ProcessingPageProps {
 }
 
 export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
-  const navigate = useNavigate();
   const {
     currentStep,
     setCurrentStep,
@@ -205,26 +204,82 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
   };
 
   const handlePayment = async () => {
-    if (!user || uploadedFiles.length === 0) {
-      console.log('❌ Cannot initiate payment: no user or files');
+    // Debouncing check - prevent multiple rapid clicks
+    if (!canInitiatePayment() || !user || uploadedFiles.length === 0) {
+      console.log('🚫 Payment blocked:', { canInitiate: canInitiatePayment(), user: !!user, files: uploadedFiles.length });
       return;
     }
 
-    console.log('🚀 Starting payment process - navigating to payment page...');
+    // Reset all payment state for fresh attempt
+    resetPaymentState();
+    setLastPaymentAttempt(Date.now());
     
-    // Store payment data for the payment processing page
-    const paymentData = {
-      uploadedFiles,
-      totalCost
-    };
-    
-    localStorage.setItem('paymentData', JSON.stringify(paymentData));
-    
-    // Navigate to dedicated payment processing page
-    navigate('/payment-processing', { 
-      state: { paymentData },
-      replace: true 
-    });
+    try {
+      console.log('🚀 Starting payment process with', uploadedFiles.length, 'files');
+      
+      // Phase 1: Preparing order (start immediately)
+      console.log('📝 Phase 1: Preparing order');
+      setPaymentPhase('preparing');
+      setOperationStatus('Authenticating user...');
+      
+      // Small delay to show the preparing phase
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Phase 2: Create checkout session
+      console.log('💳 Phase 2: Creating payment intent');
+      setOperationStatus('Calculating pricing...');
+      setPaymentPhase('creating-order');
+      setOperationStatus('Setting up Stripe payment...');
+      
+      console.log('🔄 Calling create-payment-intent function');
+      const { data: paymentData, error: paymentError } = await supabase.functions.invoke('create-payment-intent', {
+        body: {
+          imageCount: uploadedFiles.length,
+          batchName: `Batch ${new Date().toISOString()}`
+        }
+      });
+
+      if (paymentError) {
+        console.error('💥 Payment error:', paymentError);
+        throw paymentError;
+      }
+
+      console.log('✅ Payment intent created successfully:', paymentData);
+      setOrderId(paymentData.order_id);
+      
+      // Phase 3: Upload files to storage
+      console.log('📤 Phase 3: Uploading files');
+      setOperationStatus('Uploading files...');
+      await uploadFilesToStorage(paymentData.order_id);
+      
+      // Store only the order ID in localStorage
+      localStorage.setItem('orbit_pending_order_id', paymentData.order_id);
+
+      // Phase 4: Connecting to Stripe
+      console.log('🔗 Phase 4: Connecting to Stripe');
+      setPaymentPhase('connecting-stripe');
+      setCheckoutUrl(paymentData.checkout_url);
+      setOperationStatus('');
+      
+      console.log('🎯 Checkout URL received:', paymentData.checkout_url);
+      
+      // Immediate redirect without artificial delay
+      if (paymentData.checkout_url && !redirectAttempted) {
+        console.log('🚀 Redirecting to Stripe checkout now');
+        setRedirectAttempted(true);
+        window.location.href = paymentData.checkout_url;
+      } else {
+        console.error('❌ No checkout URL available for redirect');
+        setPaymentError('Failed to get checkout URL. Please try again.');
+      }
+
+    } catch (error: any) {
+      console.error('❌ Payment error:', error);
+      // Only reset payment state on explicit errors, not during redirect
+      if (!redirectAttempted) {
+        setPaymentError(error.message || "There was an error processing your payment. Please try again.");
+      }
+    }
   };
 
   const handlePaymentRetry = () => {
@@ -302,14 +357,30 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
             )}
 
             {currentStep === 'upload' && (
-              <UploadStep
-                onFileUpload={handleFileUpload}
-                uploadedFiles={uploadedFiles}
-                totalCost={totalCost}
-                isProcessing={false}
-                onPayment={handlePayment}
-                canInitiatePayment={canInitiatePayment()}
-              />
+              <>
+                {paymentPhase ? (
+                  <PaymentProcessingPage
+                    uploadedFiles={uploadedFiles}
+                    totalCost={totalCost}
+                    phase={paymentPhase}
+                    uploadProgress={uploadProgress}
+                    error={paymentError}
+                    checkoutUrl={checkoutUrl}
+                    operationStatus={operationStatus}
+                    onRetry={handlePaymentRetry}
+                    onCancel={handlePaymentCancel}
+                  />
+                ) : (
+                  <UploadStep
+                    onFileUpload={handleFileUpload}
+                    uploadedFiles={uploadedFiles}
+                    totalCost={totalCost}
+                    isProcessing={!!paymentPhase}
+                    onPayment={handlePayment}
+                    canInitiatePayment={canInitiatePayment()}
+                  />
+                )}
+              </>
             )}
 
             {currentStep === 'processing' && (
