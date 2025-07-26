@@ -232,7 +232,7 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
         if (paymentData.checkout_url) {
           window.location.href = paymentData.checkout_url;
         }
-      }, 4000);
+      }, 8000);
 
     } catch (error: any) {
       console.error('❌ Payment error:', error);
