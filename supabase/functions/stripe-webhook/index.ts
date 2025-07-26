@@ -2,49 +2,24 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://cdn.skypack.dev/stripe@13.11.0?dts";
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0/+esm";
 
-// Security-enhanced CORS headers
-const getAllowedOrigin = (requestOrigin: string | null) => {
-  const allowedOrigins = [
-    "https://orbit-image-forge.lovable.app",
-    "https://preview--orbit-image-forge.lovable.app"
-  ];
-  return allowedOrigins.includes(requestOrigin || '') ? requestOrigin : allowedOrigins[0];
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, stripe-signature",
 };
 
-const getCorsHeaders = (requestOrigin: string | null) => ({
-  "Access-Control-Allow-Origin": getAllowedOrigin(requestOrigin),
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, stripe-signature",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "X-Content-Type-Options": "nosniff",
-  "X-Frame-Options": "DENY",
-  "Referrer-Policy": "strict-origin-when-cross-origin",
-});
-
 serve(async (req) => {
-  const corsHeaders = getCorsHeaders(req.headers.get("origin"));
-  
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    // Enhanced environment variable validation
-    const stripeSecretKey = Deno.env.get("STRIPE_SECRET_KEY");
-    const supabaseUrl = Deno.env.get("SUPABASE_URL");
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    
-    if (!stripeSecretKey || !supabaseUrl || !supabaseServiceKey) {
-      console.error("Missing required environment variables");
-      return new Response("Server configuration error", { status: 500 });
-    }
-
-    const stripe = new Stripe(stripeSecretKey, {
+    const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
       apiVersion: "2023-10-16",
     });
 
     const supabaseClient = createClient(
-      supabaseUrl,
-      supabaseServiceKey,
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
       { auth: { persistSession: false } }
     );
 
@@ -176,19 +151,17 @@ serve(async (req) => {
 
         console.log(`Order updated for session: ${checkoutSessionId}, Order ID: ${orderData.id}`);
 
-        // Trigger AI image processing with enhanced security
+        // Trigger AI image processing
         try {
           console.log(`Starting image processing for order: ${orderData.id}`);
           
           const processingResponse = await fetch(
-            `${supabaseUrl}/functions/v1/process-image-batch`,
+            `${Deno.env.get('SUPABASE_URL')}/functions/v1/process-image-batch`,
             {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${supabaseServiceKey}`,
-                'x-webhook-source': 'stripe-webhook',
-                'User-Agent': 'Supabase-Edge-Function/Stripe-Webhook'
+                'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
               },
               body: JSON.stringify({
                 orderId: orderData.id,

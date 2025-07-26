@@ -1,23 +1,10 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0/+esm";
 
-// Security-enhanced CORS headers
-const getAllowedOrigin = (requestOrigin: string | null) => {
-  const allowedOrigins = [
-    "https://orbit-image-forge.lovable.app",
-    "https://preview--orbit-image-forge.lovable.app"
-  ];
-  return allowedOrigins.includes(requestOrigin || '') ? requestOrigin : allowedOrigins[0];
-};
-
-const getCorsHeaders = (requestOrigin: string | null) => ({
-  "Access-Control-Allow-Origin": getAllowedOrigin(requestOrigin),
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "X-Content-Type-Options": "nosniff",
-  "X-Frame-Options": "DENY", 
-  "Referrer-Policy": "strict-origin-when-cross-origin",
-});
+};
 
 interface UploadRequest {
   orderId: string;
@@ -98,27 +85,19 @@ function validateFileSignature(buffer: Uint8Array, mimeType: string): boolean {
 }
 
 serve(async (req) => {
-  const corsHeaders = getCorsHeaders(req.headers.get("origin"));
-  
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    // Enhanced environment variable validation
-    const supabaseUrl = Deno.env.get("SUPABASE_URL");
-    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    
-    if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceKey) {
-      throw new Error('Missing required Supabase environment variables');
-    }
-
-    const supabaseClient = createClient(supabaseUrl, supabaseAnonKey);
+    const supabaseClient = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_ANON_KEY") ?? ""
+    );
 
     const supabaseService = createClient(
-      supabaseUrl,
-      supabaseServiceKey,
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
       { auth: { persistSession: false } }
     );
 
@@ -142,20 +121,10 @@ serve(async (req) => {
       });
     }
 
-    // Enhanced input validation and sanitization
-    const requestBody = await req.json();
-    const { orderId, files }: UploadRequest = requestBody;
+    const { orderId, files }: UploadRequest = await req.json();
 
-    // Validate orderId format
-    if (!orderId || typeof orderId !== 'string' || !orderId.match(/^[a-f0-9-]+$/)) {
-      return new Response(JSON.stringify({ error: "Invalid orderId format" }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 400,
-      });
-    }
-
-    if (!files || !Array.isArray(files) || files.length === 0) {
-      return new Response(JSON.stringify({ error: "Invalid request: missing or invalid files array" }), {
+    if (!orderId || !files || files.length === 0) {
+      return new Response(JSON.stringify({ error: "Invalid request: missing orderId or files" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 400,
       });
@@ -227,12 +196,8 @@ serve(async (req) => {
           continue;
         }
 
-        // Enhanced filename sanitization
-        const sanitizedName = file.name
-          .replace(/[^a-zA-Z0-9.-]/g, '_')
-          .replace(/_{2,}/g, '_')
-          .replace(/^_+|_+$/g, '')
-          .substring(0, 100); // Limit filename length
+        // Sanitize filename
+        const sanitizedName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
         const timestamp = Date.now();
         const fileName = `${timestamp}_${i}_${sanitizedName}`;
         const filePath = `${folderPath}/${fileName}`;

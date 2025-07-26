@@ -2,36 +2,10 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 
-// Security-enhanced CORS headers
-const getAllowedOrigins = () => {
-  const frontendUrl = Deno.env.get('FRONTEND_URL');
-  const supabaseUrl = Deno.env.get('SUPABASE_URL');
-  return [
-    frontendUrl,
-    supabaseUrl,
-    'https://ufdcvxmizlzlnyyqpfck.supabase.co',
-    'https://orbit-image-forge.lovable.app',
-    'https://preview--orbit-image-forge.lovable.app'
-  ].filter(Boolean);
-};
-
-const getAllowedOrigin = (requestOrigin: string | null) => {
-  const allowedOrigins = [
-    "https://orbit-image-forge.lovable.app",
-    "https://preview--orbit-image-forge.lovable.app"
-  ];
-  return allowedOrigins.includes(requestOrigin || '') ? requestOrigin : allowedOrigins[0];
-};
-
-const getCorsHeaders = (requestOrigin: string | null) => ({
-  'Access-Control-Allow-Origin': getAllowedOrigin(requestOrigin),
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Max-Age': '3600',
-  'X-Content-Type-Options': 'nosniff',
-  'X-Frame-Options': 'DENY',
-  'Referrer-Policy': 'strict-origin-when-cross-origin',
-});
+};
 
 interface ProcessBatchRequest {
   orderId: string;
@@ -47,91 +21,43 @@ interface ImageFile {
 }
 
 serve(async (req) => {
-  const corsHeaders = getCorsHeaders(req.headers.get("origin"));
-  
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    // Validate origin
-    const origin = req.headers.get('origin');
-    const allowedOrigins = getAllowedOrigins();
-    if (origin && !allowedOrigins.includes(origin)) {
-      console.warn(`Blocked request from unauthorized origin: ${origin}`);
-      return new Response(JSON.stringify({ error: 'Unauthorized origin' }), {
-        status: 403,
-        headers: { 'Content-Type': 'application/json' }
-      });
-    }
-
     // Initialize Supabase with service role for full access
-    const supabaseUrl = Deno.env.get('SUPABASE_URL');
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
+
+    // Get authenticated user
+    const authHeader = req.headers.get('Authorization')!;
+    const token = authHeader.replace('Bearer ', '');
+    const { data: userData } = await supabase.auth.getUser(token);
+    const user = userData.user;
     
-    if (!supabaseUrl || !supabaseKey) {
-      throw new Error('Missing required environment variables');
+    if (!user) {
+      throw new Error('User not authenticated');
     }
 
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    const { orderId, analysisType = 'product' }: ProcessBatchRequest = await req.json();
 
-    // Enhanced authentication handling for webhooks and user requests
-    const authHeader = req.headers.get('Authorization');
-    let user = null;
-    let isWebhookRequest = false;
-
-    if (!authHeader) {
-      // Check if this is a webhook request (from stripe-webhook function)
-      const userAgent = req.headers.get('user-agent');
-      if (userAgent?.includes('Deno') || req.headers.get('x-webhook-source')) {
-        isWebhookRequest = true;
-        console.log('Processing webhook request with service role authentication');
-      } else {
-        throw new Error('Missing authentication header');
-      }
-    } else {
-      const token = authHeader.replace('Bearer ', '');
-      if (token === supabaseKey) {
-        // Service role authentication (from webhooks)
-        isWebhookRequest = true;
-        console.log('Processing request with service role authentication');
-      } else {
-        // User authentication
-        const { data: userData, error: authError } = await supabase.auth.getUser(token);
-        if (authError || !userData.user) {
-          throw new Error('User not authenticated');
-        }
-        user = userData.user;
-      }
-    }
-
-    // Enhanced input validation
-    const requestBody = await req.json();
-    const { orderId, analysisType = 'product' }: ProcessBatchRequest = requestBody;
-
-    // Input sanitization
-    if (!orderId || typeof orderId !== 'string' || !orderId.match(/^[a-f0-9-]+$/)) {
-      throw new Error('Invalid Order ID format');
-    }
-
-    if (analysisType && !['product', 'lifestyle'].includes(analysisType)) {
-      throw new Error('Invalid analysis type');
+    if (!orderId) {
+      throw new Error('Order ID is required');
     }
 
     console.log(`Starting batch processing for order: ${orderId}`);
 
-    // 1. Get the order and verify ownership (skip user check for webhook requests)
-    let orderQuery = supabase
+    // 1. Get the order and verify ownership
+    const { data: order, error: orderError } = await supabase
       .from('orders')
       .select('*, batches(*)')
-      .eq('id', orderId);
-    
-    if (!isWebhookRequest && user) {
-      orderQuery = orderQuery.eq('user_id', user.id);
-    }
-    
-    const { data: order, error: orderError } = await orderQuery.single();
+      .eq('id', orderId)
+      .eq('user_id', user.id)
+      .single();
 
     if (orderError || !order) {
       throw new Error('Order not found or access denied');
@@ -186,22 +112,13 @@ serve(async (req) => {
           .update({ processing_status: 'processing' })
           .eq('id', image.id);
 
-        // Call Gemini analysis function with enhanced security
+        // Call Gemini analysis function
         const analysisResult = await callGeminiAnalysis({
           image_path: image.storage_path_original,
           analysis_type: analysisType,
-          supabase_url: supabaseUrl,
-          supabase_key: supabaseKey
+          supabase_url: Deno.env.get('SUPABASE_URL'),
+          supabase_key: Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
         });
-
-        // Sanitize analysis results before storing
-        const sanitizedAnalysis = analysisResult.metadata ? 
-          JSON.parse(JSON.stringify(analysisResult.metadata).replace(/<script[^>]*>.*?<\/script>/gi, '')) : 
-          null;
-        
-        const sanitizedRawText = analysisResult.raw_text ? 
-          analysisResult.raw_text.replace(/<script[^>]*>.*?<\/script>/gi, '') : 
-          null;
 
         // Update image with analysis results
         await supabase
@@ -209,8 +126,8 @@ serve(async (req) => {
           .update({
             processing_status: 'complete',
             processed_at: new Date().toISOString(),
-            ai_analysis: sanitizedAnalysis,
-            gemini_analysis_raw: sanitizedRawText,
+            ai_analysis: analysisResult.metadata,
+            gemini_analysis_raw: analysisResult.raw_text,
             analysis_type: analysisType,
             processing_duration_ms: analysisResult.processing_time_ms
           })
@@ -285,30 +202,22 @@ serve(async (req) => {
     // 7.5. Send completion email if order is successfully completed
     if (finalStatus === 'completed') {
       try {
-      // Get user email from orbit_users table
-      const userId = isWebhookRequest ? order.user_id : user.id;
-      const { data: userProfile, error: userError } = await supabase
-        .from('orbit_users')
-        .select('email')
-        .eq('id', userId)
-        .single();
+        // Get user email from orbit_users table
+        const { data: userProfile, error: userError } = await supabase
+          .from('orbit_users')
+          .select('email')
+          .eq('id', user.id)
+          .single();
 
         if (!userError && userProfile?.email) {
           console.log(`Sending completion email to: ${userProfile.email}`);
           
-          // Sanitize email for security
-          const sanitizedEmail = userProfile.email.trim().toLowerCase();
-          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(sanitizedEmail)) {
-            console.error('Invalid email format detected');
-            return;
-          }
-          
           const emailResult = await supabase.functions.invoke('send-order-completion-email', {
             body: {
               orderId: orderId,
-              userEmail: sanitizedEmail,
+              userEmail: userProfile.email,
               imageCount: successCount,
-              downloadUrl: downloadInfo ? `${Deno.env.get('FRONTEND_URL') || 'https://orbit-image-forge.lovable.app'}/processing?order=${orderId}&step=processing` : undefined
+              downloadUrl: downloadInfo ? `${Deno.env.get('FRONTEND_URL') || 'https://ufdcvxmizlzlnyyqpfck.supabase.co'}/processing?order=${orderId}&step=processing` : undefined
             }
           });
 
@@ -328,12 +237,11 @@ serve(async (req) => {
 
     // 8. Create download link if successful
     let downloadInfo = null;
-    if (successCount > 0 && (!isWebhookRequest || order.user_id)) {
-      const userId = isWebhookRequest ? order.user_id : user.id;
+    if (successCount > 0) {
       const { data: downloadData, error: downloadError } = await supabase
         .from('file_downloads')
         .insert({
-          user_id: userId,
+          user_id: user.id,
           order_id: orderId,
           batch_id: batch.id,
           file_paths: processedResults

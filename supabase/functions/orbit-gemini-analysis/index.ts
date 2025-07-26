@@ -5,11 +5,7 @@ import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 // Security Configuration
 const SECURITY_CONFIG = {
   MAX_FILE_SIZE: 10 * 1024 * 1024, // 10MB
-  ALLOWED_ORIGINS: [
-    'https://orbit-image-forge.lovable.app',
-    'https://preview--orbit-image-forge.lovable.app',
-    'https://ufdcvxmizlzlnyyqpfck.supabase.co'
-  ],
+  ALLOWED_ORIGINS: ['*'], // Configure as needed
   RATE_LIMIT_WINDOW: 60000, // 1 minute
   MAX_REQUESTS_PER_WINDOW: 30,
   ENABLE_AUTH_VALIDATION: true
@@ -18,43 +14,25 @@ const SECURITY_CONFIG = {
 // Rate limiting store
 const rateLimitStore = new Map();
 
-const getAllowedOrigin = (requestOrigin: string | null) => {
-  const allowedOrigins = [
-    "https://orbit-image-forge.lovable.app",
-    "https://preview--orbit-image-forge.lovable.app"
-  ];
-  return allowedOrigins.includes(requestOrigin || '') ? requestOrigin : allowedOrigins[0];
-};
-
-const getCorsHeaders = (requestOrigin: string | null) => ({
-  'Access-Control-Allow-Origin': getAllowedOrigin(requestOrigin),
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-session-id',
-  'Access-Control-Max-Age': '3600',
-  'X-Content-Type-Options': 'nosniff',
-  'X-Frame-Options': 'DENY',
-  'Referrer-Policy': 'strict-origin-when-cross-origin'
-});
+  'Access-Control-Max-Age': '86400'
+};
 
 serve(async (req) => {
-  const corsHeaders = getCorsHeaders(req.headers.get("origin"));
-  
   // CORS handling
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
 
   try {
-    // Enhanced environment variable validation
-    const supabaseUrl = Deno.env.get('SUPABASE_URL');
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    
-    if (!supabaseUrl || !supabaseServiceKey) {
-      throw new Error('Missing required Supabase environment variables');
-    }
-
     // Initialize Supabase
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
 
     // Security context extraction
     const securityContext = await extractSecurityContext(req, supabase);
