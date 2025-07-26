@@ -1,9 +1,14 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0/+esm";
 
+// Security-enhanced CORS headers
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Origin": "https://orbit-image-nexus.lovable.app",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "X-Content-Type-Options": "nosniff",
+  "X-Frame-Options": "DENY", 
+  "Referrer-Policy": "strict-origin-when-cross-origin",
 };
 
 interface UploadRequest {
@@ -90,14 +95,20 @@ serve(async (req) => {
   }
 
   try {
-    const supabaseClient = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_ANON_KEY") ?? ""
-    );
+    // Enhanced environment variable validation
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    
+    if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceKey) {
+      throw new Error('Missing required Supabase environment variables');
+    }
+
+    const supabaseClient = createClient(supabaseUrl, supabaseAnonKey);
 
     const supabaseService = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+      supabaseUrl,
+      supabaseServiceKey,
       { auth: { persistSession: false } }
     );
 
@@ -121,10 +132,20 @@ serve(async (req) => {
       });
     }
 
-    const { orderId, files }: UploadRequest = await req.json();
+    // Enhanced input validation and sanitization
+    const requestBody = await req.json();
+    const { orderId, files }: UploadRequest = requestBody;
 
-    if (!orderId || !files || files.length === 0) {
-      return new Response(JSON.stringify({ error: "Invalid request: missing orderId or files" }), {
+    // Validate orderId format
+    if (!orderId || typeof orderId !== 'string' || !orderId.match(/^[a-f0-9-]+$/)) {
+      return new Response(JSON.stringify({ error: "Invalid orderId format" }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 400,
+      });
+    }
+
+    if (!files || !Array.isArray(files) || files.length === 0) {
+      return new Response(JSON.stringify({ error: "Invalid request: missing or invalid files array" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 400,
       });
@@ -196,8 +217,12 @@ serve(async (req) => {
           continue;
         }
 
-        // Sanitize filename
-        const sanitizedName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+        // Enhanced filename sanitization
+        const sanitizedName = file.name
+          .replace(/[^a-zA-Z0-9.-]/g, '_')
+          .replace(/_{2,}/g, '_')
+          .replace(/^_+|_+$/g, '')
+          .substring(0, 100); // Limit filename length
         const timestamp = Date.now();
         const fileName = `${timestamp}_${i}_${sanitizedName}`;
         const filePath = `${folderPath}/${fileName}`;
