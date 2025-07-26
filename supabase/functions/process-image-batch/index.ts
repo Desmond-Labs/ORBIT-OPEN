@@ -10,12 +10,12 @@ const getAllowedOrigins = () => {
     frontendUrl,
     supabaseUrl,
     'https://ufdcvxmizlzlnyyqpfck.supabase.co',
-    'https://orbit-image-nexus.lovable.app'
+    'https://orbit-image-forge.lovable.app'
   ].filter(Boolean);
 };
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': 'https://orbit-image-nexus.lovable.app', // Restrict to specific domain
+  'Access-Control-Allow-Origin': 'https://orbit-image-forge.lovable.app', // Restrict to specific domain
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Access-Control-Max-Age': '3600',
@@ -297,7 +297,7 @@ serve(async (req) => {
               orderId: orderId,
               userEmail: sanitizedEmail,
               imageCount: successCount,
-              downloadUrl: downloadInfo ? `${Deno.env.get('FRONTEND_URL') || 'https://orbit-image-nexus.lovable.app'}/processing?order=${orderId}&step=processing` : undefined
+              downloadUrl: downloadInfo ? `${Deno.env.get('FRONTEND_URL') || 'https://orbit-image-forge.lovable.app'}/processing?order=${orderId}&step=processing` : undefined
             }
           });
 

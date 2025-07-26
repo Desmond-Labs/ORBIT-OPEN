@@ -3,7 +3,7 @@ import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 
 // Security-enhanced CORS headers
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "https://orbit-image-nexus.lovable.app",
+  "Access-Control-Allow-Origin": "https://orbit-image-forge.lovable.app",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   "X-Content-Type-Options": "nosniff",

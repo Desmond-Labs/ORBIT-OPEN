@@ -6,7 +6,7 @@ import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 const SECURITY_CONFIG = {
   MAX_FILE_SIZE: 10 * 1024 * 1024, // 10MB
   ALLOWED_ORIGINS: [
-    'https://orbit-image-nexus.lovable.app',
+    'https://orbit-image-forge.lovable.app',
     'https://ufdcvxmizlzlnyyqpfck.supabase.co'
   ],
   RATE_LIMIT_WINDOW: 60000, // 1 minute
@@ -18,7 +18,7 @@ const SECURITY_CONFIG = {
 const rateLimitStore = new Map();
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': 'https://orbit-image-nexus.lovable.app',
+  'Access-Control-Allow-Origin': 'https://orbit-image-forge.lovable.app',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-session-id',
   'Access-Control-Max-Age': '3600',
