@@ -225,7 +225,7 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
       // Extended display time for stripe connection
       setTimeout(() => {
         setPaymentPhase('connecting-stripe-fallback');
-      }, 8000);
+      }, 3000);
 
       // Attempt automatic redirect
       setTimeout(() => {
