@@ -2,14 +2,22 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0/+esm";
 
 // Security-enhanced CORS headers
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "https://orbit-image-forge.lovable.app",
+const getAllowedOrigin = (requestOrigin: string | null) => {
+  const allowedOrigins = [
+    "https://orbit-image-forge.lovable.app",
+    "https://preview--orbit-image-forge.lovable.app"
+  ];
+  return allowedOrigins.includes(requestOrigin || '') ? requestOrigin : allowedOrigins[0];
+};
+
+const getCorsHeaders = (requestOrigin: string | null) => ({
+  "Access-Control-Allow-Origin": getAllowedOrigin(requestOrigin),
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   "X-Content-Type-Options": "nosniff",
   "X-Frame-Options": "DENY", 
   "Referrer-Policy": "strict-origin-when-cross-origin",
-};
+});
 
 interface UploadRequest {
   orderId: string;
@@ -90,6 +98,8 @@ function validateFileSignature(buffer: Uint8Array, mimeType: string): boolean {
 }
 
 serve(async (req) => {
+  const corsHeaders = getCorsHeaders(req.headers.get("origin"));
+  
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }

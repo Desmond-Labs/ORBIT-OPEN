@@ -7,6 +7,7 @@ const SECURITY_CONFIG = {
   MAX_FILE_SIZE: 10 * 1024 * 1024, // 10MB
   ALLOWED_ORIGINS: [
     'https://orbit-image-forge.lovable.app',
+    'https://preview--orbit-image-forge.lovable.app',
     'https://ufdcvxmizlzlnyyqpfck.supabase.co'
   ],
   RATE_LIMIT_WINDOW: 60000, // 1 minute
@@ -17,17 +18,27 @@ const SECURITY_CONFIG = {
 // Rate limiting store
 const rateLimitStore = new Map();
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': 'https://orbit-image-forge.lovable.app',
+const getAllowedOrigin = (requestOrigin: string | null) => {
+  const allowedOrigins = [
+    "https://orbit-image-forge.lovable.app",
+    "https://preview--orbit-image-forge.lovable.app"
+  ];
+  return allowedOrigins.includes(requestOrigin || '') ? requestOrigin : allowedOrigins[0];
+};
+
+const getCorsHeaders = (requestOrigin: string | null) => ({
+  'Access-Control-Allow-Origin': getAllowedOrigin(requestOrigin),
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-session-id',
   'Access-Control-Max-Age': '3600',
   'X-Content-Type-Options': 'nosniff',
   'X-Frame-Options': 'DENY',
   'Referrer-Policy': 'strict-origin-when-cross-origin'
-};
+});
 
 serve(async (req) => {
+  const corsHeaders = getCorsHeaders(req.headers.get("origin"));
+  
   // CORS handling
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });

@@ -10,19 +10,28 @@ const getAllowedOrigins = () => {
     frontendUrl,
     supabaseUrl,
     'https://ufdcvxmizlzlnyyqpfck.supabase.co',
-    'https://orbit-image-forge.lovable.app'
+    'https://orbit-image-forge.lovable.app',
+    'https://preview--orbit-image-forge.lovable.app'
   ].filter(Boolean);
 };
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': 'https://orbit-image-forge.lovable.app', // Restrict to specific domain
+const getAllowedOrigin = (requestOrigin: string | null) => {
+  const allowedOrigins = [
+    "https://orbit-image-forge.lovable.app",
+    "https://preview--orbit-image-forge.lovable.app"
+  ];
+  return allowedOrigins.includes(requestOrigin || '') ? requestOrigin : allowedOrigins[0];
+};
+
+const getCorsHeaders = (requestOrigin: string | null) => ({
+  'Access-Control-Allow-Origin': getAllowedOrigin(requestOrigin),
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Access-Control-Max-Age': '3600',
   'X-Content-Type-Options': 'nosniff',
   'X-Frame-Options': 'DENY',
   'Referrer-Policy': 'strict-origin-when-cross-origin',
-};
+});
 
 interface ProcessBatchRequest {
   orderId: string;
@@ -38,6 +47,8 @@ interface ImageFile {
 }
 
 serve(async (req) => {
+  const corsHeaders = getCorsHeaders(req.headers.get("origin"));
+  
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
