@@ -42,7 +42,6 @@ export const useProcessingState = () => {
     setPaymentLoading(false);
     setConnectingToStripe(false);
     setUploadingFiles(false);
-    setPhaseLocked(false);
   };
 
   // Calculate file size-aware timing
@@ -56,7 +55,7 @@ export const useProcessingState = () => {
   const canInitiatePayment = () => {
     const now = Date.now();
     const timeSinceLastAttempt = now - lastPaymentAttempt;
-    return !paymentLoading && !phaseLocked && timeSinceLastAttempt > 500;
+    return !paymentLoading && !paymentPhase && timeSinceLastAttempt > 500;
   };
 
   // Check authentication status on component mount
