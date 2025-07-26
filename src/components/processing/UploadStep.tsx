@@ -112,7 +112,7 @@ export const UploadStep: React.FC<UploadStepProps> = ({
               className="w-full"
               disabled={isProcessing || !canInitiatePayment}
             >
-              {getButtonText()}
+              Process Images
             </Button>
             
             <p className="text-xs text-muted-foreground text-center mt-4">
