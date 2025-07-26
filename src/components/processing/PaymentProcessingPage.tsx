@@ -6,10 +6,11 @@ import { CreditCard, Upload, Settings, ArrowLeft, ExternalLink } from 'lucide-re
 interface PaymentProcessingPageProps {
   uploadedFiles: File[];
   totalCost: number;
-  phase: 'preparing' | 'uploading' | 'creating-order' | 'connecting-stripe' | 'connecting-stripe-fallback';
+  phase: 'preparing' | 'uploading' | 'creating-order' | 'connecting-stripe';
   uploadProgress?: { current: number; total: number };
   error?: string | null;
   checkoutUrl?: string;
+  operationStatus?: string;
   onRetry?: () => void;
   onCancel?: () => void;
 }
@@ -21,6 +22,7 @@ export const PaymentProcessingPage: React.FC<PaymentProcessingPageProps> = ({
   uploadProgress,
   error,
   checkoutUrl,
+  operationStatus,
   onRetry,
   onCancel
 }) => {
@@ -28,13 +30,13 @@ export const PaymentProcessingPage: React.FC<PaymentProcessingPageProps> = ({
 
   // Show fallback button after 3 seconds for Stripe connection
   useEffect(() => {
-    if (phase === 'connecting-stripe') {
+    if (phase === 'connecting-stripe' && checkoutUrl) {
       const timer = setTimeout(() => {
         setShowFallbackButton(true);
       }, 3000);
       return () => clearTimeout(timer);
     }
-  }, [phase]);
+  }, [phase, checkoutUrl]);
 
   const getPhaseConfig = () => {
     switch (phase) {
@@ -42,7 +44,7 @@ export const PaymentProcessingPage: React.FC<PaymentProcessingPageProps> = ({
         return {
           icon: Settings,
           title: 'Preparing Your Order',
-          description: 'Setting up your image processing request...',
+          description: operationStatus || 'Authenticating and calculating pricing...',
           showProgress: false
         };
       case 'uploading':
@@ -56,21 +58,14 @@ export const PaymentProcessingPage: React.FC<PaymentProcessingPageProps> = ({
         return {
           icon: CreditCard,
           title: 'Creating Payment',
-          description: 'Setting up your payment with Stripe...',
+          description: operationStatus || 'Setting up your payment with Stripe...',
           showProgress: false
         };
       case 'connecting-stripe':
         return {
           icon: CreditCard,
-          title: 'Connecting to Stripe',
-          description: 'Redirecting you to secure payment processing...',
-          showProgress: false
-        };
-      case 'connecting-stripe-fallback':
-        return {
-          icon: CreditCard,
-          title: 'Payment Ready',
-          description: 'Complete your payment to proceed with image processing.',
+          title: 'Opening Stripe Checkout',
+          description: 'Stripe is loading your secure payment page...',
           showProgress: false
         };
     }
@@ -128,7 +123,7 @@ export const PaymentProcessingPage: React.FC<PaymentProcessingPageProps> = ({
       <div className="mb-8">
         <div className="relative">
           <Icon className="w-24 h-24 text-accent mx-auto mb-6" />
-          {phase !== 'connecting-stripe-fallback' && phase !== 'connecting-stripe' && (
+          {phase !== 'connecting-stripe' && (
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="w-32 h-32 border-4 border-accent/20 border-t-accent rounded-full animate-spin" />
             </div>
@@ -172,7 +167,7 @@ export const PaymentProcessingPage: React.FC<PaymentProcessingPageProps> = ({
       </div>
 
       {/* Action Buttons */}
-      {(phase === 'connecting-stripe-fallback' || (phase === 'connecting-stripe' && showFallbackButton)) && checkoutUrl && (
+      {phase === 'connecting-stripe' && showFallbackButton && checkoutUrl && (
         <div className="mb-6">
           <Button 
             onClick={() => window.open(checkoutUrl, '_blank')}
@@ -181,7 +176,7 @@ export const PaymentProcessingPage: React.FC<PaymentProcessingPageProps> = ({
             className="w-full max-w-md"
           >
             <ExternalLink className="w-4 h-4 mr-2" />
-            Open Payment Window
+            If Stripe didn't open, click here
           </Button>
           <p className="text-sm text-muted-foreground mt-2">
             This will open Stripe checkout in a new tab
@@ -190,7 +185,7 @@ export const PaymentProcessingPage: React.FC<PaymentProcessingPageProps> = ({
       )}
 
       {/* Loading Animation */}
-      {phase !== 'connecting-stripe-fallback' && !showFallbackButton && (
+      {!showFallbackButton && (
         <div className="flex items-center justify-center space-x-2 text-sm text-muted-foreground">
           <div className="w-3 h-3 bg-accent rounded-full animate-bounce" />
           <div className="w-3 h-3 bg-accent rounded-full animate-bounce" style={{ animationDelay: '0.1s' }} />
@@ -199,7 +194,7 @@ export const PaymentProcessingPage: React.FC<PaymentProcessingPageProps> = ({
       )}
 
       {/* Cancel Button */}
-      {onCancel && phase !== 'connecting-stripe' && phase !== 'connecting-stripe-fallback' && (
+      {onCancel && phase !== 'connecting-stripe' && (
         <Button 
           onClick={onCancel} 
           variant="ghost" 

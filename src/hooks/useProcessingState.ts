@@ -23,10 +23,11 @@ export const useProcessingState = () => {
   const [processingStage, setProcessingStage] = useState<string>('pending');
   
   // Progressive payment states
-  const [paymentPhase, setPaymentPhase] = useState<'preparing' | 'uploading' | 'creating-order' | 'connecting-stripe' | 'connecting-stripe-fallback' | null>(null);
+  const [paymentPhase, setPaymentPhase] = useState<'preparing' | 'uploading' | 'creating-order' | 'connecting-stripe' | null>(null);
   const [uploadProgress, setUploadProgress] = useState<{current: number, total: number}>({current: 0, total: 0});
   const [paymentError, setPaymentError] = useState<string | null>(null);
   const [checkoutUrl, setCheckoutUrl] = useState<string | null>(null);
+  const [operationStatus, setOperationStatus] = useState<string>('');
   
   // State locking for minimum display times
   const [phaseLocked, setPhaseLocked] = useState(false);
@@ -39,6 +40,7 @@ export const useProcessingState = () => {
     setUploadProgress({current: 0, total: 0});
     setPaymentError(null);
     setCheckoutUrl(null);
+    setOperationStatus('');
     setPaymentLoading(false);
     setConnectingToStripe(false);
     setUploadingFiles(false);
@@ -154,6 +156,8 @@ export const useProcessingState = () => {
     setPaymentError,
     checkoutUrl,
     setCheckoutUrl,
+    operationStatus,
+    setOperationStatus,
     // New helper functions
     resetPaymentState,
     calculatePhaseDuration,

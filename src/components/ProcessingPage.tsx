@@ -58,6 +58,8 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
     setPaymentError,
     checkoutUrl,
     setCheckoutUrl,
+    operationStatus,
+    setOperationStatus,
     // New helper functions
     resetPaymentState,
     calculatePhaseDuration,
@@ -206,12 +208,14 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
     try {
       console.log('🚀 Starting payment process with', uploadedFiles.length, 'files');
       
-      // Phase 1: Preparing order
+      // Phase 1: Preparing order (no delay, start immediately)
       setPaymentPhase('preparing');
-      await new Promise(resolve => setTimeout(resolve, 800));
+      setOperationStatus('Authenticating user...');
       
-      // Phase 2: Create checkout session
+      // Phase 2: Create checkout session immediately
+      setOperationStatus('Calculating pricing...');
       setPaymentPhase('creating-order');
+      setOperationStatus('Setting up Stripe payment...');
       
       const { data: paymentData, error: paymentError } = await supabase.functions.invoke('create-payment-intent', {
         body: {
@@ -226,27 +230,22 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
       setOrderId(paymentData.order_id);
       
       // Phase 3: Upload files to storage
+      setOperationStatus('Uploading files...');
       await uploadFilesToStorage(paymentData.order_id);
       
       // Store only the order ID in localStorage
       localStorage.setItem('orbit_pending_order_id', paymentData.order_id);
 
-      // Phase 4: Connecting to Stripe
+      // Phase 4: Connecting to Stripe immediately
       setPaymentPhase('connecting-stripe');
       setCheckoutUrl(paymentData.checkout_url);
+      setOperationStatus('');
       
       // Attempt immediate redirect
-      setTimeout(() => {
-        if (paymentData.checkout_url) {
-          console.log('🔗 Redirecting to Stripe checkout');
-          window.location.href = paymentData.checkout_url;
-        }
-      }, 1000);
-
-      // Show fallback after 5 seconds
-      setTimeout(() => {
-        setPaymentPhase('connecting-stripe-fallback');
-      }, 5000);
+      if (paymentData.checkout_url) {
+        console.log('🔗 Redirecting to Stripe checkout');
+        window.location.href = paymentData.checkout_url;
+      }
 
     } catch (error: any) {
       console.error('❌ Payment error:', error);
@@ -337,6 +336,7 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
                     uploadProgress={uploadProgress}
                     error={paymentError}
                     checkoutUrl={checkoutUrl}
+                    operationStatus={operationStatus}
                     onRetry={handlePaymentRetry}
                     onCancel={handlePaymentCancel}
                   />

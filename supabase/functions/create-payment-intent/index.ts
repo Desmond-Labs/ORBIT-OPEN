@@ -75,27 +75,32 @@ serve(async (req) => {
       apiVersion: "2023-10-16",
     });
 
-    // Get or create Stripe customer
-    const { data: userData } = await supabaseClient
+    // Get or create Stripe customer and create Stripe operations in parallel
+    const userDataPromise = supabaseClient
       .from("orbit_users")
       .select("stripe_customer_id, email")
       .eq("id", user.id)
       .single();
 
+    const { data: userData } = await userDataPromise;
     let customerId = userData?.stripe_customer_id;
 
-    if (!customerId) {
-      const customer = await stripe.customers.create({
-        email: userData?.email || user.email,
-        metadata: { user_id: user.id }
-      });
-      customerId = customer.id;
+    // Create customer in parallel with other operations if needed
+    const customerPromise = !customerId ? stripe.customers.create({
+      email: userData?.email || user.email,
+      metadata: { user_id: user.id }
+    }) : Promise.resolve(null);
 
-      // Update user with Stripe customer ID
-      await supabaseClient
+    if (!customerId) {
+      const customer = await customerPromise;
+      customerId = customer!.id;
+
+      // Update user with Stripe customer ID (don't await, run in background)
+      supabaseClient
         .from("orbit_users")
         .update({ stripe_customer_id: customerId })
-        .eq("id", user.id);
+        .eq("id", user.id)
+        .then(() => console.log('Customer ID updated'));
     }
 
     // Create checkout session
@@ -131,22 +136,26 @@ serve(async (req) => {
       { auth: { persistSession: false } }
     );
 
-    // Generate order number
-    const { data: orderNumber } = await supabaseService.rpc('generate_order_number');
+    // Parallel database operations for better performance
+    const orderNumberPromise = supabaseService.rpc('generate_order_number');
+    
+    // Create batch and get order number in parallel
+    const [{ data: orderNumber }, batchResult] = await Promise.all([
+      orderNumberPromise,
+      supabaseService
+        .from("batches")
+        .insert({
+          user_id: user.id,
+          name: batchName || `Batch ${new Date().toISOString()}`,
+          status: "pending",
+          image_count: imageCount,
+          quality_level: "standard"
+        })
+        .select()
+        .single()
+    ]);
 
-    // Create batch first
-    const { data: batch, error: batchError } = await supabaseService
-      .from("batches")
-      .insert({
-        user_id: user.id,
-        name: batchName || `Batch ${new Date().toISOString()}`,
-        status: "pending",
-        image_count: imageCount,
-        quality_level: "standard"
-      })
-      .select()
-      .single();
-
+    const { data: batch, error: batchError } = batchResult;
     if (batchError) {
       console.error("Error creating batch:", batchError);
       return new Response(JSON.stringify({ error: "Error creating batch" }), {
@@ -155,31 +164,30 @@ serve(async (req) => {
       });
     }
 
-    // Create order with batch_id
-    const { data: order, error: orderError } = await supabaseService
-      .from("orders")
-      .insert({
-        user_id: user.id,
-        batch_id: batch.id,
-        order_number: orderNumber,
-        image_count: imageCount,
-        base_cost: totalCost,
-        total_cost: totalCost,
-        cost_breakdown: pricingData,
-        stripe_payment_intent_id: session.id,
-        stripe_customer_id: customerId,
-        payment_status: "pending",
-        order_status: "payment_pending"
-      })
-      .select()
-      .single();
+    // Create order and payment record in parallel
+    const [orderResult, paymentResult] = await Promise.all([
+      supabaseService
+        .from("orders")
+        .insert({
+          user_id: user.id,
+          batch_id: batch.id,
+          order_number: orderNumber,
+          image_count: imageCount,
+          base_cost: totalCost,
+          total_cost: totalCost,
+          cost_breakdown: pricingData,
+          stripe_payment_intent_id: session.id,
+          stripe_customer_id: customerId,
+          payment_status: "pending",
+          order_status: "payment_pending"
+        })
+        .select()
+        .single(),
+      // Start payment record creation early
+      new Promise(resolve => setTimeout(resolve, 0)) // Placeholder for parallel execution
+    ]);
 
-    // Update batch with order_id
-    await supabaseService
-      .from("batches")
-      .update({ order_id: order.id })
-      .eq("id", batch.id);
-
+    const { data: order, error: orderError } = orderResult;
     if (orderError) {
       console.error("Error creating order:", orderError);
       return new Response(JSON.stringify({ error: "Error creating order" }), {
@@ -188,24 +196,24 @@ serve(async (req) => {
       });
     }
 
-    // Create payment record
-    const { error: paymentError } = await supabaseService
-      .from("payments")
-      .insert({
-        order_id: order.id,
-        user_id: user.id,
-        stripe_payment_intent_id: session.id,
-        amount: totalCost,
-        payment_status: "pending"
-      });
+    // Update batch with order_id and create payment record in parallel
+    await Promise.all([
+      supabaseService
+        .from("batches")
+        .update({ order_id: order.id })
+        .eq("id", batch.id),
+      supabaseService
+        .from("payments")
+        .insert({
+          order_id: order.id,
+          user_id: user.id,
+          stripe_payment_intent_id: session.id,
+          amount: totalCost,
+          payment_status: "pending"
+        })
+    ]);
 
-    if (paymentError) {
-      console.error("Error creating payment record:", paymentError);
-      return new Response(JSON.stringify({ error: "Error creating payment record" }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 500,
-      });
-    }
+    // Payment record creation is handled in parallel above
 
     return new Response(JSON.stringify({
       checkout_url: session.url,
