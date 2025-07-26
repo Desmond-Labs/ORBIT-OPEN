@@ -152,11 +152,12 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
 
   const uploadFilesToStorage = async (orderId: string) => {
     try {
-      console.log('📤 Uploading files to storage for order:', orderId);
+      console.log('📤 Starting file upload to storage for order:', orderId);
       setPaymentPhase('uploading');
       setUploadProgress({ current: 0, total: uploadedFiles.length });
       
       // Convert files to the format expected by upload-order-images
+      console.log('🔄 Converting files to base64...');
       const filesData = await Promise.all(
         uploadedFiles.map(async (file, index) => {
           return new Promise<{name: string, data: string, type: string}>((resolve, reject) => {
@@ -164,6 +165,7 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
             reader.onload = () => {
               const base64 = reader.result as string;
               const data = base64.split(',')[1]; // Remove data:image/jpeg;base64, prefix
+              console.log(`✅ Converted file ${index + 1}/${uploadedFiles.length}: ${file.name}`);
               setUploadProgress(prev => ({ ...prev, current: index + 1 }));
               resolve({
                 name: file.name,
@@ -177,6 +179,7 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
         })
       );
 
+      console.log('📡 Invoking upload-order-images function with', filesData.length, 'files');
       const { data, error } = await supabase.functions.invoke('upload-order-images', {
         body: {
           orderId: orderId,
@@ -184,7 +187,10 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Upload function error:', error);
+        throw error;
+      }
       
       console.log('✅ Files uploaded successfully:', data);
       return data;
@@ -208,15 +214,21 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
     try {
       console.log('🚀 Starting payment process with', uploadedFiles.length, 'files');
       
-      // Phase 1: Preparing order (no delay, start immediately)
+      // Phase 1: Preparing order (start immediately)
+      console.log('📝 Phase 1: Preparing order');
       setPaymentPhase('preparing');
       setOperationStatus('Authenticating user...');
       
-      // Phase 2: Create checkout session immediately
+      // Small delay to show the preparing phase
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Phase 2: Create checkout session
+      console.log('💳 Phase 2: Creating payment intent');
       setOperationStatus('Calculating pricing...');
       setPaymentPhase('creating-order');
       setOperationStatus('Setting up Stripe payment...');
       
+      console.log('🔄 Calling create-payment-intent function');
       const { data: paymentData, error: paymentError } = await supabase.functions.invoke('create-payment-intent', {
         body: {
           imageCount: uploadedFiles.length,
@@ -224,28 +236,39 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
         }
       });
 
-      if (paymentError) throw paymentError;
+      if (paymentError) {
+        console.error('💥 Payment error:', paymentError);
+        throw paymentError;
+      }
 
-      console.log('💳 Order created:', paymentData.order_id);
+      console.log('✅ Payment intent created successfully:', paymentData);
       setOrderId(paymentData.order_id);
       
       // Phase 3: Upload files to storage
+      console.log('📤 Phase 3: Uploading files');
       setOperationStatus('Uploading files...');
       await uploadFilesToStorage(paymentData.order_id);
       
       // Store only the order ID in localStorage
       localStorage.setItem('orbit_pending_order_id', paymentData.order_id);
 
-      // Phase 4: Connecting to Stripe immediately
+      // Phase 4: Connecting to Stripe
+      console.log('🔗 Phase 4: Connecting to Stripe');
       setPaymentPhase('connecting-stripe');
       setCheckoutUrl(paymentData.checkout_url);
       setOperationStatus('');
       
-      // Attempt immediate redirect
-      if (paymentData.checkout_url) {
-        console.log('🔗 Redirecting to Stripe checkout');
-        window.location.href = paymentData.checkout_url;
-      }
+      console.log('🎯 Checkout URL received:', paymentData.checkout_url);
+      
+      // Attempt immediate redirect with small delay to show connecting phase
+      setTimeout(() => {
+        if (paymentData.checkout_url) {
+          console.log('🚀 Redirecting to Stripe checkout now');
+          window.location.href = paymentData.checkout_url;
+        } else {
+          console.error('❌ No checkout URL available for redirect');
+        }
+      }, 800);
 
     } catch (error: any) {
       console.error('❌ Payment error:', error);
