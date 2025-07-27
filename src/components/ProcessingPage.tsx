@@ -9,7 +9,6 @@ import { AuthPage } from './AuthPage';
 import { ProcessingSteps } from './processing/ProcessingSteps';
 import { AuthStep } from './processing/AuthStep';
 import { UploadStep } from './processing/UploadStep';
-import { PaymentProcessingPage } from './processing/PaymentProcessingPage';
 
 import { ProcessingStep } from './processing/ProcessingStep';
 import { CompleteStep } from './processing/CompleteStep';
@@ -212,28 +211,15 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
       return;
     }
 
-    // Reset all payment state for fresh attempt
-    resetPaymentState();
+    // Start payment loading state
+    setPaymentLoading(true);
     setLastPaymentAttempt(Date.now());
     
     try {
       console.log('🚀 Starting payment process with', uploadedFiles.length, 'files');
       
-      // Phase 1: Preparing order (start immediately)
-      console.log('📝 Phase 1: Preparing order');
-      setPaymentPhase('preparing');
-      setOperationStatus('Authenticating user...');
-      
-      // Small delay to show the preparing phase
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      // Phase 2: Create checkout session
-      console.log('💳 Phase 2: Creating payment intent');
-      setOperationStatus('Calculating pricing...');
-      setPaymentPhase('creating-order');
-      setOperationStatus('Setting up Stripe payment...');
-      
-      console.log('🔄 Calling create-payment-intent function');
+      // Create checkout session
+      console.log('💳 Creating payment intent');
       const { data: paymentData, error: paymentError } = await supabase.functions.invoke('create-payment-intent', {
         body: {
           imageCount: uploadedFiles.length,
@@ -249,10 +235,8 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
       console.log('✅ Payment intent created successfully:', paymentData);
       setOrderId(paymentData.order_id);
       
-      // Phase 3: Prepare files for upload after payment (optimized approach)
-      console.log('📤 Phase 3: Preparing files for post-payment upload');
-      setOperationStatus('Preparing files...');
-      setPaymentPhase('uploading');
+      // Prepare files for upload after payment
+      console.log('📤 Preparing files for post-payment upload');
       
       // Calculate total file size to determine strategy  
       const totalFileSizeMB = uploadedFiles.reduce((sum, file) => sum + file.size, 0) / (1024 * 1024);
@@ -263,7 +247,6 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
       // For normal files, store temporarily and upload after payment for better UX
       if (totalFileSizeMB > 10) {
         console.log('📤 Large files detected, uploading before payment for reliability');
-        setOperationStatus('Uploading large files...');
         await uploadFilesToStorage(paymentData.order_id);
         
         // Store only the order ID 
@@ -291,55 +274,23 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
         console.log('✅ File references stored efficiently (no base64 conversion)');
       }
 
-      // Phase 4: Connecting to Stripe - Navigate to payment waiting page
-      console.log('🔗 Phase 4: Connecting to Stripe');
-      setPaymentPhase('connecting-stripe');
-      setCheckoutUrl(paymentData.checkout_url);
-      setOperationStatus('');
+      // Store data for the payment waiting page
+      localStorage.setItem('orbit-checkout-url', paymentData.checkout_url);
+      localStorage.setItem('orbit-total-cost', totalCost.toString());
+      localStorage.setItem('orbit-file-count', uploadedFiles.length.toString());
+      localStorage.setItem('orbit-order-id', paymentData.order_id);
       
-      console.log('🎯 Checkout URL received:', paymentData.checkout_url);
-      
-      // Store payment data in localStorage for the payment waiting page
-      if (paymentData.checkout_url && !redirectAttempted) {
-        console.log('🚀 Storing payment data and navigating to payment waiting page');
-        setRedirectAttempted(true);
-        
-        // Store data for the payment waiting page
-        localStorage.setItem('orbit-checkout-url', paymentData.checkout_url);
-        localStorage.setItem('orbit-total-cost', totalCost.toString());
-        localStorage.setItem('orbit-file-count', uploadedFiles.length.toString());
-        localStorage.setItem('orbit-order-id', paymentData.order_id);
-        
-        // Navigate to payment waiting page using React Router
-        navigate(`/payment-waiting?checkoutUrl=${encodeURIComponent(paymentData.checkout_url)}&totalCost=${totalCost}&fileCount=${uploadedFiles.length}&orderId=${paymentData.order_id}`);
-      } else if (paymentData.checkout_url) {
-        // Fallback to direct Stripe redirect if payment waiting page not available
-        window.location.href = paymentData.checkout_url;
-      } else {
-        console.error('❌ No checkout URL available for redirect');
-        setPaymentError('Failed to get checkout URL. Please try again.');
-      }
+      // Navigate directly to payment waiting page (single loading experience)
+      console.log('🚀 Navigating directly to payment waiting page');
+      navigate(`/payment-waiting?checkoutUrl=${encodeURIComponent(paymentData.checkout_url)}&totalCost=${totalCost}&fileCount=${uploadedFiles.length}&orderId=${paymentData.order_id}`);
 
     } catch (error: any) {
       console.error('❌ Payment error:', error);
-      // Only reset payment state on explicit errors, not during redirect
-      if (!redirectAttempted) {
-        setPaymentError(error.message || "There was an error processing your payment. Please try again.");
-      }
+      setPaymentError(error.message || "There was an error processing your payment. Please try again.");
+      setPaymentLoading(false);
     }
   };
 
-  const handlePaymentRetry = () => {
-    console.log('🔄 Payment retry initiated');
-    resetPaymentState(); // Full reset for explicit retry
-    handlePayment();
-  };
-
-  const handlePaymentCancel = () => {
-    console.log('❌ Payment cancelled by user');
-    resetPaymentState(); // Full reset for explicit cancel
-    setCurrentStep('upload'); // Return to upload step
-  };
 
   const handleProcessMore = () => {
     setCurrentStep('upload');
@@ -404,30 +355,14 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
             )}
 
             {currentStep === 'upload' && (
-              <>
-                {paymentPhase ? (
-                  <PaymentProcessingPage
-                    uploadedFiles={uploadedFiles}
-                    totalCost={totalCost}
-                    phase={paymentPhase}
-                    uploadProgress={uploadProgress}
-                    error={paymentError}
-                    checkoutUrl={checkoutUrl}
-                    operationStatus={operationStatus}
-                    onRetry={handlePaymentRetry}
-                    onCancel={handlePaymentCancel}
-                  />
-                ) : (
-                  <UploadStep
-                    onFileUpload={handleFileUpload}
-                    uploadedFiles={uploadedFiles}
-                    totalCost={totalCost}
-                    isProcessing={!!paymentPhase}
-                    onPayment={handlePayment}
-                    canInitiatePayment={canInitiatePayment()}
-                  />
-                )}
-              </>
+              <UploadStep
+                onFileUpload={handleFileUpload}
+                uploadedFiles={uploadedFiles}
+                totalCost={totalCost}
+                isProcessing={paymentLoading}
+                onPayment={handlePayment}
+                canInitiatePayment={canInitiatePayment()}
+              />
             )}
 
             {currentStep === 'processing' && (
