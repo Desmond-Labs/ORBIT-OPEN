@@ -46,14 +46,80 @@ serve(async (req) => {
     console.log(`Starting batch processing for order: ${orderId}`);
 
     // 1. Get the order and validate it exists with proper status
-    const { data: order, error: orderError } = await supabase
-      .from('orders')
-      .select('*, batches(*)')
-      .eq('id', orderId)
-      .single();
+    // Enhanced logging and error handling for order lookup with retry mechanism
+    console.log(`🔍 Attempting to find order with ID: ${orderId}`);
+    
+    let order = null;
+    let orderError = null;
+    const maxRetries = 3;
+    const retryDelay = 1000; // 1 second
+    
+    // Retry function for order lookup
+    const attemptOrderLookup = async (attempt: number): Promise<any> => {
+      console.log(`🔍 Order lookup attempt ${attempt}/${maxRetries} for: ${orderId}`);
+      
+      // First try: Direct order ID lookup
+      const { data: directOrder, error: directError } = await supabase
+        .from('orders')
+        .select('*, batches(*)')
+        .eq('id', orderId)
+        .single();
+      
+      if (directOrder) {
+        console.log(`✅ Found order directly by ID: ${orderId} (attempt ${attempt})`);
+        return { order: directOrder, error: null };
+      } else {
+        console.log(`❌ Direct lookup failed (attempt ${attempt}): ${directError?.message}`);
+        
+        // Second try: Search by stripe payment intent fields in case orderId is actually a payment intent
+        console.log(`🔍 Trying alternative lookup by payment intent fields (attempt ${attempt})`);
+        const { data: altOrder, error: altError } = await supabase
+          .from('orders')
+          .select('*, batches(*)')
+          .or(`stripe_payment_intent_id.eq.${orderId},stripe_payment_intent_id_actual.eq.${orderId}`)
+          .single();
+        
+        if (altOrder) {
+          console.log(`✅ Found order by payment intent lookup: ${altOrder.id} (searched for: ${orderId}, attempt ${attempt})`);
+          return { order: altOrder, error: null };
+        } else {
+          console.log(`❌ Alternative lookup also failed (attempt ${attempt}): ${altError?.message}`);
+          return { order: null, error: altError || directError };
+        }
+      }
+    };
+    
+    // Try with retries
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      const result = await attemptOrderLookup(attempt);
+      
+      if (result.order) {
+        order = result.order;
+        break;
+      } else {
+        orderError = result.error;
+        
+        if (attempt < maxRetries) {
+          console.log(`⏳ Waiting ${retryDelay}ms before retry ${attempt + 1}...`);
+          await new Promise(resolve => setTimeout(resolve, retryDelay));
+        }
+      }
+    }
 
-    if (orderError || !order) {
-      throw new Error(`Order not found: ${orderId}`);
+    if (!order) {
+      // Enhanced error message with debugging info
+      console.error(`🚨 Order lookup failed completely for: ${orderId} after ${maxRetries} attempts`);
+      
+      // Try to get some debugging info - recent orders to see what's in the database
+      const { data: recentOrders } = await supabase
+        .from('orders')
+        .select('id, stripe_payment_intent_id, stripe_payment_intent_id_actual, created_at')
+        .order('created_at', { ascending: false })
+        .limit(5);
+      
+      console.log('Recent orders in database:', recentOrders);
+      
+      throw new Error(`Order not found: ${orderId} after ${maxRetries} retry attempts. Last error: ${orderError?.message}`);
     }
 
     // Validate order is in the correct state for processing

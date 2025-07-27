@@ -145,15 +145,40 @@ serve(async (req) => {
           .single();
 
         if (orderError || !orderData) {
-          console.error("Error updating order:", orderError);
-          return new Response("Error updating order", { status: 500 });
+          console.error(`🚨 Error updating order for session ${checkoutSessionId}:`, orderError);
+          console.error(`❌ Payment Intent ID: ${paymentIntent.id}`);
+          console.error(`❌ Searched using query: stripe_payment_intent_id.eq.${checkoutSessionId} OR stripe_payment_intent_id_actual.eq.${paymentIntent.id}`);
+          
+          // Get debugging info to understand what's in the database
+          try {
+            const { data: debugOrders } = await supabaseClient
+              .from('orders')
+              .select('id, stripe_payment_intent_id, stripe_payment_intent_id_actual, created_at, payment_status')
+              .order('created_at', { ascending: false })
+              .limit(5);
+            
+            console.error(`❌ Recent orders in database:`, debugOrders);
+          } catch (debugError) {
+            console.error(`❌ Could not fetch debug orders:`, debugError);
+          }
+          
+          return new Response(JSON.stringify({ 
+            error: "Error updating order", 
+            details: orderError?.message,
+            searchedSessionId: checkoutSessionId,
+            paymentIntentId: paymentIntent.id
+          }), { 
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" }
+          });
         }
 
         console.log(`Order updated for session: ${checkoutSessionId}, Order ID: ${orderData.id}`);
 
         // Trigger AI image processing
         try {
-          console.log(`Starting image processing for order: ${orderData.id}`);
+          console.log(`🚀 Starting image processing for order: ${orderData.id}`);
+          console.log(`📋 Order details - Session ID: ${checkoutSessionId}, Payment Intent: ${paymentIntent.id}`);
           
           const processingResponse = await fetch(
             `${Deno.env.get('SUPABASE_URL')}/functions/v1/process-image-batch`,
@@ -172,13 +197,56 @@ serve(async (req) => {
 
           if (!processingResponse.ok) {
             const errorText = await processingResponse.text();
-            console.error(`Image processing failed: ${errorText}`);
+            console.error(`🚨 Image processing failed for order ${orderData.id}:`);
+            console.error(`❌ Status: ${processingResponse.status}`);
+            console.error(`❌ Error: ${errorText}`);
+            
+            // Try to parse error response for more details
+            try {
+              const errorJson = JSON.parse(errorText);
+              console.error(`❌ Parsed error:`, errorJson);
+            } catch (parseErr) {
+              console.error(`❌ Could not parse error response as JSON`);
+            }
           } else {
             const processingResult = await processingResponse.json();
-            console.log(`Image processing started successfully:`, processingResult);
+            console.log(`✅ Image processing started successfully for order ${orderData.id}:`, processingResult);
           }
         } catch (processingError) {
-          console.error("Error starting image processing:", processingError);
+          console.error(`🚨 Error starting image processing for order ${orderData.id}:`, processingError);
+          console.error(`❌ Error details:`, {
+            message: processingError.message,
+            stack: processingError.stack,
+            orderId: orderData.id,
+            sessionId: checkoutSessionId,
+            paymentIntentId: paymentIntent.id
+          });
+          
+          // Add debugging context for order lookup failures
+          if (processingError.message?.includes('Order not found')) {
+            console.error(`🔍 Order lookup failure debugging context:`);
+            console.error(`   - Order ID passed to processing: ${orderData.id}`);
+            console.error(`   - Stripe session ID: ${checkoutSessionId}`);  
+            console.error(`   - Stripe payment intent ID: ${paymentIntent.id}`);
+            console.error(`   - Order payment status: ${orderData.payment_status}`);
+            console.error(`   - Order status: ${orderData.order_status}`);
+            console.error(`   - Order stripe_payment_intent_id: ${orderData.stripe_payment_intent_id}`);
+            console.error(`   - Order stripe_payment_intent_id_actual: ${orderData.stripe_payment_intent_id_actual}`);
+            
+            // Get recent orders for comparison
+            try {
+              const { data: recentOrders } = await supabaseClient
+                .from('orders')
+                .select('id, stripe_payment_intent_id, stripe_payment_intent_id_actual, payment_status, created_at')
+                .order('created_at', { ascending: false })
+                .limit(3);
+                
+              console.error(`🔍 Recent orders for comparison:`, recentOrders);
+            } catch (debugError) {
+              console.error(`❌ Could not fetch recent orders for debugging:`, debugError);
+            }
+          }
+          
           // Don't fail the webhook, just log the error
         }
 
