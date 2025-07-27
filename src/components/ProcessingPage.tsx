@@ -235,44 +235,11 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
       console.log('✅ Payment intent created successfully:', paymentData);
       setOrderId(paymentData.order_id);
       
-      // Prepare files for upload after payment
-      console.log('📤 Preparing files for post-payment upload');
+      // Upload files immediately (parallel with payment process)
+      console.log('📤 Uploading files immediately for parallel processing');
+      await uploadFilesToStorage(paymentData.order_id);
       
-      // Calculate total file size to determine strategy  
-      const totalFileSizeMB = uploadedFiles.reduce((sum, file) => sum + file.size, 0) / (1024 * 1024);
-      
-      console.log(`📊 File size analysis: ${uploadedFiles.length} files, ${totalFileSizeMB.toFixed(2)}MB total`);
-      
-      // Strategy: For very large files (>10MB), upload before payment to avoid timeout
-      // For normal files, store temporarily and upload after payment for better UX
-      if (totalFileSizeMB > 10) {
-        console.log('📤 Large files detected, uploading before payment for reliability');
-        await uploadFilesToStorage(paymentData.order_id);
-        
-        // Store only the order ID 
-        localStorage.setItem('orbit_pending_order_id', paymentData.order_id);
-        localStorage.setItem('orbit_files_uploaded', 'true');
-      } else {
-        console.log('⚡ Normal sized files, storing temporarily for post-payment upload');
-        
-        // Store file references temporarily (much more efficient than base64)
-        const fileRefs = uploadedFiles.map((file, index) => ({
-          name: file.name,
-          type: file.type,
-          size: file.size,
-          index: index
-        }));
-
-        // Store minimal data in localStorage
-        localStorage.setItem('orbit_pending_order_id', paymentData.order_id);
-        localStorage.setItem('orbit_pending_file_refs', JSON.stringify(fileRefs));
-        
-        // Store actual File objects in a global temporary variable (not localStorage)
-        // This avoids the localStorage quota issue entirely
-        (window as any).orbitTempFiles = uploadedFiles;
-        
-        console.log('✅ File references stored efficiently (no base64 conversion)');
-      }
+      console.log('✅ Files uploaded successfully - images ready for processing');
 
       // Store data for the payment waiting page
       localStorage.setItem('orbit-checkout-url', paymentData.checkout_url);

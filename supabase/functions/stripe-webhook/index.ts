@@ -247,45 +247,6 @@ serve(async (req) => {
             }
           }
           
-          // Handle timing issues - retry processing if images may still be uploading
-          if (processingError.message?.includes('images may still be uploading')) {
-            console.log(`⏳ Detected timing issue - images may still be uploading. Scheduling retry...`);
-            
-            // Schedule a retry in 30 seconds using a delayed webhook call
-            setTimeout(async () => {
-              try {
-                console.log(`🔄 Retrying image processing for order ${orderData.id} after 30 second delay`);
-                
-                const retryResponse = await fetch(
-                  `${Deno.env.get('SUPABASE_URL')}/functions/v1/process-image-batch`,
-                  {
-                    method: 'POST',
-                    headers: {
-                      'Content-Type': 'application/json',
-                      'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
-                    },
-                    body: JSON.stringify({
-                      orderId: orderData.id,
-                      analysisType: 'product'
-                    })
-                  }
-                );
-
-                if (retryResponse.ok) {
-                  const retryResult = await retryResponse.json();
-                  console.log(`✅ Retry successful for order ${orderData.id}:`, retryResult);
-                } else {
-                  const retryError = await retryResponse.text();
-                  console.error(`❌ Retry failed for order ${orderData.id}:`, retryError);
-                }
-              } catch (retryError) {
-                console.error(`❌ Retry attempt failed for order ${orderData.id}:`, retryError);
-              }
-            }, 30000); // 30 second delay
-            
-            console.log(`📅 Retry scheduled for order ${orderData.id} in 30 seconds`);
-          }
-          
           // Don't fail the webhook, just log the error
         }
 

@@ -156,36 +156,21 @@ serve(async (req) => {
     }
 
     if (!images || images.length === 0) {
-      console.log(`❌ No images found for batch ${batch.id}. This might be a timing issue - images may still be uploading.`);
+      console.log(`❌ No images found for batch ${batch.id}`);
       
-      // Check if this is likely a timing issue by looking at recent order creation
-      const orderCreatedAt = new Date(order.created_at);
-      const timeSinceCreation = Date.now() - orderCreatedAt.getTime();
-      const minutesSinceCreation = Math.floor(timeSinceCreation / 60000);
-      
-      console.log(`🕒 Order created ${minutesSinceCreation} minutes ago`);
-      
-      if (minutesSinceCreation < 5) {
-        // Recent order, likely timing issue - images may still be uploading
-        console.log(`⏳ Recent order detected. Images may still be uploading. Will retry in webhook.`);
-        throw new Error(`No images found for processing. Order is ${minutesSinceCreation} minutes old - images may still be uploading. Will retry automatically.`);
-      } else {
-        // Older order, likely a real issue
-        console.log(`🚨 Order is ${minutesSinceCreation} minutes old but no images found. This may be a real issue.`);
+      // Debug: Check if batch exists but has no images at all
+      const { data: allBatchImages } = await supabase
+        .from('images')
+        .select('id, processing_status, created_at')
+        .eq('batch_id', batch.id);
         
-        // Debug: Check if batch exists but has no images at all
-        const { data: allBatchImages } = await supabase
-          .from('images')
-          .select('id, processing_status, created_at')
-          .eq('batch_id', batch.id);
-          
-        console.log(`🔍 Total images in batch (any status): ${allBatchImages?.length || 0}`);
-        if (allBatchImages && allBatchImages.length > 0) {
-          console.log(`📋 Image statuses:`, allBatchImages.map(img => img.processing_status));
-        }
-        
-        throw new Error(`No pending images found for processing in batch ${batch.id}. Total images in batch: ${allBatchImages?.length || 0}`);
+      console.log(`🔍 Total images in batch (any status): ${allBatchImages?.length || 0}`);
+      if (allBatchImages && allBatchImages.length > 0) {
+        console.log(`📋 Image statuses:`, allBatchImages.map(img => img.processing_status));
+        throw new Error(`No pending images found for processing in batch ${batch.id}. Found ${allBatchImages.length} images with other statuses.`);
       }
+      
+      throw new Error(`No images found for processing in batch ${batch.id}. Batch appears to be empty.`);
     }
 
     console.log(`Processing ${images.length} images for batch ${batch.id}`);

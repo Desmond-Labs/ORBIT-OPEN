@@ -44,8 +44,8 @@ const PaymentSuccess: React.FC = () => {
         if (order.payment_status === 'completed') {
           setStatus('success');
           
-          // Upload files if they haven't been uploaded yet
-          await handleFileUploadAfterPayment(order);
+          // Files were uploaded during payment process - trigger processing as backup
+          await triggerProcessingIfNeeded(order);
           
           // Auto-redirect to processing after 3 seconds
           setTimeout(() => {
@@ -75,12 +75,12 @@ const PaymentSuccess: React.FC = () => {
         
         toast({
           title: "Payment Successful!",
-          description: "Your payment has been processed. Uploading your images...",
+          description: "Your payment has been processed. Your images are being analyzed...",
           variant: "default"
         });
 
-        // Upload files after successful payment
-        await handleFileUploadAfterPayment(order);
+        // Files were uploaded during payment - trigger processing as backup
+        await triggerProcessingIfNeeded(order);
 
         // Auto-redirect to processing after 3 seconds
         setTimeout(() => {
@@ -102,118 +102,45 @@ const PaymentSuccess: React.FC = () => {
     verifyPayment();
   }, [sessionId, navigate, toast]);
 
-  const handleFileUploadAfterPayment = async (order: any) => {
+  const triggerProcessingIfNeeded = async (order: any) => {
     try {
-      console.log('📤 Starting file upload after successful payment for order:', order.id);
+      console.log('🚀 Triggering image processing as backup safety check for order:', order.id);
       
-      // Check if files were already uploaded before payment (large files)
-      const filesAlreadyUploaded = localStorage.getItem('orbit_files_uploaded');
-      if (filesAlreadyUploaded === 'true') {
-        console.log('✅ Files were already uploaded before payment (large files)');
-        
-        // Clean up localStorage
-        localStorage.removeItem('orbit_pending_order_id');
-        localStorage.removeItem('orbit_files_uploaded');
-        
-        toast({
-          title: "Order Complete!",
-          description: "Your images are ready for processing",
-          variant: "default"
-        });
-        return;
-      }
-      
-      // Check for temporarily stored files (new efficient method)
-      const storedFileRefs = localStorage.getItem('orbit_pending_file_refs');
-      const tempFiles = (window as any).orbitTempFiles;
-      
-      if (!storedFileRefs || !tempFiles) {
-        console.log('⚠️ No temporary files found, files may have been uploaded already');
-        localStorage.removeItem('orbit_pending_order_id');
-        localStorage.removeItem('orbit_pending_file_refs');
-        
-        toast({
-          title: "Order Complete!",
-          description: "Your images are ready for processing",
-          variant: "default"
-        });
-        return;
-      }
-
-      const fileRefs = JSON.parse(storedFileRefs);
-      console.log(`📋 Found ${fileRefs.length} files to upload from temporary storage`);
-
-      // Create FormData for direct upload (efficient method)
-      const formData = new FormData();
-      formData.append('orderId', order.id);
-      
-      tempFiles.forEach((file: File, index: number) => {
-        formData.append(`file_${index}`, file);
-      });
-
-      // Get auth token for the request
-      const session = await supabase.auth.getSession();
-      const authToken = session.data.session?.access_token;
-      
-      if (!authToken) {
-        throw new Error('No authentication token available');
-      }
-
-      // Use direct upload (no base64 conversion!)
-      const response = await fetch(`${supabase.supabaseUrl}/functions/v1/upload-order-images-direct`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${authToken}`,
-        },
-        body: formData
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || `Upload failed with status ${response.status}`);
-      }
-
-      const data = await response.json();
-      console.log('✅ Files uploaded successfully via direct upload:', data);
-      
-      // Trigger processing now that images are uploaded
-      console.log('🚀 Triggering image processing after successful upload...');
-      try {
-        const { data: processingData, error: processingError } = await supabase.functions.invoke('process-image-batch', {
-          body: {
-            orderId: order.id,
-            analysisType: 'product'
-          }
-        });
-
-        if (processingError) {
-          console.error('❌ Failed to trigger processing:', processingError);
-        } else {
-          console.log('✅ Processing triggered successfully:', processingData);
-        }
-      } catch (processingTriggerError) {
-        console.error('❌ Error triggering processing:', processingTriggerError);
-        // Don't fail the entire flow if processing trigger fails
-      }
-      
-      // Clean up temporary storage
+      // Clean up any old localStorage data
       localStorage.removeItem('orbit_pending_order_id');
       localStorage.removeItem('orbit_pending_file_refs');
+      localStorage.removeItem('orbit_files_uploaded');
       delete (window as any).orbitTempFiles;
+      
+      // Trigger processing (defensive programming - webhook should have already done this)
+      const { data: processingData, error: processingError } = await supabase.functions.invoke('process-image-batch', {
+        body: {
+          orderId: order.id,
+          analysisType: 'product'
+        }
+      });
+
+      if (processingError) {
+        console.log('ℹ️ Processing trigger failed (likely already running):', processingError);
+      } else {
+        console.log('✅ Processing triggered successfully:', processingData);
+      }
       
       // Show success message
       toast({
         title: "Order Complete!",
-        description: "Your images have been uploaded and processing has started",
+        description: "Your images are being processed",
         variant: "default"
       });
 
     } catch (error: any) {
-      console.error('Order completion error:', error);
+      console.log('ℹ️ Processing trigger error (likely already running):', error.message);
+      
+      // Still show success - processing failure doesn't mean payment failed
       toast({
-        title: "File Upload Error",
-        description: error.message || "There was an error uploading your files. Please contact support.",
-        variant: "destructive"
+        title: "Payment Successful!",
+        description: "Your order is being processed",
+        variant: "default"
       });
     }
   };

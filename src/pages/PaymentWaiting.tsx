@@ -33,7 +33,7 @@ export const PaymentWaiting = () => {
         return {
           icon: Upload,
           title: 'Processing Files',
-          description: 'Preparing your images for upload...',
+          description: 'Your images are being uploaded and prepared for analysis...',
           progress: 50
         };
       case 'creating-order':
