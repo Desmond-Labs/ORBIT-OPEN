@@ -1,11 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { CreditCard, ArrowLeft, ExternalLink } from 'lucide-react';
+import { Progress } from '@/components/ui/progress';
+import { CreditCard, ArrowLeft, ExternalLink, Upload, Settings, CheckCircle } from 'lucide-react';
+
+type PaymentPhase = 'preparing' | 'uploading' | 'creating-order' | 'connecting-stripe' | 'opening-checkout' | 'complete';
 
 export const PaymentWaiting = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const [currentPhase, setCurrentPhase] = useState<PaymentPhase>('preparing');
+  const [progress, setProgress] = useState(0);
   const [showFallbackButton, setShowFallbackButton] = useState(false);
   
   // Get data from URL params or localStorage
@@ -14,21 +19,87 @@ export const PaymentWaiting = () => {
   const fileCount = searchParams.get('fileCount') || localStorage.getItem('orbit-file-count');
   const orderId = searchParams.get('orderId') || localStorage.getItem('orbit-order-id');
 
-  // Auto-redirect to Stripe on page load
-  useEffect(() => {
-    if (checkoutUrl && !sessionStorage.getItem('stripe-redirect-attempted')) {
-      sessionStorage.setItem('stripe-redirect-attempted', 'true');
-      window.location.href = checkoutUrl;
+  // Phase configuration
+  const getPhaseConfig = (phase: PaymentPhase) => {
+    switch (phase) {
+      case 'preparing':
+        return {
+          icon: Settings,
+          title: 'Preparing Your Order',
+          description: 'Setting up your payment details...',
+          progress: 25
+        };
+      case 'uploading':
+        return {
+          icon: Upload,
+          title: 'Processing Files',
+          description: 'Preparing your images for upload...',
+          progress: 50
+        };
+      case 'creating-order':
+        return {
+          icon: CreditCard,
+          title: 'Creating Payment',
+          description: 'Setting up secure payment with Stripe...',
+          progress: 75
+        };
+      case 'connecting-stripe':
+        return {
+          icon: CreditCard,
+          title: 'Opening Stripe Checkout',
+          description: 'Loading your secure payment page...',
+          progress: 90
+        };
+      case 'opening-checkout':
+        return {
+          icon: ExternalLink,
+          title: 'Redirecting to Payment',
+          description: 'Opening Stripe checkout...',
+          progress: 100
+        };
+      case 'complete':
+        return {
+          icon: CheckCircle,
+          title: 'Ready for Payment',
+          description: 'Stripe checkout is now ready!',
+          progress: 100
+        };
     }
-  }, [checkoutUrl]);
+  };
 
-  // Show fallback button after 3 seconds
+  // Simulate payment preparation phases with realistic timing
   useEffect(() => {
-    const timer = setTimeout(() => {
+    const phases: PaymentPhase[] = ['preparing', 'uploading', 'creating-order', 'connecting-stripe', 'opening-checkout'];
+    let currentIndex = 0;
+
+    const progressTimer = setInterval(() => {
+      if (currentIndex < phases.length) {
+        setCurrentPhase(phases[currentIndex]);
+        const config = getPhaseConfig(phases[currentIndex]);
+        setProgress(config.progress);
+        currentIndex++;
+      } else {
+        clearInterval(progressTimer);
+        // Auto-open Stripe checkout when ready
+        if (checkoutUrl && !sessionStorage.getItem('stripe-redirect-attempted')) {
+          console.log('🚀 Auto-opening Stripe checkout:', checkoutUrl);
+          sessionStorage.setItem('stripe-redirect-attempted', 'true');
+          window.location.href = checkoutUrl;
+        }
+        setCurrentPhase('complete');
+      }
+    }, 1200); // 1.2 seconds per phase for realistic feel
+
+    // Show fallback button after 6 seconds if checkout hasn't opened
+    const fallbackTimer = setTimeout(() => {
       setShowFallbackButton(true);
-    }, 3000);
-    return () => clearTimeout(timer);
-  }, []);
+    }, 7000);
+
+    return () => {
+      clearInterval(progressTimer);
+      clearTimeout(fallbackTimer);
+    };
+  }, [checkoutUrl]);
 
   const handleFallbackRedirect = () => {
     if (checkoutUrl) {
@@ -59,16 +130,32 @@ export const PaymentWaiting = () => {
 
       <div className="relative z-10 container mx-auto px-4 py-16">
         <div className="max-w-2xl mx-auto text-center">
-          {/* Loading State */}
+          {/* Progress Indicator */}
           <div className="mb-8">
-            <div className="relative">
-              <CreditCard className="w-24 h-24 text-accent mx-auto mb-6" />
+            <div className="relative mb-6">
+              {(() => {
+                const config = getPhaseConfig(currentPhase);
+                const Icon = config.icon;
+                return <Icon className="w-24 h-24 text-accent mx-auto" />;
+              })()}
+              {currentPhase !== 'complete' && (
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="w-32 h-32 border-4 border-accent/20 border-t-accent rounded-full animate-spin" />
+                </div>
+              )}
             </div>
             
-            <h2 className="text-3xl font-bold mb-4">Opening Stripe Checkout</h2>
+            <h2 className="text-3xl font-bold mb-4">{getPhaseConfig(currentPhase).title}</h2>
             <p className="text-lg text-muted-foreground mb-6">
-              Stripe is loading your secure payment page...
+              {getPhaseConfig(currentPhase).description}
             </p>
+
+            <div className="mb-6">
+              <Progress value={progress} className="mb-3 h-3" />
+              <p className="text-sm text-muted-foreground">
+                {progress}% Complete
+              </p>
+            </div>
           </div>
 
           {/* Order Summary */}
@@ -111,13 +198,22 @@ export const PaymentWaiting = () => {
           )}
 
           {/* Loading Animation */}
-          {!showFallbackButton && (
+          {!showFallbackButton && currentPhase !== 'complete' && (
             <div className="flex items-center justify-center space-x-2 text-sm text-muted-foreground mb-6">
               <div className="w-3 h-3 bg-accent rounded-full animate-bounce" />
               <div className="w-3 h-3 bg-accent rounded-full animate-bounce" style={{ animationDelay: '0.1s' }} />
               <div className="w-3 h-3 bg-accent rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
             </div>
           )}
+
+          {/* Information */}
+          <div className="mt-8 p-4 bg-blue-50/50 border border-blue-200/50 rounded-lg">
+            <p className="text-sm text-blue-800">
+              <strong>What's happening?</strong><br />
+              We're preparing your order and setting up secure payment with Stripe. 
+              This process usually takes a few seconds and will open automatically.
+            </p>
+          </div>
 
           {/* Cancel Button */}
           <Button 

@@ -24,6 +24,7 @@ interface ProcessingPageProps {
 }
 
 export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
+  const navigate = useNavigate();
   const {
     currentStep,
     setCurrentStep,
@@ -297,8 +298,8 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
         localStorage.setItem('orbit-file-count', uploadedFiles.length.toString());
         localStorage.setItem('orbit-order-id', paymentData.order_id);
         
-        // Navigate to payment waiting page
-        window.location.href = `/payment-waiting?checkoutUrl=${encodeURIComponent(paymentData.checkout_url)}&totalCost=${totalCost}&fileCount=${uploadedFiles.length}&orderId=${paymentData.order_id}`;
+        // Navigate to payment waiting page using React Router
+        navigate(`/payment-waiting?checkoutUrl=${encodeURIComponent(paymentData.checkout_url)}&totalCost=${totalCost}&fileCount=${uploadedFiles.length}&orderId=${paymentData.order_id}`);
       } else if (paymentData.checkout_url) {
         // Fallback to direct Stripe redirect if payment waiting page not available
         window.location.href = paymentData.checkout_url;
