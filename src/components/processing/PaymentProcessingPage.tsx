@@ -28,12 +28,12 @@ export const PaymentProcessingPage: React.FC<PaymentProcessingPageProps> = ({
 }) => {
   const [showFallbackButton, setShowFallbackButton] = useState(false);
 
-  // Show fallback button after 3 seconds for Stripe connection
+  // Show fallback button after 2 seconds for Stripe connection
   useEffect(() => {
     if (phase === 'connecting-stripe' && checkoutUrl) {
       const timer = setTimeout(() => {
         setShowFallbackButton(true);
-      }, 3000);
+      }, 2000);
       return () => clearTimeout(timer);
     }
   }, [phase, checkoutUrl]);

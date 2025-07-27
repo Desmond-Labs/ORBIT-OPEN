@@ -47,11 +47,11 @@ const PaymentSuccess: React.FC = () => {
           // Files were uploaded during payment process - trigger processing as backup
           await triggerProcessingIfNeeded(order);
           
-          // Auto-redirect to processing after 3 seconds
+          // Auto-redirect to processing after 1 second
           setTimeout(() => {
             console.log('🔄 Redirecting to processing page with order:', order.id);
             navigate(`/?step=processing&order=${order.id}`);
-          }, 3000);
+          }, 1000);
           return;
         }
 
@@ -82,11 +82,11 @@ const PaymentSuccess: React.FC = () => {
         // Files were uploaded during payment - trigger processing as backup
         await triggerProcessingIfNeeded(order);
 
-        // Auto-redirect to processing after 3 seconds
+        // Auto-redirect to processing after 1 second
         setTimeout(() => {
           console.log('🔄 Redirecting to processing page with order:', order.id);
           navigate(`/?step=processing&order=${order.id}`);
-        }, 3000);
+        }, 1000);
 
       } catch (error: any) {
         console.error('Payment verification error:', error);
@@ -212,7 +212,10 @@ const PaymentSuccess: React.FC = () => {
                     Start Processing Now
                   </Button>
                   <p className="text-sm text-muted-foreground">
-                    Automatically redirecting in 3 seconds...
+                    Automatically redirecting in 1 second...
+                  </p>
+                  <p className="text-xs text-muted-foreground/70">
+                    Click "Start Processing Now" to skip the wait
                   </p>
                 </div>
               </>

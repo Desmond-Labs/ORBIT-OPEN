@@ -88,12 +88,12 @@ export const PaymentWaiting = () => {
         }
         setCurrentPhase('complete');
       }
-    }, 1200); // 1.2 seconds per phase for realistic feel
+    }, 800); // 0.8 seconds per phase for faster experience
 
-    // Show fallback button after 6 seconds if checkout hasn't opened
+    // Show fallback button after 5 seconds if checkout hasn't opened
     const fallbackTimer = setTimeout(() => {
       setShowFallbackButton(true);
-    }, 7000);
+    }, 5000);
 
     return () => {
       clearInterval(progressTimer);
