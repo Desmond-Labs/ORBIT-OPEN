@@ -61,7 +61,7 @@ serve(async (req) => {
       // First try: Direct order ID lookup
       const { data: directOrder, error: directError } = await supabase
         .from('orders')
-        .select('*, batches(*)')
+        .select('*')
         .eq('id', orderId)
         .single();
       
@@ -75,7 +75,7 @@ serve(async (req) => {
         console.log(`🔍 Trying alternative lookup by payment intent fields (attempt ${attempt})`);
         const { data: altOrder, error: altError } = await supabase
           .from('orders')
-          .select('*, batches(*)')
+          .select('*')
           .or(`stripe_payment_intent_id.eq.${orderId},stripe_payment_intent_id_actual.eq.${orderId}`)
           .single();
         
@@ -130,9 +130,16 @@ serve(async (req) => {
     console.log(`Processing order ${orderId} for user ${order.user_id}`);
 
     // 2. Get the batch associated with this order (should already exist)
-    let batch = order.batches;
-    if (!batch) {
-      throw new Error('No batch found for this order. Order should have been created with a batch.');
+    console.log(`🔍 Looking up batch for order. batch_id: ${order.batch_id}`);
+    
+    const { data: batch, error: batchError } = await supabase
+      .from('batches')
+      .select('*')
+      .eq('id', order.batch_id)
+      .single();
+    
+    if (batchError || !batch) {
+      throw new Error(`No batch found for this order. batch_id: ${order.batch_id}, error: ${batchError?.message}`);
     }
 
     console.log(`Using existing batch: ${batch.id} for order: ${orderId}`);
