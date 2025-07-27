@@ -176,6 +176,26 @@ const PaymentSuccess: React.FC = () => {
       const data = await response.json();
       console.log('✅ Files uploaded successfully via direct upload:', data);
       
+      // Trigger processing now that images are uploaded
+      console.log('🚀 Triggering image processing after successful upload...');
+      try {
+        const { data: processingData, error: processingError } = await supabase.functions.invoke('process-image-batch', {
+          body: {
+            orderId: order.id,
+            analysisType: 'product'
+          }
+        });
+
+        if (processingError) {
+          console.error('❌ Failed to trigger processing:', processingError);
+        } else {
+          console.log('✅ Processing triggered successfully:', processingData);
+        }
+      } catch (processingTriggerError) {
+        console.error('❌ Error triggering processing:', processingTriggerError);
+        // Don't fail the entire flow if processing trigger fails
+      }
+      
       // Clean up temporary storage
       localStorage.removeItem('orbit_pending_order_id');
       localStorage.removeItem('orbit_pending_file_refs');
@@ -184,7 +204,7 @@ const PaymentSuccess: React.FC = () => {
       // Show success message
       toast({
         title: "Order Complete!",
-        description: "Your images have been uploaded and are ready for processing",
+        description: "Your images have been uploaded and processing has started",
         variant: "default"
       });
 
