@@ -123,11 +123,15 @@ const PaymentSuccess: React.FC = () => {
         return;
       }
       
-      // Retrieve stored files from localStorage
-      const storedFiles = localStorage.getItem('orbit_pending_files');
-      if (!storedFiles) {
-        console.log('⚠️ No files found in localStorage and no upload flag, files may have been uploaded already');
+      // Check for temporarily stored files (new efficient method)
+      const storedFileRefs = localStorage.getItem('orbit_pending_file_refs');
+      const tempFiles = (window as any).orbitTempFiles;
+      
+      if (!storedFileRefs || !tempFiles) {
+        console.log('⚠️ No temporary files found, files may have been uploaded already');
         localStorage.removeItem('orbit_pending_order_id');
+        localStorage.removeItem('orbit_pending_file_refs');
+        
         toast({
           title: "Order Complete!",
           description: "Your images are ready for processing",
@@ -136,31 +140,46 @@ const PaymentSuccess: React.FC = () => {
         return;
       }
 
-      const filesData = JSON.parse(storedFiles);
-      console.log(`📋 Found ${filesData.length} files to upload from localStorage`);
+      const fileRefs = JSON.parse(storedFileRefs);
+      console.log(`📋 Found ${fileRefs.length} files to upload from temporary storage`);
 
-      // Upload files to storage using existing function logic
-      const { data, error } = await supabase.functions.invoke('upload-order-images', {
-        body: {
-          orderId: order.id,
-          files: filesData.map((file: any) => ({
-            name: file.name,
-            data: file.data,
-            type: file.type
-          }))
-        }
+      // Create FormData for direct upload (efficient method)
+      const formData = new FormData();
+      formData.append('orderId', order.id);
+      
+      tempFiles.forEach((file: File, index: number) => {
+        formData.append(`file_${index}`, file);
       });
 
-      if (error) {
-        console.error('❌ File upload failed:', error);
-        throw new Error(`File upload failed: ${error.message}`);
+      // Get auth token for the request
+      const session = await supabase.auth.getSession();
+      const authToken = session.data.session?.access_token;
+      
+      if (!authToken) {
+        throw new Error('No authentication token available');
       }
+
+      // Use direct upload (no base64 conversion!)
+      const response = await fetch(`${supabase.supabaseUrl}/functions/v1/upload-order-images-direct`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+        },
+        body: formData
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `Upload failed with status ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('✅ Files uploaded successfully via direct upload:', data);
       
-      console.log('✅ Files uploaded successfully from localStorage:', data);
-      
-      // Clean up localStorage after successful upload
+      // Clean up temporary storage
       localStorage.removeItem('orbit_pending_order_id');
-      localStorage.removeItem('orbit_pending_files');
+      localStorage.removeItem('orbit_pending_file_refs');
+      delete (window as any).orbitTempFiles;
       
       // Show success message
       toast({

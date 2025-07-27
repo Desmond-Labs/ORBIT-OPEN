@@ -157,50 +157,50 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
 
   const uploadFilesToStorage = async (orderId: string) => {
     try {
-      console.log('📤 Starting file upload to storage for order:', orderId);
+      console.log('📤 Starting direct file upload to storage for order:', orderId);
       setPaymentPhase('uploading');
       setUploadProgress({ current: 0, total: uploadedFiles.length });
       
-      // Convert files to the format expected by upload-order-images
-      console.log('🔄 Converting files to base64...');
-      const filesData = await Promise.all(
-        uploadedFiles.map(async (file, index) => {
-          return new Promise<{name: string, data: string, type: string}>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => {
-              const base64 = reader.result as string;
-              const data = base64.split(',')[1]; // Remove data:image/jpeg;base64, prefix
-              console.log(`✅ Converted file ${index + 1}/${uploadedFiles.length}: ${file.name}`);
-              setUploadProgress(prev => ({ ...prev, current: index + 1 }));
-              resolve({
-                name: file.name,
-                data,
-                type: file.type
-              });
-            };
-            reader.onerror = reject;
-            reader.readAsDataURL(file);
-          });
-        })
-      );
-
-      console.log('📡 Invoking upload-order-images function with', filesData.length, 'files');
-      const { data, error } = await supabase.functions.invoke('upload-order-images', {
-        body: {
-          orderId: orderId,
-          files: filesData
-        }
+      // Create FormData for direct file upload (no base64 conversion!)
+      console.log('📋 Preparing direct file upload...');
+      const formData = new FormData();
+      formData.append('orderId', orderId);
+      
+      uploadedFiles.forEach((file, index) => {
+        formData.append(`file_${index}`, file);
+        console.log(`✅ Added file ${index + 1}/${uploadedFiles.length}: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)}MB)`);
+        setUploadProgress(prev => ({ ...prev, current: index + 1 }));
       });
 
-      if (error) {
-        console.error('❌ Upload function error:', error);
-        throw error;
-      }
+      console.log('📡 Invoking direct upload function with', uploadedFiles.length, 'files');
       
-      console.log('✅ Files uploaded successfully:', data);
+      // Get auth token for the request
+      const session = await supabase.auth.getSession();
+      const authToken = session.data.session?.access_token;
+      
+      if (!authToken) {
+        throw new Error('No authentication token available');
+      }
+
+      // Use direct fetch to upload FormData
+      const response = await fetch(`${supabase.supabaseUrl}/functions/v1/upload-order-images-direct`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+        },
+        body: formData
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `Upload failed with status ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('✅ Files uploaded successfully via direct upload:', data);
       return data;
     } catch (error) {
-      console.error('❌ File upload failed:', error);
+      console.error('❌ Direct file upload failed:', error);
       throw error;
     }
   };
@@ -254,15 +254,15 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
       setOperationStatus('Preparing files...');
       setPaymentPhase('uploading');
       
-      // Calculate total file size to determine storage strategy
+      // Calculate total file size to determine strategy  
       const totalFileSizeMB = uploadedFiles.reduce((sum, file) => sum + file.size, 0) / (1024 * 1024);
-      const estimatedBase64SizeMB = totalFileSizeMB * 1.33; // Base64 increases size by ~33%
       
-      console.log(`📊 File size analysis: ${uploadedFiles.length} files, ${totalFileSizeMB.toFixed(2)}MB total, ~${estimatedBase64SizeMB.toFixed(2)}MB as base64`);
+      console.log(`📊 File size analysis: ${uploadedFiles.length} files, ${totalFileSizeMB.toFixed(2)}MB total`);
       
-      // Strategy: If files are too large for localStorage, upload before payment
-      if (estimatedBase64SizeMB > 4) { // Keep under 5MB localStorage limit
-        console.log('📤 Files too large for localStorage, uploading before payment');
+      // Strategy: For very large files (>10MB), upload before payment to avoid timeout
+      // For normal files, store temporarily and upload after payment for better UX
+      if (totalFileSizeMB > 10) {
+        console.log('📤 Large files detected, uploading before payment for reliability');
         setOperationStatus('Uploading large files...');
         await uploadFilesToStorage(paymentData.order_id);
         
@@ -270,58 +270,25 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
         localStorage.setItem('orbit_pending_order_id', paymentData.order_id);
         localStorage.setItem('orbit_files_uploaded', 'true');
       } else {
-        console.log('💾 Files small enough for localStorage, preparing for post-payment upload');
+        console.log('⚡ Normal sized files, storing temporarily for post-payment upload');
         
-        try {
-          // Store files data in localStorage for upload after payment
-          const filesData = await Promise.all(
-            uploadedFiles.map(async (file) => {
-              return new Promise<{name: string, data: string, type: string, size: number}>((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onload = () => {
-                  const base64 = reader.result as string;
-                  const data = base64.split(',')[1]; // Remove data:image/jpeg;base64, prefix
-                  resolve({
-                    name: file.name,
-                    data,
-                    type: file.type,
-                    size: file.size
-                  });
-                };
-                reader.onerror = reject;
-                reader.readAsDataURL(file);
-              });
-            })
-          );
+        // Store file references temporarily (much more efficient than base64)
+        const fileRefs = uploadedFiles.map((file, index) => ({
+          name: file.name,
+          type: file.type,
+          size: file.size,
+          index: index
+        }));
 
-          // Store order ID and file data in localStorage with quota error handling
-          localStorage.setItem('orbit_pending_order_id', paymentData.order_id);
-          
-          try {
-            localStorage.setItem('orbit_pending_files', JSON.stringify(filesData));
-            console.log('✅ Files stored in localStorage successfully');
-          } catch (storageError: any) {
-            if (storageError.name === 'QuotaExceededError') {
-              console.log('⚠️ localStorage quota exceeded, falling back to pre-payment upload');
-              // Clear any partial data
-              localStorage.removeItem('orbit_pending_files');
-              
-              // Fallback: upload files before payment
-              setOperationStatus('Storage full, uploading files...');
-              await uploadFilesToStorage(paymentData.order_id);
-              localStorage.setItem('orbit_files_uploaded', 'true');
-            } else {
-              throw storageError;
-            }
-          }
-        } catch (fileProcessingError) {
-          console.error('❌ Error processing files for storage:', fileProcessingError);
-          // Fallback: upload files before payment
-          console.log('🔄 Falling back to pre-payment upload due to processing error');
-          await uploadFilesToStorage(paymentData.order_id);
-          localStorage.setItem('orbit_pending_order_id', paymentData.order_id);
-          localStorage.setItem('orbit_files_uploaded', 'true');
-        }
+        // Store minimal data in localStorage
+        localStorage.setItem('orbit_pending_order_id', paymentData.order_id);
+        localStorage.setItem('orbit_pending_file_refs', JSON.stringify(fileRefs));
+        
+        // Store actual File objects in a global temporary variable (not localStorage)
+        // This avoids the localStorage quota issue entirely
+        (window as any).orbitTempFiles = uploadedFiles;
+        
+        console.log('✅ File references stored efficiently (no base64 conversion)');
       }
 
       // Phase 4: Connecting to Stripe - Navigate to payment waiting page
