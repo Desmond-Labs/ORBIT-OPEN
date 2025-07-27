@@ -27,11 +27,26 @@ serve(async (req) => {
   }
 
   try {
+    console.log('🚀 process-image-batch function called');
+    console.log('🚀 Request method:', req.method);
+    console.log('🚀 Request headers:', Object.fromEntries(req.headers.entries()));
+    
+    // Check environment variables
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    
+    console.log('🚀 Environment check:', {
+      hasSupabaseUrl: !!supabaseUrl,
+      hasServiceKey: !!serviceKey,
+      serviceKeyLength: serviceKey?.length || 0
+    });
+    
+    if (!supabaseUrl || !serviceKey) {
+      throw new Error('Missing required environment variables');
+    }
+    
     // Initialize Supabase with service role for full access
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
+    const supabase = createClient(supabaseUrl, serviceKey);
 
     // No user authentication needed for webhook-triggered processing
     // The order validation below provides sufficient security
@@ -297,24 +312,30 @@ serve(async (req) => {
           .single();
 
         if (!userError && userProfile?.email) {
-          console.log(`Sending completion email to: ${userProfile.email}`);
+          console.log(`📧 Sending completion email to: ${userProfile.email}`);
+          console.log(`📧 Order ID: ${orderId}, Image count: ${successCount}`);
           
           const emailResult = await supabase.functions.invoke('send-order-completion-email', {
             body: {
               orderId: orderId,
               userEmail: userProfile.email,
               imageCount: successCount,
-              downloadUrl: downloadInfo ? `${Deno.env.get('FRONTEND_URL') || 'https://ufdcvxmizlzlnyyqpfck.supabase.co'}/processing?order=${orderId}&step=processing` : undefined
+              downloadUrl: `${Deno.env.get('FRONTEND_URL') || 'https://ufdcvxmizlzlnyyqpfck.supabase.co'}/processing?order=${orderId}&step=processing`
             }
           });
 
+          console.log(`📧 Email function response:`, emailResult);
+          
           if (emailResult.error) {
-            console.error('Failed to send completion email:', emailResult.error);
+            console.error('📧 Failed to send completion email:', emailResult.error);
+            console.error('📧 Error details:', JSON.stringify(emailResult.error, null, 2));
           } else {
-            console.log('Completion email sent successfully');
+            console.log('📧 Completion email sent successfully:', emailResult.data);
           }
         } else {
-          console.warn('Could not find user email for completion notification');
+          console.warn('📧 Could not find user email for completion notification');
+          console.warn('📧 User error:', userError);
+          console.warn('📧 User profile:', userProfile);
         }
       } catch (emailError) {
         console.error('Error sending completion email:', emailError);
@@ -367,10 +388,15 @@ serve(async (req) => {
     });
 
   } catch (error) {
-    console.error('Batch processing error:', error);
+    console.error('🚨 Batch processing error:', error);
+    console.error('🚨 Error stack:', error.stack);
+    console.error('🚨 Error name:', error.name);
+    
     return new Response(JSON.stringify({
       success: false,
       error: error.message,
+      errorName: error.name,
+      errorStack: error.stack,
       timestamp: new Date().toISOString()
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

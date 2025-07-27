@@ -25,9 +25,31 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
+    console.log('📧 send-order-completion-email function called');
+    console.log('📧 Request method:', req.method);
+    console.log('📧 Request headers:', Object.fromEntries(req.headers.entries()));
+    
     const { orderId, userEmail, userName, imageCount, downloadUrl }: OrderCompletionEmailRequest = await req.json();
 
-    console.log('Sending order completion email for order:', orderId);
+    console.log('📧 Sending order completion email for order:', orderId);
+    console.log('📧 Email recipient:', userEmail);
+    console.log('📧 Image count:', imageCount);
+    
+    // Check environment variables
+    const resendKey = Deno.env.get("RESEND_API_KEY");
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    
+    console.log('📧 Environment check:', {
+      hasResendKey: !!resendKey,
+      hasSupabaseUrl: !!supabaseUrl,
+      hasServiceKey: !!serviceKey,
+      resendKeyLength: resendKey?.length || 0
+    });
+    
+    if (!resendKey) {
+      throw new Error('RESEND_API_KEY environment variable is not set');
+    }
 
     // Create Supabase client
     const supabase = createClient(
@@ -38,13 +60,7 @@ const handler = async (req: Request): Promise<Response> => {
     // Get order details from database
     const { data: order, error: orderError } = await supabase
       .from('orders')
-      .select(`
-        *,
-        batches (
-          name,
-          processing_results
-        )
-      `)
+      .select('*')
       .eq('id', orderId)
       .single();
 
@@ -52,7 +68,19 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error(`Order not found: ${orderError?.message}`);
     }
 
-    const batchName = order.batches?.name || `Order ${order.order_number}`;
+    // Get batch info if available
+    let batchName = `Order ${order.order_number}`;
+    if (order.batch_id) {
+      const { data: batch } = await supabase
+        .from('batches')
+        .select('name')
+        .eq('id', order.batch_id)
+        .single();
+      
+      if (batch?.name) {
+        batchName = batch.name;
+      }
+    }
     const orderNumber = order.order_number;
     const totalCost = order.total_cost;
 
@@ -285,10 +313,23 @@ const handler = async (req: Request): Promise<Response> => {
 
   } catch (error: any) {
     console.error("Error in send-order-completion-email function:", error);
+    console.error("Error stack:", error.stack);
+    console.error("Error name:", error.name);
+    console.error("RESEND_API_KEY exists:", !!Deno.env.get("RESEND_API_KEY"));
+    console.error("SUPABASE_URL exists:", !!Deno.env.get("SUPABASE_URL"));
+    console.error("SUPABASE_SERVICE_ROLE_KEY exists:", !!Deno.env.get("SUPABASE_SERVICE_ROLE_KEY"));
+    
     return new Response(
       JSON.stringify({ 
         error: error.message,
-        success: false 
+        errorName: error.name,
+        errorStack: error.stack,
+        success: false,
+        envCheck: {
+          hasResendKey: !!Deno.env.get("RESEND_API_KEY"),
+          hasSupabaseUrl: !!Deno.env.get("SUPABASE_URL"),
+          hasServiceKey: !!Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")
+        }
       }),
       {
         status: 500,
