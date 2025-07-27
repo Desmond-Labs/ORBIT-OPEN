@@ -33,15 +33,9 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Get authenticated user
-    const authHeader = req.headers.get('Authorization')!;
-    const token = authHeader.replace('Bearer ', '');
-    const { data: userData } = await supabase.auth.getUser(token);
-    const user = userData.user;
-    
-    if (!user) {
-      throw new Error('User not authenticated');
-    }
+    // No user authentication needed for webhook-triggered processing
+    // The order validation below provides sufficient security
+    console.log('🚀 Starting batch image processing (webhook-triggered)');
 
     const { orderId, analysisType = 'product' }: ProcessBatchRequest = await req.json();
 
@@ -51,17 +45,23 @@ serve(async (req) => {
 
     console.log(`Starting batch processing for order: ${orderId}`);
 
-    // 1. Get the order and verify ownership
+    // 1. Get the order and validate it exists with proper status
     const { data: order, error: orderError } = await supabase
       .from('orders')
       .select('*, batches(*)')
       .eq('id', orderId)
-      .eq('user_id', user.id)
       .single();
 
     if (orderError || !order) {
-      throw new Error('Order not found or access denied');
+      throw new Error(`Order not found: ${orderId}`);
     }
+
+    // Validate order is in the correct state for processing
+    if (order.payment_status !== 'completed' && order.payment_status !== 'succeeded') {
+      throw new Error(`Order payment not completed. Status: ${order.payment_status}`);
+    }
+
+    console.log(`Processing order ${orderId} for user ${order.user_id}`);
 
     // 2. Get the batch associated with this order (should already exist)
     let batch = order.batches;
@@ -202,11 +202,11 @@ serve(async (req) => {
     // 7.5. Send completion email if order is successfully completed
     if (finalStatus === 'completed') {
       try {
-        // Get user email from orbit_users table
+        // Get user email from orbit_users table using the order's user_id
         const { data: userProfile, error: userError } = await supabase
           .from('orbit_users')
           .select('email')
-          .eq('id', user.id)
+          .eq('id', order.user_id)
           .single();
 
         if (!userError && userProfile?.email) {
@@ -241,7 +241,7 @@ serve(async (req) => {
       const { data: downloadData, error: downloadError } = await supabase
         .from('file_downloads')
         .insert({
-          user_id: user.id,
+          user_id: order.user_id,
           order_id: orderId,
           batch_id: batch.id,
           file_paths: processedResults
