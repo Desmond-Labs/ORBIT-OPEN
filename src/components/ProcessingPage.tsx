@@ -254,30 +254,75 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
       setOperationStatus('Preparing files...');
       setPaymentPhase('uploading');
       
-      // Store files data in localStorage for upload after payment
-      const filesData = await Promise.all(
-        uploadedFiles.map(async (file) => {
-          return new Promise<{name: string, data: string, type: string, size: number}>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => {
-              const base64 = reader.result as string;
-              const data = base64.split(',')[1]; // Remove data:image/jpeg;base64, prefix
-              resolve({
-                name: file.name,
-                data,
-                type: file.type,
-                size: file.size
+      // Calculate total file size to determine storage strategy
+      const totalFileSizeMB = uploadedFiles.reduce((sum, file) => sum + file.size, 0) / (1024 * 1024);
+      const estimatedBase64SizeMB = totalFileSizeMB * 1.33; // Base64 increases size by ~33%
+      
+      console.log(`📊 File size analysis: ${uploadedFiles.length} files, ${totalFileSizeMB.toFixed(2)}MB total, ~${estimatedBase64SizeMB.toFixed(2)}MB as base64`);
+      
+      // Strategy: If files are too large for localStorage, upload before payment
+      if (estimatedBase64SizeMB > 4) { // Keep under 5MB localStorage limit
+        console.log('📤 Files too large for localStorage, uploading before payment');
+        setOperationStatus('Uploading large files...');
+        await uploadFilesToStorage(paymentData.order_id);
+        
+        // Store only the order ID 
+        localStorage.setItem('orbit_pending_order_id', paymentData.order_id);
+        localStorage.setItem('orbit_files_uploaded', 'true');
+      } else {
+        console.log('💾 Files small enough for localStorage, preparing for post-payment upload');
+        
+        try {
+          // Store files data in localStorage for upload after payment
+          const filesData = await Promise.all(
+            uploadedFiles.map(async (file) => {
+              return new Promise<{name: string, data: string, type: string, size: number}>((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => {
+                  const base64 = reader.result as string;
+                  const data = base64.split(',')[1]; // Remove data:image/jpeg;base64, prefix
+                  resolve({
+                    name: file.name,
+                    data,
+                    type: file.type,
+                    size: file.size
+                  });
+                };
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
               });
-            };
-            reader.onerror = reject;
-            reader.readAsDataURL(file);
-          });
-        })
-      );
+            })
+          );
 
-      // Store order ID and file data in localStorage
-      localStorage.setItem('orbit_pending_order_id', paymentData.order_id);
-      localStorage.setItem('orbit_pending_files', JSON.stringify(filesData));
+          // Store order ID and file data in localStorage with quota error handling
+          localStorage.setItem('orbit_pending_order_id', paymentData.order_id);
+          
+          try {
+            localStorage.setItem('orbit_pending_files', JSON.stringify(filesData));
+            console.log('✅ Files stored in localStorage successfully');
+          } catch (storageError: any) {
+            if (storageError.name === 'QuotaExceededError') {
+              console.log('⚠️ localStorage quota exceeded, falling back to pre-payment upload');
+              // Clear any partial data
+              localStorage.removeItem('orbit_pending_files');
+              
+              // Fallback: upload files before payment
+              setOperationStatus('Storage full, uploading files...');
+              await uploadFilesToStorage(paymentData.order_id);
+              localStorage.setItem('orbit_files_uploaded', 'true');
+            } else {
+              throw storageError;
+            }
+          }
+        } catch (fileProcessingError) {
+          console.error('❌ Error processing files for storage:', fileProcessingError);
+          // Fallback: upload files before payment
+          console.log('🔄 Falling back to pre-payment upload due to processing error');
+          await uploadFilesToStorage(paymentData.order_id);
+          localStorage.setItem('orbit_pending_order_id', paymentData.order_id);
+          localStorage.setItem('orbit_files_uploaded', 'true');
+        }
+      }
 
       // Phase 4: Connecting to Stripe - Navigate to payment waiting page
       console.log('🔗 Phase 4: Connecting to Stripe');

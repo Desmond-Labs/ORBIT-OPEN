@@ -106,10 +106,27 @@ const PaymentSuccess: React.FC = () => {
     try {
       console.log('📤 Starting file upload after successful payment for order:', order.id);
       
+      // Check if files were already uploaded before payment (large files)
+      const filesAlreadyUploaded = localStorage.getItem('orbit_files_uploaded');
+      if (filesAlreadyUploaded === 'true') {
+        console.log('✅ Files were already uploaded before payment (large files)');
+        
+        // Clean up localStorage
+        localStorage.removeItem('orbit_pending_order_id');
+        localStorage.removeItem('orbit_files_uploaded');
+        
+        toast({
+          title: "Order Complete!",
+          description: "Your images are ready for processing",
+          variant: "default"
+        });
+        return;
+      }
+      
       // Retrieve stored files from localStorage
       const storedFiles = localStorage.getItem('orbit_pending_files');
       if (!storedFiles) {
-        console.log('⚠️ No files found in localStorage, files may have been uploaded already');
+        console.log('⚠️ No files found in localStorage and no upload flag, files may have been uploaded already');
         localStorage.removeItem('orbit_pending_order_id');
         toast({
           title: "Order Complete!",
@@ -120,7 +137,7 @@ const PaymentSuccess: React.FC = () => {
       }
 
       const filesData = JSON.parse(storedFiles);
-      console.log(`📋 Found ${filesData.length} files to upload`);
+      console.log(`📋 Found ${filesData.length} files to upload from localStorage`);
 
       // Upload files to storage using existing function logic
       const { data, error } = await supabase.functions.invoke('upload-order-images', {
@@ -139,7 +156,7 @@ const PaymentSuccess: React.FC = () => {
         throw new Error(`File upload failed: ${error.message}`);
       }
       
-      console.log('✅ Files uploaded successfully:', data);
+      console.log('✅ Files uploaded successfully from localStorage:', data);
       
       // Clean up localStorage after successful upload
       localStorage.removeItem('orbit_pending_order_id');
