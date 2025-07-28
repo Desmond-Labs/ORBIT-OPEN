@@ -105,7 +105,7 @@ export const OrbitDemo: React.FC<OrbitDemoProps> = ({ className = '' }) => {
 
           p.preload = () => {
             userImage = p.loadImage(
-              'https://images.pexels.com/photos/1850595/pexels-photo-1850595.jpeg?auto=compress&cs=tinysrgb&w=800&h=600&dpr=1',
+              '/lovable-uploads/b9339360-931e-4e06-8194-9c4b25301f7c.png',
               () => console.log('Demo image loaded'),
               () => console.log('Demo image failed to load')
             );
