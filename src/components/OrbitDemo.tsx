@@ -229,6 +229,9 @@ export const OrbitDemo: React.FC<OrbitDemoProps> = ({ className = '' }) => {
                 const word = constellationWords[i];
                 metadataTags.push(new MetadataTag(word.text, word.color, word.categoryIndex, word.wordIndex));
                 constellationWords.splice(i, 1);
+                
+                // Reposition all tags after adding a new one
+                MetadataTag.positionTagsInCategories(metadataTags);
               }
             }
 
@@ -568,29 +571,35 @@ export const OrbitDemo: React.FC<OrbitDemoProps> = ({ className = '' }) => {
               const categoryY = metadataArea.y + categoryIndex * categorySpacing;
               this.y = categoryY + (categorySpacing / 2) + 5;
 
-              // Calculate total available width for tags in this category
-              const availableWidth = metadataArea.w - 30; // Leave some margin
-              const tagsInCategory = WORDS_PER_CATEGORY;
+              // Initial position - will be recalculated after all tags are created
+              this.x = metadataArea.x + 15;
+            }
+
+            // Method to position all tags in a category evenly
+            static positionTagsInCategories(tags: MetadataTag[]) {
               const spacingBetweenTags = 8;
-              const totalSpacingWidth = (tagsInCategory - 1) * spacingBetweenTags;
-              
-              // Calculate total width of all tags in this category
-              let totalTagsWidth = 0;
-              p.textSize(9);
-              const currentCategoryData = METADATA[CATEGORIES[categoryIndex].key];
-              const sampleWords = getSampleWords(CATEGORIES[categoryIndex].key, WORDS_PER_CATEGORY);
-              for (const word of sampleWords) {
-                totalTagsWidth += p.textWidth(word) + 12; // 12 is padding
-              }
-              
-              // Calculate starting position to center all tags
-              const startX = metadataArea.x + 15 + (availableWidth - totalTagsWidth - totalSpacingWidth) / 2;
-              
-              // Position this specific tag
-              this.x = startX;
-              for (const otherTag of metadataTags) {
-                if (otherTag.categoryIndex === this.categoryIndex && otherTag.wordIndex < this.wordIndex) {
-                  this.x += otherTag.width + spacingBetweenTags;
+              const availableWidth = metadataArea.w - 30; // Leave some margin
+
+              // Group tags by category
+              for (let categoryIndex = 0; categoryIndex < CATEGORIES.length; categoryIndex++) {
+                const categoryTags = tags.filter(tag => tag.categoryIndex === categoryIndex);
+                if (categoryTags.length === 0) continue;
+
+                // Sort tags by wordIndex to maintain order
+                categoryTags.sort((a, b) => a.wordIndex - b.wordIndex);
+
+                // Calculate total width of all tags in this category
+                const totalTagsWidth = categoryTags.reduce((sum, tag) => sum + tag.width, 0);
+                const totalSpacingWidth = (categoryTags.length - 1) * spacingBetweenTags;
+                
+                // Calculate starting position to center all tags
+                const startX = metadataArea.x + 15 + Math.max(0, (availableWidth - totalTagsWidth - totalSpacingWidth) / 2);
+                
+                // Position each tag
+                let currentX = startX;
+                for (const tag of categoryTags) {
+                  tag.x = currentX;
+                  currentX += tag.width + spacingBetweenTags;
                 }
               }
             }
