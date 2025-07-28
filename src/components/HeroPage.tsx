@@ -1,6 +1,7 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { ArrowRight, Sparkles, Zap, Download } from 'lucide-react';
+import { OrbitDemo } from './OrbitDemo';
 interface HeroPageProps {
   onGetStarted: () => void;
 }
@@ -91,6 +92,20 @@ export const HeroPage: React.FC<HeroPageProps> = ({
                 </p>
               </div>
             </div>
+          </div>
+
+          {/* ORBIT Demo Section */}
+          <div className="mb-16">
+            <div className="text-center mb-8">
+              <h2 className="text-3xl md:text-4xl font-bold mb-4">
+                See How <span className="gradient-text">ORBIT</span> Works
+              </h2>
+              <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+                Watch ORBIT's AI analyze an image in real-time, extracting detailed metadata 
+                and embedding intelligent insights directly into your visual assets.
+              </p>
+            </div>
+            <OrbitDemo className="cosmic-transition" />
           </div>
 
           {/* Pricing Preview */}
