@@ -568,14 +568,31 @@ export const OrbitDemo: React.FC<OrbitDemoProps> = ({ className = '' }) => {
               const categoryY = metadataArea.y + categoryIndex * categorySpacing;
               this.y = categoryY + (categorySpacing / 2) + 5;
 
-              this.x = metadataArea.x + 15;
-              let precedingWidths = 0;
+              // Calculate total available width for tags in this category
+              const availableWidth = metadataArea.w - 30; // Leave some margin
+              const tagsInCategory = WORDS_PER_CATEGORY;
+              const spacingBetweenTags = 8;
+              const totalSpacingWidth = (tagsInCategory - 1) * spacingBetweenTags;
+              
+              // Calculate total width of all tags in this category
+              let totalTagsWidth = 0;
+              p.textSize(9);
+              const currentCategoryData = METADATA[CATEGORIES[categoryIndex].key];
+              const sampleWords = getSampleWords(CATEGORIES[categoryIndex].key, WORDS_PER_CATEGORY);
+              for (const word of sampleWords) {
+                totalTagsWidth += p.textWidth(word) + 12; // 12 is padding
+              }
+              
+              // Calculate starting position to center all tags
+              const startX = metadataArea.x + 15 + (availableWidth - totalTagsWidth - totalSpacingWidth) / 2;
+              
+              // Position this specific tag
+              this.x = startX;
               for (const otherTag of metadataTags) {
                 if (otherTag.categoryIndex === this.categoryIndex && otherTag.wordIndex < this.wordIndex) {
-                  precedingWidths += otherTag.width + 4;
+                  this.x += otherTag.width + spacingBetweenTags;
                 }
               }
-              this.x += precedingWidths;
             }
 
             update() {
