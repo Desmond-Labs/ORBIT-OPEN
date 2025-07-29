@@ -317,8 +317,8 @@ serve(async (req) => {
           throw tokenError;
         }
 
-        const accessToken = tokenData;
-        console.log(`🔐 Access token generated successfully for order: ${orderId}`);
+        const accessToken = tokenData[0].token;
+        console.log(`🔐 Access token generated successfully: ${accessToken.substring(0, 8)}... for order: ${orderId}`);
 
         // Get user email from orbit_users table using the order's user_id
         const { data: userProfile, error: userError } = await supabase
@@ -357,10 +357,14 @@ serve(async (req) => {
           console.warn('📧 User profile:', userProfile);
         }
       } catch (emailError) {
-        console.error('Error sending completion email:', emailError);
-        // Don't fail the entire process if email fails
+        console.error('❌ Error in email/token process:', emailError);
+        console.error('❌ Email error stack:', emailError.stack);
+        // Don't fail the entire process if email fails - batch results should still be recorded
       }
     }
+
+    // Ensure batch results are properly recorded even if email fails
+    console.log(`📊 Recording final batch results - Success: ${successCount}, Errors: ${errorCount}`);
 
     // 8. Create download link if successful
     let downloadInfo = null;
