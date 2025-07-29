@@ -96,8 +96,12 @@ export const OrbitDemo: React.FC<OrbitDemoProps> = ({ className = '' }) => {
           let constellationWords: any[] = [];
           let activeConstellationWords: any[] = [];
           let embeddingParticles: any[] = [];
+          let embeddingRipples: any[] = [];
+          let completionBurstParticles: any[] = [];
           let metadataTags: any[] = [];
           let embeddingStartFrame = 0;
+          let completionInitiated = false;
+          let imageGlow = 0;
           let stars: any[] = [];
           let userImage: any;
           let canvasWidth: number, canvasHeight: number;
@@ -169,8 +173,12 @@ export const OrbitDemo: React.FC<OrbitDemoProps> = ({ className = '' }) => {
             constellationWords = [];
             activeConstellationWords = [];
             embeddingParticles = [];
+            embeddingRipples = [];
+            completionBurstParticles = [];
             metadataTags = [];
             embeddingStartFrame = 0;
+            completionInitiated = false;
+            imageGlow = 0;
           }
 
           function getSampleWords(categoryKey: string, count: number) {
@@ -245,7 +253,41 @@ export const OrbitDemo: React.FC<OrbitDemoProps> = ({ className = '' }) => {
           }
 
           function updateEmbedding() {
+            const currentCategory = CATEGORIES[activeCategoryIndex];
             const embeddingFramesSinceStart = p.frameCount - embeddingStartFrame;
+            const categoryFrameCount = embeddingFramesSinceStart % EMBED_DURATION_PER_CATEGORY;
+            
+            // Create streaming particles
+            if (categoryFrameCount < EMBED_DURATION_PER_CATEGORY - 30 && !completionInitiated) {
+              const categoryYCenter = metadataArea.y + (metadataArea.h / CATEGORIES.length) * (activeCategoryIndex + 0.5);
+              for (let i = 0; i < 3; i++) {
+                const startPos = p.createVector(
+                  metadataArea.x + metadataArea.w - 10 + p.random(-5, 5),
+                  categoryYCenter + p.random(-15, 15)
+                );
+                embeddingParticles.push(new StreamingEmbeddingParticle(startPos, currentCategory.color, activeCategoryIndex));
+              }
+            }
+
+            // Update particles and create ripples
+            for (let i = embeddingParticles.length - 1; i >= 0; i--) {
+              embeddingParticles[i].update();
+              if (embeddingParticles[i].isDone()) {
+                if (embeddingParticles[i].hasEmbedded) {
+                  embeddingRipples.push(new EmbeddingRipple(embeddingParticles[i].pos, currentCategory.color));
+                }
+                embeddingParticles.splice(i, 1);
+              }
+            }
+
+            // Update ripples
+            for (let i = embeddingRipples.length - 1; i >= 0; i--) {
+              embeddingRipples[i].update();
+              if (embeddingRipples[i].isDone()) {
+                embeddingRipples.splice(i, 1);
+              }
+            }
+
             const totalEmbeddingFrames = CATEGORIES.length * EMBED_DURATION_PER_CATEGORY;
             embeddingProgress = (embeddingFramesSinceStart / totalEmbeddingFrames) * 100;
             embeddingProgress = p.min(embeddingProgress, 100);
@@ -255,30 +297,34 @@ export const OrbitDemo: React.FC<OrbitDemoProps> = ({ className = '' }) => {
               activeCategoryIndex = expectedCategoryIndex;
             }
 
-            // Create embedding particles
-            if (embeddingFramesSinceStart < totalEmbeddingFrames && activeCategoryIndex < CATEGORIES.length) {
-              const currentCategory = CATEGORIES[activeCategoryIndex];
-              const categoryYCenter = metadataArea.y + (metadataArea.h / CATEGORIES.length) * (activeCategoryIndex + 0.5);
-              
-              if (p.frameCount % 4 === 0) {
-                const startPos = p.createVector(
-                  metadataArea.x + metadataArea.w - 10,
-                  categoryYCenter + p.random(-15, 15)
-                );
-                embeddingParticles.push(new EmbeddingParticle(startPos, currentCategory.color));
-              }
+            if (embeddingFramesSinceStart >= totalEmbeddingFrames && !completionInitiated) {
+              completionInitiated = true;
+              embeddingProgress = 100;
             }
 
-            // Update particles
-            for (let i = embeddingParticles.length - 1; i >= 0; i--) {
-              embeddingParticles[i].update();
-              if (embeddingParticles[i].isDone()) {
-                embeddingParticles.splice(i, 1);
-              }
-            }
-
-            if (embeddingProgress >= 100) {
+            if (completionInitiated && embeddingParticles.length === 0 && embeddingRipples.length === 0 && currentPhase !== 'complete') {
               currentPhase = 'complete';
+              triggerCompletionBurst();
+            }
+          }
+
+          function triggerCompletionBurst() {
+            const centerPos = p.createVector(imageArea.x + imageArea.w / 2, imageArea.y + imageArea.h / 2);
+            for (let i = 0; i < 200; i++) {
+              completionBurstParticles.push(new CompletionBurstParticle(centerPos));
+            }
+            imageGlow = 1.0;
+          }
+
+          function updateComplete() {
+            for (let i = completionBurstParticles.length - 1; i >= 0; i--) {
+              completionBurstParticles[i].update();
+              if (completionBurstParticles[i].isDone()) {
+                completionBurstParticles.splice(i, 1);
+              }
+            }
+            if (imageGlow > 0) {
+              imageGlow = p.max(0, imageGlow - 0.02);
             }
           }
 
@@ -290,6 +336,8 @@ export const OrbitDemo: React.FC<OrbitDemoProps> = ({ className = '' }) => {
               updateAnalysis();
             } else if (currentPhase === 'embedding') {
               updateEmbedding();
+            } else if (currentPhase === 'complete') {
+              updateComplete();
             }
 
             drawImagePanel();
@@ -314,6 +362,16 @@ export const OrbitDemo: React.FC<OrbitDemoProps> = ({ className = '' }) => {
             p.stroke(ORBIT_TEAL);
             p.strokeWeight(2);
             p.rect(imageArea.x, imageArea.y, imageArea.w, imageArea.h, 8);
+            
+            // Add completion glow effect
+            if (imageGlow > 0) {
+              p.noFill();
+              p.strokeWeight(4 * imageGlow);
+              let glowColor = p.color(ORBIT_TEAL);
+              glowColor.setAlpha(150 * imageGlow);
+              p.stroke(glowColor);
+              p.rect(imageArea.x, imageArea.y, imageArea.w, imageArea.h, 8);
+            }
             p.pop();
           }
 
@@ -365,23 +423,51 @@ export const OrbitDemo: React.FC<OrbitDemoProps> = ({ className = '' }) => {
           }
 
           function drawAnimations() {
-            // Draw constellation lines
+            // Draw constellation lines with enhanced visibility
             if (currentPhase === 'analyzing' && activeConstellationWords.length > 1) {
               const firstWord = activeConstellationWords[0];
               let lineAlpha = 0;
               
               if (firstWord.state === 'appearing' || firstWord.state === 'stationary') {
+                const stationaryEndTime = WORD_APPEAR_DURATION + WORD_STATIONARY_DURATION;
                 if (firstWord.timer < WORD_APPEAR_DURATION) {
-                  lineAlpha = p.map(firstWord.timer, 0, WORD_APPEAR_DURATION, 0, 150);
+                  lineAlpha = p.map(firstWord.timer, 0, WORD_APPEAR_DURATION, 0, 255);
+                } else if (firstWord.timer < stationaryEndTime - 15) {
+                  lineAlpha = 255;
                 } else {
-                  lineAlpha = 150;
+                  lineAlpha = p.map(firstWord.timer, stationaryEndTime - 15, stationaryEndTime, 255, 0);
                 }
               }
 
               if (lineAlpha > 0) {
                 p.push();
+                
+                // Draw glow effect for constellation lines
+                p.strokeWeight(6);
+                p.stroke(255, lineAlpha * 0.2);
+                for (let i = 0; i < activeConstellationWords.length - 1; i++) {
+                  p.line(
+                    activeConstellationWords[i].initialPos.x,
+                    activeConstellationWords[i].initialPos.y,
+                    activeConstellationWords[i + 1].initialPos.x,
+                    activeConstellationWords[i + 1].initialPos.y
+                  );
+                }
+                // Close the constellation
+                if (activeConstellationWords.length > 2) {
+                  p.line(
+                    activeConstellationWords[activeConstellationWords.length - 1].initialPos.x,
+                    activeConstellationWords[activeConstellationWords.length - 1].initialPos.y,
+                    firstWord.initialPos.x,
+                    firstWord.initialPos.y
+                  );
+                }
+                
+                // Draw main constellation lines with category color
+                const category = CATEGORIES[activeCategoryIndex];
+                const catColor = p.color(category?.color || ORBIT_TEAL);
                 p.strokeWeight(2);
-                p.stroke(255, lineAlpha * 0.3);
+                p.stroke(p.red(catColor), p.green(catColor), p.blue(catColor), lineAlpha * 0.8);
                 
                 for (let i = 0; i < activeConstellationWords.length - 1; i++) {
                   p.line(
@@ -391,6 +477,16 @@ export const OrbitDemo: React.FC<OrbitDemoProps> = ({ className = '' }) => {
                     activeConstellationWords[i + 1].initialPos.y
                   );
                 }
+                // Close the constellation
+                if (activeConstellationWords.length > 2) {
+                  p.line(
+                    activeConstellationWords[activeConstellationWords.length - 1].initialPos.x,
+                    activeConstellationWords[activeConstellationWords.length - 1].initialPos.y,
+                    firstWord.initialPos.x,
+                    firstWord.initialPos.y
+                  );
+                }
+                
                 p.pop();
               }
             }
@@ -400,10 +496,44 @@ export const OrbitDemo: React.FC<OrbitDemoProps> = ({ className = '' }) => {
               word.draw();
             }
 
-            // Draw embedding particles
+            // Draw embedding effects
+            for (const ripple of embeddingRipples) {
+              ripple.draw();
+            }
             for (const particle of embeddingParticles) {
               particle.draw();
             }
+            for (const particle of completionBurstParticles) {
+              particle.draw();
+            }
+            
+            // Draw streaming trail during embedding
+            if (currentPhase === 'embedding' && activeCategoryIndex >= 0) {
+              drawStreamingTrail();
+            }
+          }
+
+          function drawStreamingTrail() {
+            const currentCategory = CATEGORIES[activeCategoryIndex];
+            const categoryYCenter = metadataArea.y + (metadataArea.h / CATEGORIES.length) * (activeCategoryIndex + 0.5);
+            
+            p.push();
+            p.strokeWeight(2);
+            p.noFill();
+            
+            for (let i = 0; i < 3; i++) {
+              p.beginShape();
+              for (let x = metadataArea.x + metadataArea.w; x > imageArea.x; x -= 5) {
+                let y = categoryYCenter + p.sin((x + p.frameCount * 2 + i * 20) * 0.02) * (10 + i * 5);
+                let alpha = p.map(x, metadataArea.x + metadataArea.w, imageArea.x, 80, 0);
+                let lineColor = p.color(currentCategory.color);
+                lineColor.setAlpha(alpha);
+                p.stroke(lineColor);
+                p.vertex(x, y);
+              }
+              p.endShape();
+            }
+            p.pop();
           }
 
           function drawStatus() {
@@ -531,11 +661,19 @@ export const OrbitDemo: React.FC<OrbitDemoProps> = ({ className = '' }) => {
               if (this.state === 'done') return;
               
               p.push();
-              p.textSize(10);
+              p.textSize(12);
               p.textAlign(p.CENTER, p.CENTER);
+              
+              // Add glow effect to words
+              p.drawingContext.shadowBlur = 8;
+              p.drawingContext.shadowColor = `rgba(${p.red(this.color)}, ${p.green(this.color)}, ${p.blue(this.color)}, 0.6)`;
+              
               p.noStroke();
               p.fill(p.red(this.color), p.green(this.color), p.blue(this.color), this.alpha);
               p.text(this.text, this.pos.x, this.pos.y);
+              
+              // Reset shadow
+              p.drawingContext.shadowBlur = 0;
               p.pop();
             }
 
@@ -633,37 +771,152 @@ export const OrbitDemo: React.FC<OrbitDemoProps> = ({ className = '' }) => {
             }
           }
 
-          class EmbeddingParticle {
+          class StreamingEmbeddingParticle {
             pos: any;
             startPos: any;
             color: any;
             lifespan: number;
             maxLifespan: number;
+            categoryIndex: number;
+            hasEmbedded: boolean;
+            size: number;
+            waveOffset: number;
+            waveAmplitude: number;
             targetX: number;
             targetY: number;
 
-            constructor(startPos: any, hexColor: string) {
+            constructor(startPos: any, hexColor: string, categoryIndex: number) {
               this.pos = startPos.copy();
               this.startPos = startPos.copy();
               this.color = p.color(hexColor);
-              this.lifespan = 80;
-              this.maxLifespan = 80;
+              this.lifespan = 120;
+              this.maxLifespan = 120;
+              this.categoryIndex = categoryIndex;
+              this.hasEmbedded = false;
+              this.size = p.random(2, 4);
+              this.waveOffset = p.random(p.TWO_PI);
+              this.waveAmplitude = p.random(20, 40);
               this.targetX = p.random(imageArea.x + 20, imageArea.x + imageArea.w - 20);
               this.targetY = p.random(imageArea.y + 20, imageArea.y + imageArea.h - 20);
             }
 
             update() {
               this.lifespan--;
-              const progress = 1 - (this.lifespan / this.maxLifespan);
+              let progress = 1 - (this.lifespan / this.maxLifespan);
               this.pos.x = p.lerp(this.startPos.x, this.targetX, progress);
-              this.pos.y = p.lerp(this.startPos.y, this.targetY, progress);
+              let baseY = p.lerp(this.startPos.y, this.targetY, progress);
+              this.pos.y = baseY + p.sin(progress * p.PI * 3 + this.waveOffset) * this.waveAmplitude * (1 - progress);
+              
+              if (this.pos.x <= imageArea.x + imageArea.w && !this.hasEmbedded) {
+                if (this.pos.x >= imageArea.x && this.pos.y >= imageArea.y && this.pos.y <= imageArea.y + imageArea.h) {
+                  this.hasEmbedded = true;
+                  this.lifespan = p.min(this.lifespan, 20);
+                }
+              }
             }
 
             draw() {
               p.push();
               p.noStroke();
-              const alpha = p.map(this.lifespan, 0, this.maxLifespan, 0, 255);
+              let alpha = 255;
+              let progress = 1 - (this.lifespan / this.maxLifespan);
+              if (progress < 0.1) {
+                alpha = p.map(progress, 0, 0.1, 0, 255);
+              } else if (this.hasEmbedded) {
+                alpha = p.map(this.lifespan, 0, 20, 0, 255);
+              }
+              
+              if (!this.hasEmbedded) {
+                let trailLength = 15;
+                for (let i = 0; i < trailLength; i++) {
+                  let trailAlpha = alpha * (1 - i / trailLength) * 0.3;
+                  let trailX = this.pos.x + i * 2;
+                  p.fill(p.red(this.color), p.green(this.color), p.blue(this.color), trailAlpha);
+                  p.ellipse(trailX, this.pos.y, this.size * (1 - i / trailLength), this.size * (1 - i / trailLength));
+                }
+              }
+              
               p.fill(p.red(this.color), p.green(this.color), p.blue(this.color), alpha);
+              p.ellipse(this.pos.x, this.pos.y, this.size, this.size);
+              
+              let glowColor = p.color(this.color);
+              glowColor.setAlpha(alpha * 0.3);
+              p.fill(glowColor);
+              p.ellipse(this.pos.x, this.pos.y, this.size * 2, this.size * 2);
+              p.pop();
+            }
+
+            isDone() {
+              return this.lifespan <= 0;
+            }
+          }
+
+          class EmbeddingRipple {
+            pos: any;
+            color: any;
+            radius: number;
+            maxRadius: number;
+            lifespan: number;
+            maxLifespan: number;
+
+            constructor(pos: any, hexColor: string) {
+              this.pos = pos.copy();
+              this.color = p.color(hexColor);
+              this.radius = 0;
+              this.maxRadius = 30;
+              this.lifespan = 40;
+              this.maxLifespan = 40;
+            }
+
+            update() {
+              this.lifespan--;
+              this.radius = p.map(this.lifespan, this.maxLifespan, 0, 0, this.maxRadius);
+            }
+
+            draw() {
+              if (this.lifespan <= 0) return;
+              p.push();
+              p.noFill();
+              let alpha = p.map(this.lifespan, 0, this.maxLifespan, 0, 150);
+              p.strokeWeight(2);
+              p.stroke(p.red(this.color), p.green(this.color), p.blue(this.color), alpha);
+              p.ellipse(this.pos.x, this.pos.y, this.radius * 2, this.radius * 2);
+              p.strokeWeight(1);
+              let innerAlpha = alpha * 0.5;
+              p.stroke(p.red(this.color), p.green(this.color), p.blue(this.color), innerAlpha);
+              p.ellipse(this.pos.x, this.pos.y, this.radius, this.radius);
+              p.pop();
+            }
+
+            isDone() {
+              return this.lifespan <= 0;
+            }
+          }
+
+          class CompletionBurstParticle {
+            pos: any;
+            vel: any;
+            lifespan: number;
+            color: any;
+
+            constructor(centerPos: any) {
+              this.pos = centerPos.copy();
+              this.vel = (p as any).constructor.Vector.random2D().mult(p.random(2, 8));
+              this.lifespan = 70;
+              this.color = p.lerpColor(p.color(ORBIT_TEAL), p.color(SUCCESS_GREEN), p.random(1));
+            }
+
+            update() {
+              this.vel.mult(0.95);
+              this.pos.add(this.vel);
+              this.lifespan--;
+            }
+
+            draw() {
+              p.push();
+              p.noStroke();
+              let currentAlpha = p.map(this.lifespan, 0, 70, 0, 255);
+              p.fill(p.red(this.color), p.green(this.color), p.blue(this.color), currentAlpha);
               p.ellipse(this.pos.x, this.pos.y, 3, 3);
               p.pop();
             }
@@ -744,6 +997,67 @@ export const OrbitDemo: React.FC<OrbitDemoProps> = ({ className = '' }) => {
           <Sparkles className="w-4 h-4 mr-2" />
           Restart Demo
         </Button>
+      </div>
+      
+      {/* How ORBIT Works Section */}
+      <div className="mt-8 bg-card/30 backdrop-blur-sm border border-accent/20 rounded-xl p-6">
+        <div className="mb-6">
+          <h3 className="text-2xl font-bold text-center mb-2">
+            <span className="gradient-text">How ORBIT Works</span>
+          </h3>
+          <p className="text-center text-muted-foreground">
+            ORBIT's advanced AI doesn't just see images—it understands them across multiple dimensions, creating 
+            rich metadata that powers better search, organization, and insights. The metadata is permanently 
+            embedded into the image file using industry-standard XMP format that travels with your images across systems.
+          </p>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Analysis Phase */}
+          <div className="bg-card/50 backdrop-blur-sm border border-accent/10 rounded-lg p-6">
+            <div className="flex items-center mb-4">
+              <div className="w-8 h-8 bg-gradient-to-br from-cyan-400 to-cyan-600 rounded-full flex items-center justify-center mr-3">
+                <Sparkles className="w-4 h-4 text-white" />
+              </div>
+              <h4 className="text-lg font-semibold">Analysis Phase</h4>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              ORBIT analyzes your image across 8 distinct categories to extract comprehensive metadata, 
+              including scene overview, human elements, environment, key objects, atmospheric elements, 
+              narrative analysis, photographic elements, and marketing potential.
+            </p>
+          </div>
+          
+          {/* Embedding Phase */}
+          <div className="bg-card/50 backdrop-blur-sm border border-accent/10 rounded-lg p-6">
+            <div className="flex items-center mb-4">
+              <div className="w-8 h-8 bg-gradient-to-br from-purple-400 to-purple-600 rounded-full flex items-center justify-center mr-3">
+                <div className="w-4 h-4 border-2 border-white rounded-sm opacity-80" />
+              </div>
+              <h4 className="text-lg font-semibold">Embedding Phase</h4>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Each category of metadata is embedded sequentially into your image using XMP 
+              (Extensible Metadata Platform) format. The process is visualized through colored particles 
+              representing each metadata category flowing into the image.
+            </p>
+          </div>
+          
+          {/* Completion Phase */}
+          <div className="bg-card/50 backdrop-blur-sm border border-accent/10 rounded-lg p-6">
+            <div className="flex items-center mb-4">
+              <div className="w-8 h-8 bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center mr-3">
+                <div className="w-3 h-3 bg-white rounded-full" />
+              </div>
+              <h4 className="text-lg font-semibold">Completion Phase</h4>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Once all metadata has been successfully embedded, you can download the enhanced 
+              image with its rich embedded metadata. This metadata stays with your image as it moves 
+              across different systems and applications, enabling better searchability and organization.
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   );

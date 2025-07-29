@@ -15,6 +15,9 @@ interface OrderCompletionEmailRequest {
   userEmail: string;
   userName?: string;
   imageCount: number;
+  errorCount?: number;
+  status?: string;
+  accessToken?: string;
   downloadUrl?: string;
 }
 
@@ -29,11 +32,14 @@ const handler = async (req: Request): Promise<Response> => {
     console.log('📧 Request method:', req.method);
     console.log('📧 Request headers:', Object.fromEntries(req.headers.entries()));
     
-    const { orderId, userEmail, userName, imageCount, downloadUrl }: OrderCompletionEmailRequest = await req.json();
+    const { orderId, userEmail, userName, imageCount, errorCount = 0, status = 'completed', accessToken, downloadUrl }: OrderCompletionEmailRequest = await req.json();
 
     console.log('📧 Sending order completion email for order:', orderId);
     console.log('📧 Email recipient:', userEmail);
     console.log('📧 Image count:', imageCount);
+    console.log('📧 Error count:', errorCount);
+    console.log('📧 Status:', status);
+    console.log('📧 Has access token:', !!accessToken);
     
     // Check environment variables
     const resendKey = Deno.env.get("RESEND_API_KEY");
@@ -274,12 +280,15 @@ const handler = async (req: Request): Promise<Response> => {
               </a>
             </div>
             ` : `
-            <!-- Login to Download -->
+            <!-- Secure Token Access -->
             <div style="text-align: center; margin: 32px 0;">
-              <a href="${Deno.env.get('FRONTEND_URL') || 'https://ufdcvxmizlzlnyyqpfck.supabase.co'}/processing?order=${orderId}&step=processing" 
+              <a href="${Deno.env.get('FRONTEND_URL') || 'https://ufdcvxmizlzlnyyqpfck.supabase.co'}/processing?token=${accessToken}&order=${orderId}" 
                  style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-decoration: none; padding: 16px 32px; border-radius: 8px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);">
                 🚀 View & Download Results
               </a>
+              <p style="color: #64748b; font-size: 12px; margin-top: 8px;">
+                ✨ No login required - secure link expires in 7 days
+              </p>
             </div>
             `}
 
@@ -292,6 +301,17 @@ const handler = async (req: Request): Promise<Response> => {
                 <li>Consistent formatting and sizing</li>
               </ul>
             </div>
+            
+            ${accessToken ? `
+            <!-- Security Notice -->
+            <div style="background: #e0f2fe; border-radius: 8px; padding: 16px; margin: 24px 0; border-left: 4px solid #0ea5e9;">
+              <h4 style="margin-top: 0; color: #0c4a6e; font-size: 14px;">🔒 Secure Access</h4>
+              <p style="margin: 8px 0 0 0; color: #075985; font-size: 12px;">
+                This link provides secure access to your order results for 7 days. 
+                You can download your files up to 10 times without creating an account.
+              </p>
+            </div>
+            ` : ''}
           </div>
 
           <!-- Footer -->
@@ -313,11 +333,14 @@ const handler = async (req: Request): Promise<Response> => {
     });
 
     console.log("Order completion email sent successfully:", emailResponse);
+    console.log("✅ Email includes secure access token:", !!accessToken);
 
     return new Response(JSON.stringify({ 
       success: true, 
       emailId: emailResponse.data?.id,
-      message: "Order completion email sent successfully" 
+      accessToken: accessToken,
+      hasToken: !!accessToken,
+      message: "Order completion email sent successfully with secure access link" 
     }), {
       status: 200,
       headers: {

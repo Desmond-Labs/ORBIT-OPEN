@@ -301,9 +301,25 @@ serve(async (req) => {
       })
       .eq('id', orderId);
 
-    // 7.5. Send completion email if order is successfully completed
-    if (finalStatus === 'completed') {
+    // 7.5. Generate access token and send completion email for both complete and partial success
+    if (finalStatus === 'completed' || finalStatus === 'completed_with_errors') {
       try {
+        // Generate access token for email link
+        console.log(`🔐 Generating access token for order: ${orderId}`);
+        const { data: tokenData, error: tokenError } = await supabase
+          .rpc('generate_order_access_token', {
+            order_id_param: orderId,
+            expires_in_hours: 168 // 7 days
+          });
+
+        if (tokenError) {
+          console.error('🔐 Failed to generate access token:', tokenError);
+          throw tokenError;
+        }
+
+        const accessToken = tokenData;
+        console.log(`🔐 Access token generated successfully for order: ${orderId}`);
+
         // Get user email from orbit_users table using the order's user_id
         const { data: userProfile, error: userError } = await supabase
           .from('orbit_users')
@@ -313,14 +329,17 @@ serve(async (req) => {
 
         if (!userError && userProfile?.email) {
           console.log(`📧 Sending completion email to: ${userProfile.email}`);
-          console.log(`📧 Order ID: ${orderId}, Image count: ${successCount}`);
+          console.log(`📧 Order ID: ${orderId}, Image count: ${successCount}, Error count: ${errorCount}`);
           
           const emailResult = await supabase.functions.invoke('send-order-completion-email', {
             body: {
               orderId: orderId,
               userEmail: userProfile.email,
               imageCount: successCount,
-              downloadUrl: `${Deno.env.get('FRONTEND_URL') || 'https://ufdcvxmizlzlnyyqpfck.supabase.co'}/processing?order=${orderId}&step=processing`
+              errorCount: errorCount,
+              status: finalStatus,
+              accessToken: accessToken,
+              downloadUrl: `${Deno.env.get('FRONTEND_URL') || 'https://preview--orbit-image-forge.lovable.app'}/?token=${accessToken}&order=${orderId}&step=processing`
             }
           });
 
