@@ -314,9 +314,10 @@ export const OrbitDemo: React.FC<OrbitDemoProps> = ({ className = '' }) => {
               embeddingProgress = 100;
             }
 
-            if (completionInitiated && embeddingParticles.length === 0 && embeddingRipples.length === 0 && currentPhase !== 'complete') {
-              currentPhase = 'complete';
-              triggerCompletionBurst();
+            if (completionInitiated && embeddingParticles.length === 0 && embeddingRipples.length === 0 && currentPhase !== 'report') {
+              currentPhase = 'report';
+              reportStartFrame = p.frameCount;
+              initializeReport();
             }
           }
 
@@ -338,20 +339,6 @@ export const OrbitDemo: React.FC<OrbitDemoProps> = ({ className = '' }) => {
             if (imageGlow > 0) {
               imageGlow = p.max(0, imageGlow - 0.02);
             }
-            
-            // Transition to report phase after completion burst finishes
-            if (completionBurstParticles.length === 0 && imageGlow <= 0.1 && !waitingForReport) {
-              waitingForReport = true;
-              completionEndFrame = p.frameCount;
-            }
-            
-            // Wait 2 seconds (120 frames at 60fps) before showing report
-            if (waitingForReport && p.frameCount - completionEndFrame >= 120) {
-              currentPhase = 'report';
-              reportStartFrame = p.frameCount;
-              initializeReport();
-              waitingForReport = false;
-            }
           }
 
           function initializeReport() {
@@ -363,14 +350,14 @@ export const OrbitDemo: React.FC<OrbitDemoProps> = ({ className = '' }) => {
               { title: "Analysis Type: Lifestyle", type: "info" },
               { title: "Processing Time: 2.4 seconds", type: "info" },
               { title: "", type: "spacer" },
-              { title: "SCENE OVERVIEW", type: "section", data: METADATA.scene_overview },
-              { title: "HUMAN ELEMENTS", type: "section", data: METADATA.human_elements },
-              { title: "ENVIRONMENT", type: "section", data: METADATA.environment },
-              { title: "KEY OBJECTS", type: "section", data: METADATA.key_objects },
-              { title: "ATMOSPHERIC ELEMENTS", type: "section", data: METADATA.atmospheric_elements },
-              { title: "NARRATIVE ANALYSIS", type: "section", data: METADATA.narrative_analysis },
-              { title: "PHOTOGRAPHIC ELEMENTS", type: "section", data: METADATA.photographic_elements },
-              { title: "MARKETING POTENTIAL", type: "section", data: METADATA.marketing_potential },
+              { title: "🏠 SCENE OVERVIEW", type: "section", data: METADATA.scene_overview },
+              { title: "👥 HUMAN ELEMENTS", type: "section", data: METADATA.human_elements },
+              { title: "🌍 ENVIRONMENT", type: "section", data: METADATA.environment },
+              { title: "🔑 KEY OBJECTS", type: "section", data: METADATA.key_objects },
+              { title: "🎨 ATMOSPHERIC ELEMENTS", type: "section", data: METADATA.atmospheric_elements },
+              { title: "📖 NARRATIVE ANALYSIS", type: "section", data: METADATA.narrative_analysis },
+              { title: "📷 PHOTOGRAPHIC ELEMENTS", type: "section", data: METADATA.photographic_elements },
+              { title: "🎯 MARKETING POTENTIAL", type: "section", data: METADATA.marketing_potential },
               { title: "", type: "spacer" },
               { title: "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━", type: "separator" },
               { title: "RAW JSON DATA", type: "section-header" },
@@ -380,7 +367,13 @@ export const OrbitDemo: React.FC<OrbitDemoProps> = ({ className = '' }) => {
 
           function updateReport() {
             const framesSinceStart = p.frameCount - reportStartFrame;
-            reportProgress = p.min(100, (framesSinceStart / 180) * 100); // 3 seconds to fully reveal
+            reportProgress = p.min(100, (framesSinceStart / 240) * 100); // 4 seconds to fully reveal
+            
+            // Transition to complete phase after report is finished
+            if (reportProgress >= 100 && framesSinceStart >= 300) { // Wait extra 1 second after report
+              currentPhase = 'complete';
+              triggerCompletionBurst();
+            }
           }
 
           p.draw = () => {
@@ -600,15 +593,15 @@ export const OrbitDemo: React.FC<OrbitDemoProps> = ({ className = '' }) => {
           function drawReportPanel() {
             p.push();
             
-            // Terminal-style background
-            const reportBg = p.color(15, 17, 33, 240);
+            // Darker terminal-style background
+            const reportBg = p.color(0, 0, 0, 250);
             p.fill(reportBg);
             p.noStroke();
             p.rect(metadataArea.x, metadataArea.y, metadataArea.w, metadataArea.h, 8);
             
-            // Terminal border
+            // Terminal border with glow effect
             p.noFill();
-            p.stroke(ORBIT_GREEN);
+            p.stroke(0, 255, 100);
             p.strokeWeight(2);
             p.rect(metadataArea.x, metadataArea.y, metadataArea.w, metadataArea.h, 8);
 
@@ -618,6 +611,7 @@ export const OrbitDemo: React.FC<OrbitDemoProps> = ({ className = '' }) => {
             const lineHeight = 14;
             
             p.textAlign(p.LEFT, p.TOP);
+            p.textFont('Courier New');
             
             for (let i = 0; i < Math.min(visibleSections, reportSections.length); i++) {
               const section = reportSections[i];
@@ -625,63 +619,65 @@ export const OrbitDemo: React.FC<OrbitDemoProps> = ({ className = '' }) => {
               if (yOffset > metadataArea.y + metadataArea.h - 20) break; // Stop if we run out of space
               
               if (section.type === 'header') {
-                p.fill(ORBIT_GREEN);
-                p.textSize(12);
+                p.fill(0, 255, 255); // Bright cyan
+                p.textSize(11);
                 p.text(section.title, metadataArea.x + 10, yOffset);
                 yOffset += lineHeight + 5;
               } else if (section.type === 'separator') {
-                p.fill(ORBIT_PURPLE);
+                p.fill(0, 255, 100); // Bright green
                 p.textSize(8);
                 p.text(section.title, metadataArea.x + 10, yOffset);
                 yOffset += lineHeight;
               } else if (section.type === 'info') {
-                p.fill(ORBIT_TEAL);
-                p.textSize(10);
+                p.fill(150, 150, 150); // Dim gray
+                p.textSize(9);
                 p.text(section.title, metadataArea.x + 10, yOffset);
                 yOffset += lineHeight;
               } else if (section.type === 'spacer') {
                 yOffset += lineHeight / 2;
               } else if (section.type === 'section') {
-                p.fill(ORBIT_CORAL);
+                p.fill(255, 255, 100); // Bright yellow for emoji sections
                 p.textSize(10);
-                p.text(`[${section.title}]`, metadataArea.x + 10, yOffset);
+                p.text(section.title, metadataArea.x + 10, yOffset);
                 yOffset += lineHeight;
                 
                 if (section.data) {
-                  p.fill(TEXT_COLOR_BRIGHT);
-                  p.textSize(9);
+                  p.fill(200, 200, 200); // Light gray for data
+                  p.textSize(8);
                   Object.entries(section.data).forEach(([key, value]) => {
                     if (yOffset < metadataArea.y + metadataArea.h - 20) {
-                      p.text(`  ${key}: ${value}`, metadataArea.x + 15, yOffset);
+                      p.text(`    ${key}: ${value}`, metadataArea.x + 15, yOffset);
                       yOffset += lineHeight - 2;
                     }
                   });
                 }
                 yOffset += 5;
               } else if (section.type === 'section-header') {
-                p.fill(ORBIT_GOLD);
+                p.fill(255, 100, 255); // Bright magenta
                 p.textSize(10);
-                p.text(`[${section.title}]`, metadataArea.x + 10, yOffset);
+                p.text(section.title, metadataArea.x + 10, yOffset);
                 yOffset += lineHeight + 5;
               } else if (section.type === 'json') {
-                p.fill(TEXT_COLOR_DIM);
-                p.textSize(8);
+                p.fill(100, 200, 255); // Light blue for JSON
+                p.textSize(7);
                 const jsonLines = section.title.split('\n');
-                for (let line of jsonLines.slice(0, 10)) { // Show first 10 lines of JSON
+                for (let line of jsonLines.slice(0, 8)) { // Show first 8 lines of JSON
                   if (yOffset < metadataArea.y + metadataArea.h - 20) {
-                    p.text(line, metadataArea.x + 10, yOffset);
+                    p.text(line, metadataArea.x + 15, yOffset);
                     yOffset += lineHeight - 3;
                   }
+                }
+                if (jsonLines.length > 8) {
+                  p.fill(150, 150, 150);
+                  p.text('... [truncated]', metadataArea.x + 15, yOffset);
                 }
               }
             }
             
-            // Blinking cursor at the end
-            if (visibleSections >= reportSections.length) {
-              if (p.frameCount % 60 < 30) { // Blink every second
-                p.fill(ORBIT_GREEN);
-                p.rect(metadataArea.x + 10, yOffset, 8, 2);
-              }
+            // Blinking terminal cursor
+            if (visibleSections < reportSections.length && p.frameCount % 60 < 30) {
+              p.fill(0, 255, 100);
+              p.rect(metadataArea.x + 10, yOffset, 8, 12);
             }
             
             p.pop();
