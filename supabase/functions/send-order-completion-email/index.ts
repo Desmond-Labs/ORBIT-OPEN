@@ -83,6 +83,21 @@ const handler = async (req: Request): Promise<Response> => {
     }
     const orderNumber = order.order_number;
     const totalCost = order.total_cost;
+    
+    // Generate secure access token for this order
+    console.log('📧 Generating access token for order:', orderId);
+    const { data: tokenData, error: tokenError } = await supabase.rpc('generate_order_access_token', {
+      order_id_param: orderId,
+      expires_in_hours: 168 // 7 days
+    });
+    
+    if (tokenError) {
+      console.error('❌ Failed to generate access token:', tokenError);
+      // Don't fail the email - just use fallback URL
+    }
+    
+    const accessToken = tokenData;
+    console.log('✅ Access token generated:', accessToken ? 'SUCCESS' : 'FAILED');
 
     // Get processed images with analysis reports
     const { data: processedImages, error: imagesError } = await supabase
