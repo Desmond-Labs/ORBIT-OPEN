@@ -23,17 +23,21 @@ import { useDownloadProcessedImages } from '@/hooks/useDownloadProcessedImages';
 import { ProcessedImageGallery } from './ProcessedImageGallery';
 
 interface ProcessingStatusDashboardProps {
-  status: ProcessingStatus;
+  status: ProcessingStatus | any; // Allow token order status as well
   onDownload?: () => void;
   onProcessMore?: () => void;
   onBackToDashboard?: () => void;
+  isTokenUser?: boolean;
+  tokenAuth?: any;
 }
 
 export const ProcessingStatusDashboard: React.FC<ProcessingStatusDashboardProps> = ({
   status,
   onDownload,
   onProcessMore,
-  onBackToDashboard
+  onBackToDashboard,
+  isTokenUser = false,
+  tokenAuth
 }) => {
   const { downloadProcessedImages, downloading } = useDownloadProcessedImages();
   
@@ -237,7 +241,17 @@ export const ProcessingStatusDashboard: React.FC<ProcessingStatusDashboardProps>
             variant="default" 
             size="lg" 
             className="w-full"
-            onClick={() => downloadProcessedImages(status.orderId)}
+            onClick={async () => {
+              if (isTokenUser && tokenAuth) {
+                // Increment token usage for token users
+                const urlParams = new URLSearchParams(window.location.search);
+                const actualToken = urlParams.get('token');
+                if (actualToken) {
+                  await tokenAuth.incrementTokenUsage(actualToken);
+                }
+              }
+              downloadProcessedImages(status.orderId, isTokenUser ? tokenAuth : undefined);
+            }}
             disabled={downloading}
           >
             {downloading ? (
@@ -247,6 +261,15 @@ export const ProcessingStatusDashboard: React.FC<ProcessingStatusDashboardProps>
             )}
             {downloading ? 'Preparing Download...' : 'Download Processed Images'}
           </Button>
+        )}
+        
+        {/* Token user additional information */}
+        {isTokenUser && status.orderStatus === 'completed' && (
+          <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+            <p className="text-sm text-amber-800">
+              💡 <strong>Want to process more images?</strong> Create a free account to access additional features and manage all your orders.
+            </p>
+          </div>
         )}
         
         <div className="flex gap-3">

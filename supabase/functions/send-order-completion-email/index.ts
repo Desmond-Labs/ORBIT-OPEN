@@ -237,13 +237,18 @@ const handler = async (req: Request): Promise<Response> => {
 
           <!-- Main Content -->
           <div style="background: #f8fafc; border-radius: 12px; padding: 32px; margin-bottom: 24px;">
-            <h2 style="color: #1e293b; margin-top: 0; font-size: 24px;">🎉 Your order is complete!</h2>
+            <h2 style="color: #1e293b; margin-top: 0; font-size: 24px;">
+              ${status === 'completed_with_errors' && errorCount > 0 ? '⚠️ Your order is partially complete!' : '🎉 Your order is complete!'}
+            </h2>
             
             ${userName ? `<p style="font-size: 16px; margin-bottom: 24px;">Hi ${userName},</p>` : ''}
             
             <p style="font-size: 16px; margin-bottom: 24px;">
-              Great news! Your ORBIT image processing order has been completed successfully. 
-              Your ${imageCount} ${imageCount === 1 ? 'image has' : 'images have'} been processed and enhanced using our advanced AI technology.
+              ${status === 'completed_with_errors' && errorCount > 0 ? 
+                `Your ORBIT image processing order has been completed with some issues. 
+                ${imageCount} of ${imageCount + errorCount} ${imageCount + errorCount === 1 ? 'image was' : 'images were'} successfully processed, while ${errorCount} ${errorCount === 1 ? 'image' : 'images'} encountered processing errors.` :
+                `Great news! Your ORBIT image processing order has been completed successfully. 
+                Your ${imageCount} ${imageCount === 1 ? 'image has' : 'images have'} been processed and enhanced using our advanced AI technology.`}
             </p>
 
             <!-- Order Details -->
@@ -262,6 +267,12 @@ const handler = async (req: Request): Promise<Response> => {
                   <td style="padding: 8px 0; color: #64748b; font-weight: 500;">Images Processed:</td>
                   <td style="padding: 8px 0; font-weight: 600;">${imageCount}</td>
                 </tr>
+                ${errorCount > 0 ? `
+                <tr>
+                  <td style="padding: 8px 0; color: #dc2626; font-weight: 500;">Processing Errors:</td>
+                  <td style="padding: 8px 0; font-weight: 600; color: #dc2626;">${errorCount}</td>
+                </tr>
+                ` : ''}
                 <tr>
                   <td style="padding: 8px 0; color: #64748b; font-weight: 500;">Total Cost:</td>
                   <td style="padding: 8px 0; font-weight: 600;">$${totalCost}</td>
@@ -271,26 +282,19 @@ const handler = async (req: Request): Promise<Response> => {
 
             ${analysisReportsHtml}
 
-            ${downloadUrl ? `
-            <!-- Download Button -->
+            <!-- Secure Token Access -->
             <div style="text-align: center; margin: 32px 0;">
               <a href="${downloadUrl}" 
                  style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-decoration: none; padding: 16px 32px; border-radius: 8px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);">
-                📥 Download Your Processed Images
-              </a>
-            </div>
-            ` : `
-            <!-- Secure Token Access -->
-            <div style="text-align: center; margin: 32px 0;">
-              <a href="${Deno.env.get('FRONTEND_URL') || 'https://ufdcvxmizlzlnyyqpfck.supabase.co'}/processing?token=${accessToken}&order=${orderId}" 
-                 style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-decoration: none; padding: 16px 32px; border-radius: 8px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);">
                 🚀 View & Download Results
               </a>
-              <p style="color: #64748b; font-size: 12px; margin-top: 8px;">
-                ✨ No login required - secure link expires in 7 days
-              </p>
+              <div style="background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 6px; padding: 12px; margin-top: 16px;">
+                <p style="color: #0369a1; font-size: 12px; margin: 0; font-weight: 500;">
+                  🔐 Secure Access: This link provides direct access to your order results without requiring login. 
+                  It expires in 7 days and can be used up to 10 times for downloads.
+                </p>
+              </div>
             </div>
-            `}
 
             <div style="background: #f1f5f9; border-radius: 8px; padding: 20px; margin: 24px 0;">
               <h4 style="margin-top: 0; color: #475569; font-size: 16px;">✨ What we've enhanced:</h4>

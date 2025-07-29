@@ -1,8 +1,8 @@
 import React, { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { ArrowLeft, Loader2 } from 'lucide-react';
+import { ArrowLeft, Loader2, Shield, Clock, Download } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { AuthPage } from './AuthPage';
@@ -16,6 +16,8 @@ import { ProcessingStatusDashboard } from './processing/ProcessingStatusDashboar
 import { useOrderProcessingStatus } from '@/hooks/useOrderProcessingStatus';
 import { useProcessingState } from '@/hooks/useProcessingState';
 import { useRealTimeOrderUpdates } from '@/hooks/useRealTimeOrderUpdates';
+import { useTokenAuth } from '@/hooks/useTokenAuth';
+import { useTokenOrderStatus } from '@/hooks/useTokenOrderStatus';
 import { calculateCost } from '@/utils/processingUtils';
 
 interface ProcessingPageProps {
@@ -24,6 +26,13 @@ interface ProcessingPageProps {
 
 export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  
+  // Extract URL parameters for token authentication
+  const tokenFromUrl = searchParams.get('token');
+  const orderIdFromUrl = searchParams.get('order');
+  const stepFromUrl = searchParams.get('step');
+  
   const {
     currentStep,
     setCurrentStep,
@@ -72,6 +81,10 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
     redirectAttempted,
     setRedirectAttempted,
   } = useProcessingState();
+
+  // Token authentication hooks
+  const tokenAuth = useTokenAuth(tokenFromUrl, orderIdFromUrl);
+  const tokenOrderStatus = useTokenOrderStatus(orderIdFromUrl, tokenAuth.hasValidToken);
 
   const { setupRealTimeSubscription } = useRealTimeOrderUpdates(
     setRealTimeOrderData,
@@ -135,12 +148,23 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
     console.log('Total files:', allFiles.length, 'Total cost calculated:', calculateCost(allFiles.length));
   };
 
+  // Handle token-based access initialization
+  useEffect(() => {
+    if (tokenFromUrl && orderIdFromUrl && stepFromUrl === 'processing') {
+      console.log('🔐 Token-based access detected');
+      setOrderId(orderIdFromUrl);
+      setCurrentStep('processing');
+    } else if (orderIdFromUrl && stepFromUrl === 'processing' && user) {
+      // Regular authenticated user access
+      setOrderId(orderIdFromUrl);
+      setCurrentStep('processing');
+    }
+  }, [tokenFromUrl, orderIdFromUrl, stepFromUrl, user]);
+
   const handleAuthSuccess = () => {
     setShowAuthPage(false);
     
     // Check if user was in the middle of an upload workflow
-    const orderIdFromUrl = new URLSearchParams(window.location.search).get('order');
-    const stepFromUrl = new URLSearchParams(window.location.search).get('step');
     const hasUploadedFiles = uploadedFiles.length > 0;
     
     // Only proceed to upload if user was already in an upload workflow
@@ -334,25 +358,109 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
 
             {currentStep === 'processing' && (
               <>
-                {statusLoading ? (
+                {/* Token authentication validation */}
+                {tokenFromUrl && tokenAuth.isValidating && (
                   <div className="flex items-center justify-center py-8">
-                    <Loader2 className="w-8 h-8 animate-spin text-accent" />
-                    <span className="ml-2">Loading order status...</span>
+                    <Shield className="w-8 h-8 animate-pulse text-accent" />
+                    <span className="ml-2">Validating secure access...</span>
                   </div>
-                ) : orderId && orderStatus ? (
-                  <ProcessingStatusDashboard
-                    status={orderStatus}
-                    onProcessMore={handleProcessMore}
-                    onBackToDashboard={user ? () => onBack() : undefined}
-                  />
-                ) : (
-                  <ProcessingStep
-                    processingStage={processingStage}
-                    analysisType={analysisType}
-                    realTimeOrderData={realTimeOrderData}
-                    processingProgress={processingProgress}
-                    uploadedFiles={uploadedFiles}
-                  />
+                )}
+
+                {/* Token authentication failed */}
+                {tokenFromUrl && !tokenAuth.isValidating && !tokenAuth.isValidToken && (
+                  <div className="text-center py-8">
+                    <div className="flex items-center justify-center mb-4">
+                      <Shield className="w-12 h-12 text-destructive" />
+                    </div>
+                    <h3 className="text-2xl font-semibold mb-2">Access Link Invalid</h3>
+                    <p className="text-muted-foreground mb-4">
+                      This secure access link has expired or is no longer valid.
+                    </p>
+                    <div className="flex justify-center">
+                      <Button onClick={onBack} variant="outline">
+                        Return to Home
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Token access successful - show order status */}
+                {tokenFromUrl && tokenAuth.isValidToken && (
+                  <>
+                    {/* Token status info */}
+                    <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Shield className="w-4 h-4 text-blue-600" />
+                        <span className="text-sm font-medium text-blue-900">Secure Token Access</span>
+                      </div>
+                      <div className="flex items-center gap-4 text-xs text-blue-700">
+                        <div className="flex items-center gap-1">
+                          <Clock className="w-3 h-3" />
+                          <span>Expires: {tokenAuth.expiresAt?.toLocaleDateString()}</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Download className="w-3 h-3" />
+                          <span>{tokenAuth.usesRemaining} downloads remaining</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {tokenOrderStatus.loading ? (
+                      <div className="flex items-center justify-center py-8">
+                        <Loader2 className="w-8 h-8 animate-spin text-accent" />
+                        <span className="ml-2">Loading order status...</span>
+                      </div>
+                    ) : tokenOrderStatus.status ? (
+                      <ProcessingStatusDashboard
+                        status={tokenOrderStatus.status}
+                        onProcessMore={undefined} // Token users can't process more
+                        onBackToDashboard={undefined} // Token users don't have dashboard
+                        isTokenUser={true}
+                        tokenAuth={tokenAuth}
+                      />
+                    ) : tokenOrderStatus.error ? (
+                      <div className="text-center py-8">
+                        <div className="flex items-center justify-center mb-4">
+                          <Shield className="w-12 h-12 text-destructive" />
+                        </div>
+                        <h3 className="text-2xl font-semibold mb-2">Order Not Found</h3>
+                        <p className="text-muted-foreground mb-4">
+                          {tokenOrderStatus.error}
+                        </p>
+                        <div className="flex justify-center">
+                          <Button onClick={onBack} variant="outline">
+                            Return to Home
+                          </Button>
+                        </div>
+                      </div>
+                    ) : null}
+                  </>
+                )}
+
+                {/* Regular authenticated user access */}
+                {!tokenFromUrl && (
+                  <>
+                    {statusLoading ? (
+                      <div className="flex items-center justify-center py-8">
+                        <Loader2 className="w-8 h-8 animate-spin text-accent" />
+                        <span className="ml-2">Loading order status...</span>
+                      </div>
+                    ) : orderId && orderStatus ? (
+                      <ProcessingStatusDashboard
+                        status={orderStatus}
+                        onProcessMore={handleProcessMore}
+                        onBackToDashboard={user ? () => onBack() : undefined}
+                      />
+                    ) : (
+                      <ProcessingStep
+                        processingStage={processingStage}
+                        analysisType={analysisType}
+                        realTimeOrderData={realTimeOrderData}
+                        processingProgress={processingProgress}
+                        uploadedFiles={uploadedFiles}
+                      />
+                    )}
+                  </>
                 )}
               </>
             )}

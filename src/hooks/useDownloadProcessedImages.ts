@@ -6,7 +6,7 @@ export const useDownloadProcessedImages = () => {
   const [downloading, setDownloading] = useState(false);
   const { toast } = useToast();
 
-  const downloadProcessedImages = async (orderId: string) => {
+  const downloadProcessedImages = async (orderId: string, tokenAuth?: any) => {
     if (!orderId) {
       toast({
         title: "Error",
@@ -20,23 +20,43 @@ export const useDownloadProcessedImages = () => {
 
     try {
       console.log('Starting download for order:', orderId);
+      console.log('Token auth provided:', !!tokenAuth);
 
-      // Get the auth session to get the access token
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session?.access_token) {
-        throw new Error('Not authenticated');
+      let authHeaders: any = {
+        'Content-Type': 'application/json',
+        'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVmZGN2eG1pemx6bG55eXFwZmNrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDYyMzM1NzMsImV4cCI6MjA2MTgwOTU3M30.bpYLwFpQxq5tAw4uvRrHPi9WeFmxHnLjQaZraZqa3Bs'
+      };
+
+      let requestBody: any = { orderId };
+
+      if (tokenAuth && tokenAuth.isValidToken) {
+        // Token-based authentication
+        console.log('Using token authentication for download');
+        // We need to get the actual token from the URL params since it's not stored in tokenData
+        const urlParams = new URLSearchParams(window.location.search);
+        const actualToken = urlParams.get('token');
+        if (actualToken) {
+          requestBody.accessToken = actualToken;
+          authHeaders['Authorization'] = `Bearer ${actualToken}`;
+        } else {
+          throw new Error('Token not found in URL');
+        }
+      } else {
+        // Regular user authentication
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (!session?.access_token) {
+          throw new Error('Not authenticated');
+        }
+        
+        authHeaders['Authorization'] = `Bearer ${session.access_token}`;
       }
 
       // Call the edge function directly to get the ZIP file
       const response = await fetch(`https://ufdcvxmizlzlnyyqpfck.supabase.co/functions/v1/download-processed-images`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
-          'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVmZGN2eG1pemx6bG55eXFwZmNrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDYyMzM1NzMsImV4cCI6MjA2MTgwOTU3M30.bpYLwFpQxq5tAw4uvRrHPi9WeFmxHnLjQaZraZqa3Bs'
-        },
-        body: JSON.stringify({ orderId })
+        headers: authHeaders,
+        body: JSON.stringify(requestBody)
       });
 
       if (!response.ok) {

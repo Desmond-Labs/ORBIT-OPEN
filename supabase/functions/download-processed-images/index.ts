@@ -21,30 +21,9 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    // Get authenticated user from the Authorization header
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      console.log("Missing authorization header");
-      return new Response(JSON.stringify({ error: "Missing authorization header" }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 401,
-      });
-    }
-    
-    const token = authHeader.replace("Bearer ", "");
-    const { data: { user }, error: userError } = await supabaseClient.auth.getUser(token);
-    
-    if (userError || !user) {
-      console.log("User authentication failed:", userError);
-      return new Response(JSON.stringify({ error: "User not authenticated" }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 401,
-      });
-    }
-
-    console.log('User authenticated:', user.id);
-
-    const { orderId } = await req.json();
+    // Get request body first to check for token auth
+    const requestBody = await req.json();
+    const { orderId, accessToken } = requestBody;
 
     if (!orderId) {
       console.log("Missing orderId in request body");
@@ -54,14 +33,72 @@ serve(async (req) => {
       });
     }
 
-    console.log('Processing download request for order:', orderId, 'user:', user.id);
+    let userId: string | null = null;
+    let isTokenAuth = false;
+
+    // Check if this is token-based authentication
+    if (accessToken) {
+      console.log('🔐 Token-based authentication detected');
+      isTokenAuth = true;
+
+      // Validate the access token
+      const { data: tokenValidation, error: tokenError } = await supabaseClient
+        .rpc('validate_order_token', {
+          token_param: accessToken,
+          order_id_param: orderId
+        });
+
+      if (tokenError || !tokenValidation?.[0]?.valid) {
+        console.log("Token authentication failed:", tokenError);
+        return new Response(JSON.stringify({ error: "Invalid or expired token" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 401,
+        });
+      }
+
+      userId = tokenValidation[0].user_id;
+      console.log('🔐 Token validated for user:', userId);
+
+      // Set token in session for RLS access
+      await supabaseClient.rpc('set_config', {
+        setting_name: 'app.current_token',
+        setting_value: accessToken,
+        is_local: true
+      });
+    } else {
+      // Regular user authentication
+      const authHeader = req.headers.get("Authorization");
+      if (!authHeader) {
+        console.log("Missing authorization header");
+        return new Response(JSON.stringify({ error: "Missing authorization header" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 401,
+        });
+      }
+      
+      const token = authHeader.replace("Bearer ", "");
+      const { data: { user }, error: userError } = await supabaseClient.auth.getUser(token);
+      
+      if (userError || !user) {
+        console.log("User authentication failed:", userError);
+        return new Response(JSON.stringify({ error: "User not authenticated" }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 401,
+        });
+      }
+
+      userId = user.id;
+      console.log('👤 User authenticated:', userId);
+    }
+
+    console.log('Processing download request for order:', orderId, 'user:', userId);
 
     // Get order information and verify ownership
     const { data: order, error: orderError } = await supabaseClient
       .from('orders')
       .select('*')
       .eq('id', orderId)
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .single();
 
     if (orderError || !order) {
