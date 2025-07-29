@@ -48,7 +48,7 @@ export const WorkflowSteps: React.FC = () => {
       </div>
 
       {/* Desktop Layout */}
-      <div className="hidden md:flex items-center justify-between max-w-5xl mx-auto">
+      <div className="hidden md:flex items-center justify-center gap-4 max-w-7xl mx-auto overflow-x-auto">
         {steps.map((step, index) => {
           const Icon = step.icon;
           const isLast = index === steps.length - 1;
