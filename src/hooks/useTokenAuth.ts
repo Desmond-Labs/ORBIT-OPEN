@@ -38,7 +38,7 @@ export const useTokenAuth = (token: string | null, orderId: string | null) => {
       console.log('🔐 Validating token:', token.substring(0, 8) + '...');
 
       // Call the validation function
-      const { data, error } = await supabase.rpc('validate_order_token', {
+      const { data, error } = await supabase.rpc('validate_order_token' as any, {
         token_param: token,
         order_id_param: orderId || null,
       });
@@ -68,7 +68,7 @@ export const useTokenAuth = (token: string | null, orderId: string | null) => {
       }
 
       // Set the token in the database session for RLS policies
-      await supabase.rpc('set_config', {
+      await supabase.rpc('set_config' as any, {
         setting_name: 'app.current_token',
         setting_value: token,
         is_local: true,
@@ -104,7 +104,7 @@ export const useTokenAuth = (token: string | null, orderId: string | null) => {
     if (!token || !state.tokenValid) return false;
 
     try {
-      const { data, error } = await supabase.rpc('increment_token_usage', {
+      const { data, error } = await supabase.rpc('increment_token_usage' as any, {
         token_param: token,
       });
 

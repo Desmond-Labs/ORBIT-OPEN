@@ -22,7 +22,7 @@ export const useTokenOrderStatus = (token: string | null, orderId: string | null
       console.log('📊 Fetching order status with token for order:', orderId);
 
       // Set the token for RLS policies before making queries
-      await supabase.rpc('set_config', {
+      await supabase.rpc('set_config' as any, {
         setting_name: 'app.current_token',
         setting_value: token,
         is_local: true,
