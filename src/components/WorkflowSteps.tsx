@@ -48,22 +48,22 @@ export const WorkflowSteps: React.FC = () => {
       </div>
 
       {/* Desktop Layout */}
-      <div className="hidden md:flex items-center justify-center gap-4 max-w-7xl mx-auto overflow-x-auto">
+      <div className="hidden md:flex items-center justify-center max-w-7xl mx-auto">
         {steps.map((step, index) => {
           const Icon = step.icon;
           const isLast = index === steps.length - 1;
           
           return (
-            <div key={step.id} className="flex items-center">
+            <div key={step.id} className="flex items-center flex-1">
               {/* Step */}
-              <div className="relative group">
+              <div className="relative group flex-1">
                 <div className="absolute inset-0 bg-gradient-glow rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                <div className="relative bg-card/50 backdrop-blur-sm border border-accent/20 rounded-xl p-6 cosmic-transition hover:border-accent/40 text-center min-w-[200px]">
+                <div className="relative bg-card/50 backdrop-blur-sm border border-accent/20 rounded-xl p-4 lg:p-6 cosmic-transition hover:border-accent/40 text-center max-w-[220px] mx-auto">
                   <div className="w-12 h-12 bg-gradient-primary rounded-full flex items-center justify-center mb-4 mx-auto">
                     <Icon className="w-6 h-6 text-background" />
                   </div>
-                  <h3 className="text-lg font-semibold mb-2">{step.title}</h3>
-                  <p className="text-muted-foreground text-sm leading-relaxed">
+                  <h3 className="text-base lg:text-lg font-semibold mb-2">{step.title}</h3>
+                  <p className="text-muted-foreground text-xs lg:text-sm leading-relaxed">
                     {step.description}
                   </p>
                 </div>
@@ -71,7 +71,7 @@ export const WorkflowSteps: React.FC = () => {
               
               {/* Connector */}
               {!isLast && (
-                <div className="flex-1 mx-4">
+                <div className="w-8 lg:w-16 mx-2 lg:mx-4">
                   <div className="h-0.5 bg-gradient-primary opacity-30" />
                 </div>
               )}
