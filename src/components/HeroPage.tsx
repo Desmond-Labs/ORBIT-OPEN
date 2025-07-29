@@ -2,6 +2,7 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { ArrowRight, Sparkles, Zap, Download } from 'lucide-react';
 import { OrbitDemo } from './OrbitDemo';
+import { WorkflowSteps } from './WorkflowSteps';
 interface HeroPageProps {
   onGetStarted: () => void;
 }
@@ -93,6 +94,9 @@ export const HeroPage: React.FC<HeroPageProps> = ({
               </div>
             </div>
           </div>
+
+          {/* Workflow Steps */}
+          <WorkflowSteps />
 
           {/* ORBIT Demo Section */}
           <div className="mb-16">
