@@ -5,6 +5,7 @@ import { Card } from '@/components/ui/card';
 import { CheckCircle, Loader2, XCircle, ArrowLeft } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import type { User } from '@supabase/supabase-js';
 
 type PaymentStatus = 'loading' | 'success' | 'failed' | 'not_found';
 
@@ -12,10 +13,28 @@ const PaymentSuccess: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const [user, setUser] = useState<User | null>(null);
   const [status, setStatus] = useState<PaymentStatus>('loading');
   const [orderData, setOrderData] = useState<any>(null);
+  const [retryCount, setRetryCount] = useState(0);
 
   const sessionId = searchParams.get('session_id');
+
+  // Get current user
+  useEffect(() => {
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setUser(user);
+    };
+    
+    getUser();
+    
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   useEffect(() => {
     const verifyPayment = async () => {
@@ -25,18 +44,70 @@ const PaymentSuccess: React.FC = () => {
       }
 
       try {
-        // Find the order by Stripe session ID
-        const { data: order, error: orderError } = await supabase
+        console.log('🔍 Searching for order with session ID:', sessionId);
+        console.log('🔍 User authenticated:', !!user);
+        
+        // Try multiple lookup strategies
+        let order = null;
+        let orderError = null;
+        
+        // Strategy 1: Find by Stripe session ID or payment intent ID (same as webhook logic)
+        const { data: orderByStripeId, error: stripeError } = await supabase
           .from('orders')
           .select('*')
-          .eq('stripe_payment_intent_id', sessionId)
+          .or(`stripe_payment_intent_id.eq.${sessionId},stripe_payment_intent_id_actual.eq.${sessionId}`)
           .single();
+          
+        if (orderByStripeId && !stripeError) {
+          order = orderByStripeId;
+        } else {
+          orderError = stripeError;
+          console.log('🔍 Stripe ID lookup failed, trying alternative methods...');
+          
+          // Strategy 2: Check if sessionId is actually an order ID (fallback)
+          if (sessionId?.includes('-') && sessionId.length > 30) {
+            console.log('🔍 Trying to find order by ID...');
+            const { data: orderById, error: idError } = await supabase
+              .from('orders')
+              .select('*')
+              .eq('id', sessionId)
+              .single();
+              
+            if (orderById && !idError) {
+              order = orderById; 
+              orderError = null;
+              console.log('✅ Found order by ID fallback');
+            }
+          }
+        }
 
-        if (orderError || !order) {
-          console.error('Order not found:', orderError);
+        if (orderError) {
+          console.error('Order lookup error:', orderError);
+          
+          // Handle specific RLS/authentication errors
+          if (orderError.code === 'PGRST301' || orderError.message?.includes('RLS') || orderError.message?.includes('policy')) {
+            console.log('🔒 RLS policy violation - user may not be authenticated');
+            
+            // Retry with exponential backoff for potential race conditions
+            if (retryCount < 3) {
+              console.log(`🔄 Retrying order lookup (attempt ${retryCount + 1}/3)`);
+              setRetryCount(prev => prev + 1);
+              setTimeout(() => verifyPayment(), Math.pow(2, retryCount) * 1000);
+              return;
+            }
+          }
+          
           setStatus('not_found');
           return;
         }
+
+        if (!order) {
+          console.error('Order not found with session ID:', sessionId);
+          setStatus('not_found');
+          return;
+        }
+        
+        console.log('✅ Order found:', { id: order.id, order_number: order.order_number, payment_status: order.payment_status });
 
         setOrderData(order);
 
@@ -90,17 +161,35 @@ const PaymentSuccess: React.FC = () => {
 
       } catch (error: any) {
         console.error('Payment verification error:', error);
+        
+        // Handle authentication/session errors
+        if (error.message?.includes('refresh_token') || error.message?.includes('Invalid Refresh Token')) {
+          console.log('🔄 Authentication error - attempting to retry...');
+          
+          // Try to refresh the session
+          const { error: refreshError } = await supabase.auth.refreshSession();
+          if (!refreshError && retryCount < 2) {
+            console.log('🔄 Session refreshed, retrying...');
+            setRetryCount(prev => prev + 1);
+            setTimeout(() => verifyPayment(), 1000);
+            return;
+          }
+        }
+        
         setStatus('failed');
         toast({
           title: "Verification Failed",
-          description: "Unable to verify your payment. Please contact support.",
+          description: `Unable to verify your payment: ${error.message}. Please contact support if this persists.`,
           variant: "destructive"
         });
       }
     };
 
-    verifyPayment();
-  }, [sessionId, navigate, toast]);
+    // Only run verification once we have the sessionId and user state is loaded
+    if (sessionId && user !== undefined) {
+      verifyPayment();
+    }
+  }, [sessionId, navigate, toast, user, retryCount]);
 
   const triggerProcessingIfNeeded = async (order: any) => {
     try {
@@ -243,12 +332,30 @@ const PaymentSuccess: React.FC = () => {
               <>
                 <XCircle className="w-16 h-16 text-destructive mx-auto mb-4" />
                 <h1 className="text-2xl font-bold mb-2">Payment Session Not Found</h1>
-                <p className="text-muted-foreground mb-6">
-                  We couldn't find your payment session. Please try starting a new order.
+                <p className="text-muted-foreground mb-4">
+                  We couldn't find your payment session. This might be due to authentication issues or timing.
                 </p>
-                <Button variant="cosmic" size="lg" onClick={handleBackToHome}>
-                  Start New Order
-                </Button>
+                
+                {/* Debug information */}
+                <div className="bg-secondary/50 rounded-lg p-4 mb-6 text-left">
+                  <div className="text-sm space-y-1">
+                    <div><strong>Session ID:</strong> {sessionId}</div>
+                    <div><strong>User Authenticated:</strong> {user ? '✅ Yes' : '❌ No'}</div>
+                    <div><strong>Retry Attempts:</strong> {retryCount}/3</div>
+                  </div>
+                </div>
+                
+                <div className="space-y-4">
+                  <Button variant="cosmic" size="lg" onClick={() => {
+                    setRetryCount(0);
+                    setStatus('loading');
+                  }}>
+                    Try Again
+                  </Button>
+                  <Button variant="outline" onClick={handleBackToHome}>
+                    Start New Order
+                  </Button>
+                </div>
               </>
             )}
           </Card>
