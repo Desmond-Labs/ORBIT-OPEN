@@ -360,7 +360,7 @@ serve(async (req) => {
               errorCount: errorCount,
               status: finalStatus,
               accessToken: accessToken,
-              downloadUrl: `${Deno.env.get('FRONTEND_URL') || 'https://preview--orbit-image-forge.lovable.app'}/?token=${accessToken}&order=${orderId}&step=processing`
+              downloadUrl: `${Deno.env.get('FRONTEND_URL') || 'https://orbit-image-forge.lovable.app'}/?token=${accessToken}&order=${orderId}&step=processing`
             }
           });
 

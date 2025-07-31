@@ -32,6 +32,7 @@ export const useAllUserOrders = (userId: string | null) => {
     }
 
     console.log('📋 Fetching orders for user:', userId);
+    console.log('📋 User ID type and length:', typeof userId, userId.length);
     setLoading(true);
     setError(null);
 
@@ -44,6 +45,12 @@ export const useAllUserOrders = (userId: string | null) => {
         .in('payment_status', ['completed', 'succeeded'])
         .order('created_at', { ascending: false });
 
+      console.log('📋 Raw database response:', { 
+        ordersCount: ordersData?.length || 0, 
+        error: ordersError,
+        sampleOrderIds: ordersData?.slice(0, 3).map(o => ({ id: o.id, order_number: o.order_number, payment_status: o.payment_status, order_status: o.order_status }))
+      });
+
       if (ordersError) throw new Error(`Error fetching orders: ${ordersError.message}`);
 
       if (!ordersData) {
@@ -53,6 +60,8 @@ export const useAllUserOrders = (userId: string | null) => {
       }
 
       console.log('📋 Found orders:', ordersData.length);
+      console.log('📋 Missing order check - looking for c4c85a5a-2624-4865-a6db-05eab17a7981:', 
+        ordersData.some(o => o.id === 'c4c85a5a-2624-4865-a6db-05eab17a7981'));
 
       // For each order, get image counts and processing status
       const enrichedOrders = await Promise.all(

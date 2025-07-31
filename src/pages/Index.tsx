@@ -86,11 +86,14 @@ const Index = () => {
   // Debug logging for state tracking
   useEffect(() => {
     console.log('📊 State update:', { 
-      hasUser: !!user, 
+      hasUser: !!user,
+      userId: user?.id,
+      userEmail: user?.email,
       ordersCount: orders.length, 
       ordersLoading, 
       isInitialLoading,
-      currentView 
+      currentView,
+      sampleOrders: orders.slice(0, 2).map(o => ({ id: o.id, orderNumber: o.orderNumber }))
     });
   }, [user, orders.length, ordersLoading, isInitialLoading, currentView]);
 
