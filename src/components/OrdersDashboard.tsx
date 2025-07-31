@@ -72,15 +72,33 @@ export const OrdersDashboard: React.FC<OrdersDashboardProps> = ({
   }
 
   // Filter orders by payment status as well - only show paid orders
+  console.log('🎯 Dashboard filtering - total orders received:', orders.length);
+  console.log('🎯 Sample order payment/order status:', orders.slice(0, 3).map(o => ({ 
+    id: o.id.substring(0, 8), 
+    orderNumber: o.orderNumber,
+    paymentStatus: o.paymentStatus, 
+    orderStatus: o.orderStatus 
+  })));
+  
   const paidOrders = orders.filter(order => 
     order.paymentStatus === 'completed' || order.paymentStatus === 'succeeded'
   );
+  
+  console.log('🎯 After payment status filter:', paidOrders.length);
+  console.log('🎯 Missing order in paid orders:', paidOrders.some(o => o.id === 'c4c85a5a-2624-4865-a6db-05eab17a7981'));
   
   const activeOrders = paidOrders.filter(order => 
     order.orderStatus === 'processing' || order.orderStatus === 'pending'
   );
   const completedOrders = paidOrders.filter(order => order.orderStatus === 'completed');
   const failedOrders = paidOrders.filter(order => order.orderStatus === 'failed');
+  
+  console.log('🎯 Order categorization:', {
+    active: activeOrders.length,
+    completed: completedOrders.length, 
+    failed: failedOrders.length,
+    total: activeOrders.length + completedOrders.length + failedOrders.length
+  });
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
