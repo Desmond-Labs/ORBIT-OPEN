@@ -79,7 +79,7 @@ export const useAllUserOrders = (userId: string | null) => {
           }
 
           const totalImages = images?.length || 0;
-          const processedImages = images?.filter(img => img.processing_status === 'completed').length || 0;
+          const processedImages = images?.filter(img => img.processing_status === 'complete').length || 0;
           const failedImages = images?.filter(img => img.processing_status === 'failed' || img.processing_status === 'error').length || 0;
           
           // Determine overall order status

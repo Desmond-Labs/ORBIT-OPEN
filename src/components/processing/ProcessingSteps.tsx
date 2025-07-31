@@ -28,6 +28,7 @@ export const ProcessingSteps: React.FC<ProcessingStepsProps> = ({ currentStep, p
           const isActive = index === currentStepIndex;
           const isCompleted = index < currentStepIndex;
           const isProcessing = step === 'processing' && currentStep === 'processing';
+          const isProcessingComplete = step === 'processing' && currentStep === 'complete';
 
           return (
             <div key={step} className="flex items-center">
@@ -35,23 +36,29 @@ export const ProcessingSteps: React.FC<ProcessingStepsProps> = ({ currentStep, p
                 className={`w-12 h-12 rounded-full flex items-center justify-center border-2 transition-all duration-300 ${
                   isActive
                     ? 'bg-primary border-primary shadow-cosmic'
-                    : isCompleted
-                    ? 'bg-accent border-accent'
+                    : isCompleted || isProcessingComplete
+                    ? isProcessingComplete ? 'bg-green-500 border-green-500' : 'bg-accent border-accent'
                     : 'bg-transparent border-muted-foreground/30'
                 }`}
               >
-                <StepIcon
-                  className={`w-5 h-5 ${
-                    isProcessing ? 'animate-spin' : ''
-                  } ${
-                    isActive || isCompleted ? 'text-foreground' : 'text-muted-foreground'
-                  }`}
-                />
+                {step === 'processing' && isProcessingComplete ? (
+                  <StepIcon
+                    className={`w-5 h-5 text-white`}
+                  />
+                ) : (
+                  <StepIcon
+                    className={`w-5 h-5 ${
+                      isProcessing ? 'animate-spin' : ''
+                    } ${
+                      isActive || isCompleted || isProcessingComplete ? 'text-foreground' : 'text-muted-foreground'
+                    }`}
+                  />
+                )}
               </div>
               {index < steps.length - 1 && (
                 <div
                   className={`w-20 h-0.5 transition-colors duration-300 ${
-                    isCompleted ? 'bg-accent' : 'bg-muted-foreground/30'
+                    isCompleted || (step === 'processing' && currentStep === 'complete') ? 'bg-accent' : 'bg-muted-foreground/30'
                   }`}
                 />
               )}
@@ -65,8 +72,8 @@ export const ProcessingSteps: React.FC<ProcessingStepsProps> = ({ currentStep, p
           {currentStep === 'auth' && 'Sign in to access ORBIT image processing'}
           {currentStep === 'upload' && 'Select your product images to begin analysis'}
           {currentStep === 'payment' && 'Complete payment to start AI analysis'}
-          {currentStep === 'processing' && 'ORBIT is analyzing your images...'}
-          {currentStep === 'complete' && 'Your enhanced images are ready for download'}
+          {currentStep === 'processing' && 'ORBIT is analyzing your images in space...'}
+          {currentStep === 'complete' && 'Mission complete! Your enhanced images are ready for download'}
         </p>
       </div>
     </div>

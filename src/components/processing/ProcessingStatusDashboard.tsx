@@ -99,8 +99,12 @@ export const ProcessingStatusDashboard: React.FC<ProcessingStatusDashboardProps>
       case 'processing':
         return <Loader2 className="w-8 h-8 text-accent animate-spin" />;
       case 'failed':
-        return <AlertCircle className="w-8 h-8 text-destructive" />;
+        return <XCircle className="w-8 h-8 text-destructive" />;
       default:
+        // Check if it's "getting ready for launch" phase
+        if (status.processingStage === 'preparing' || status.processingStage === 'queued') {
+          return <Upload className="w-8 h-8 text-amber-500" />;
+        }
         return <Clock className="w-8 h-8 text-muted-foreground" />;
     }
   };
@@ -108,26 +112,39 @@ export const ProcessingStatusDashboard: React.FC<ProcessingStatusDashboardProps>
   const getStatusBadge = () => {
     switch (status.orderStatus) {
       case 'completed':
-        return <Badge variant="default" className="bg-green-500 text-white">Completed</Badge>;
+        return <Badge variant="default" className="bg-green-500 text-white">🚀 Mission Complete</Badge>;
       case 'processing':
-        return <Badge variant="default">Processing</Badge>;
+        return <Badge variant="default" className="bg-blue-500 text-white">🛰️ In ORBIT</Badge>;
       case 'failed':
-        return <Badge variant="destructive">Failed</Badge>;
+        return <Badge variant="destructive">❌ Mission Failed</Badge>;
       default:
-        return <Badge variant="secondary">Pending</Badge>;
+        // Check if it's "getting ready for launch" phase
+        if (status.processingStage === 'preparing' || status.processingStage === 'queued') {
+          return (
+            <div className="text-center">
+              <Badge variant="default" className="bg-amber-500 text-white mb-1">🚀 Getting Ready for Launch</Badge>
+              <div className="text-xs text-muted-foreground">Please allow 24 hrs for processing</div>
+            </div>
+          );
+        }
+        return <Badge variant="secondary">⏳ Mission Pending</Badge>;
     }
   };
 
   const getStatusDescription = () => {
     switch (status.orderStatus) {
       case 'completed':
-        return 'All images have been processed successfully';
+        return 'ORBIT analysis complete - your enhanced images are ready for download';
       case 'processing':
-        return 'Your images are currently being processed';
+        return 'ORBIT is analyzing and enhancing your images in space';
       case 'failed':
-        return 'Processing failed. Please contact support.';
+        return 'Mission encountered an error. Please contact mission control.';
       default:
-        return 'Processing is queued and will begin shortly';
+        // Check if it's "getting ready for launch" phase
+        if (status.processingStage === 'preparing' || status.processingStage === 'queued') {
+          return 'Mission is preparing for launch - systems check in progress';
+        }
+        return 'Mission queued for launch - awaiting clearance';
     }
   };
 
