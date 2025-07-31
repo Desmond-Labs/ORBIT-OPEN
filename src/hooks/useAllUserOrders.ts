@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { getUnifiedOrderStatus } from '@/utils/orderStatus';
 
 export interface UserOrder {
   id: string;
@@ -82,15 +83,17 @@ export const useAllUserOrders = (userId: string | null) => {
           const processedImages = images?.filter(img => img.processing_status === 'complete').length || 0;
           const failedImages = images?.filter(img => img.processing_status === 'failed' || img.processing_status === 'error').length || 0;
           
-          // Determine overall order status
-          let orderStatus: UserOrder['orderStatus'] = 'pending';
-          if (order.order_status === 'completed' || processedImages === totalImages) {
-            orderStatus = 'completed';
-          } else if (processedImages > 0 || order.order_status === 'processing') {
-            orderStatus = 'processing';
-          } else if (failedImages === totalImages) {
-            orderStatus = 'failed';
-          }
+          // Use unified status logic for consistency
+          const unifiedStatus = getUnifiedOrderStatus({
+            orderStatus: order.order_status,
+            paymentStatus: order.payment_status,
+            processingStage: order.processing_stage,
+            processedCount: processedImages,
+            imageCount: totalImages,
+            failedCount: failedImages
+          });
+          
+          const orderStatus = unifiedStatus.status;
 
           return {
             id: order.id,

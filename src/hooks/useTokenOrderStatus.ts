@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { getUnifiedOrderStatus } from '@/utils/orderStatus';
 
 interface TokenOrderStatus {
   orderId: string;
@@ -36,12 +37,7 @@ export const useTokenOrderStatus = (orderId: string | null, hasValidToken: boole
     try {
       console.log('🔍 Fetching order status with token access for:', orderId);
 
-      // Set the token for RLS policies before making queries
-      await supabase.rpc('set_config' as any, {
-        setting_name: 'app.current_token',
-        setting_value: token,
-        is_local: true,
-      });
+      // Note: Token-based RLS is handled by the database policies, not client-side config
 
       // Fetch order data using token-based access
       const { data: order, error: orderError } = await supabase
@@ -51,6 +47,7 @@ export const useTokenOrderStatus = (orderId: string | null, hasValidToken: boole
           order_number,
           order_status,
           payment_status,
+          processing_stage,
           total_cost,
           created_at,
           completed_at,
@@ -112,16 +109,17 @@ export const useTokenOrderStatus = (orderId: string | null, hasValidToken: boole
       const totalImages = imageCount || 1;
       const processingProgress = Math.round((completedCount / totalImages) * 100);
 
-      // Determine processing stage based on status
-      if (order.order_status === 'completed' || order.order_status === 'completed_with_errors') {
-        processingStage = 'completed';
-      } else if (order.order_status === 'processing') {
-        processingStage = 'analyzing';
-      } else if (order.payment_status === 'completed' || order.payment_status === 'succeeded') {
-        processingStage = 'initializing';
-      } else {
-        processingStage = 'pending_payment';
-      }
+      // Use unified status logic for consistency
+      const unifiedStatus = getUnifiedOrderStatus({
+        orderStatus: order.order_status,
+        paymentStatus: order.payment_status,
+        processingStage: order.processing_stage,
+        processedCount: completedCount,
+        imageCount,
+        failedCount
+      });
+
+      processingStage = unifiedStatus.stage;
 
       const orderStatus: TokenOrderStatus = {
         orderId: order.id,

@@ -23,6 +23,7 @@ import {
 import { ProcessingStatus } from '@/hooks/useOrderProcessingStatus';
 import { useDownloadProcessedImages } from '@/hooks/useDownloadProcessedImages';
 import { ProcessedImageGallery } from './ProcessedImageGallery';
+import { getUnifiedOrderStatus } from '@/utils/orderStatus';
 
 interface ProcessingStatusDashboardProps {
   status: ProcessingStatus | any; // Allow token order status as well
@@ -98,125 +99,48 @@ export const ProcessingStatusDashboard: React.FC<ProcessingStatusDashboardProps>
       </div>
     );
   }
+  // Get unified status for consistent display
+  const unifiedStatus = getUnifiedOrderStatus({
+    orderStatus: status.orderStatus,
+    paymentStatus: status.paymentStatus,
+    processingStage: status.processingStage,
+    processedCount: status.processedCount,
+    imageCount: status.imageCount,
+    failedCount: status.failedCount
+  });
+
   const getStatusIcon = () => {
-    switch (status.orderStatus) {
-      case 'completed':
-      case 'completed_with_errors':
+    switch (unifiedStatus.icon) {
+      case 'check-circle':
         return <CheckCircle className="w-8 h-8 text-success" />;
-      case 'processing':
+      case 'satellite':
         return <Satellite className="w-8 h-8 text-purple-500 animate-pulse" />;
-      case 'paid':
-      case 'images_uploaded':
+      case 'rocket':
         return <Rocket className="w-8 h-8 text-blue-500" />;
-      case 'failed':
-      case 'upload_failed':
+      case 'alert-circle':
         return <AlertCircle className="w-8 h-8 text-destructive" />;
-      case 'payment_pending':
+      case 'clock':
       default:
         return <Clock className="w-8 h-8 text-yellow-500" />;
     }
   };
 
-  // Unified function to get mission-themed status based on order status and processing stage
-  const getMissionStatus = () => {
-    // For processing orders, use the processing stage for more specific status
-    if (status.orderStatus === 'processing') {
-      switch (status.processingStage) {
-        case 'analyzing':
-          return {
-            label: 'In ORBIT',
-            description: 'AI systems are analyzing and enhancing your images',
-            colorClass: 'text-purple-600 bg-purple-100',
-            icon: 'satellite'
-          };
-        case 'initializing':
-          return {
-            label: 'Getting Ready for Launch',
-            description: 'Preparing your images for AI analysis',
-            colorClass: 'text-blue-600 bg-blue-100',
-            icon: 'rocket',
-            subtitle: 'Please allow 24 hrs'
-          };
-        case 'completed':
-          return {
-            label: 'Mission Complete',
-            description: 'All images have been processed successfully',
-            colorClass: 'text-green-600 bg-green-100',
-            icon: 'check-circle'
-          };
-        default:
-          return {
-            label: 'In ORBIT',
-            description: 'Processing your images with advanced AI',
-            colorClass: 'text-purple-600 bg-purple-100',
-            icon: 'satellite'
-          };
-      }
-    }
-
-    // For non-processing orders, use order status
-    switch (status.orderStatus) {
-      case 'payment_pending':
-        return {
-          label: 'Mission Pending',
-          description: 'Payment confirmation required to begin processing',
-          colorClass: 'text-yellow-600 bg-yellow-100',
-          icon: 'clock'
-        };
-      case 'paid':
-      case 'images_uploaded':
-        return {
-          label: 'Getting Ready for Launch',
-          description: 'Your order is queued and will begin processing shortly',
-          colorClass: 'text-blue-600 bg-blue-100',
-          icon: 'rocket',
-          subtitle: 'Please allow 24 hrs'
-        };
-      case 'completed':
-      case 'completed_with_errors':
-        return {
-          label: 'Mission Complete',
-          description: 'All images have been processed successfully',
-          colorClass: 'text-green-600 bg-green-100',
-          icon: 'check-circle'
-        };
-      case 'failed':
-      case 'upload_failed':
-        return {
-          label: 'Mission Failed',
-          description: 'Processing failed. Please contact support.',
-          colorClass: 'text-red-600 bg-red-100',
-          icon: 'alert-circle'
-        };
-      default:
-        return {
-          label: 'Mission Pending',
-          description: 'Preparing to begin your mission',
-          colorClass: 'text-yellow-600 bg-yellow-100',
-          icon: 'clock'
-        };
-    }
-  };
-
   const getStatusBadge = () => {
-    const missionStatus = getMissionStatus();
-
     return (
       <div className="flex flex-col items-center">
-        <Badge variant="outline" className={missionStatus.colorClass}>
+        <Badge variant="outline" className={unifiedStatus.colorClass}>
           {getStatusIcon()}
-          <span className="ml-2 font-medium">{missionStatus.label}</span>
+          <span className="ml-2 font-medium">{unifiedStatus.label}</span>
         </Badge>
-        {missionStatus.subtitle && (
-          <span className="text-xs text-muted-foreground italic mt-1">{missionStatus.subtitle}</span>
+        {unifiedStatus.subtitle && (
+          <span className="text-xs text-muted-foreground italic mt-1">{unifiedStatus.subtitle}</span>
         )}
       </div>
     );
   };
 
   const getStatusDescription = () => {
-    const missionStatus = getMissionStatus();
-    return missionStatus.description;
+    return unifiedStatus.description;
   };
 
   return (
@@ -308,18 +232,18 @@ export const ProcessingStatusDashboard: React.FC<ProcessingStatusDashboardProps>
       </Card>
 
       {/* Current Mission Stage */}
-      {(status.orderStatus === 'processing' || status.orderStatus === 'paid' || status.orderStatus === 'images_uploaded') && (
+      {(unifiedStatus.status === 'processing' || unifiedStatus.status === 'paid' || unifiedStatus.status === 'images_uploaded') && (
         <Card className="bg-secondary/50 p-6">
           <h4 className="text-lg font-semibold mb-4">Current Mission Stage</h4>
           <div className="flex items-center gap-3">
-            {status.orderStatus === 'processing' ? (
+            {unifiedStatus.icon === 'satellite' ? (
               <Satellite className="w-5 h-5 text-purple-500 animate-pulse" />
             ) : (
               <Rocket className="w-5 h-5 text-blue-500" />
             )}
             <div className="flex flex-col">
-              <span className="font-medium">{getMissionStatus().label}</span>
-              <span className="text-sm text-muted-foreground">{getMissionStatus().description}</span>
+              <span className="font-medium">{unifiedStatus.label}</span>
+              <span className="text-sm text-muted-foreground">{unifiedStatus.description}</span>
             </div>
           </div>
           {status.processingCompletionPercentage !== undefined && status.processingCompletionPercentage > 0 && (
