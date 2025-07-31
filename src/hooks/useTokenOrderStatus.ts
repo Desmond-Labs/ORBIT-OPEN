@@ -36,7 +36,14 @@ export const useTokenOrderStatus = (orderId: string | null, hasValidToken: boole
     try {
       console.log('🔍 Fetching order status with token access for:', orderId);
 
-      // Fetch order data using token-based RLS
+      // Set the token for RLS policies before making queries
+      await supabase.rpc('set_config' as any, {
+        setting_name: 'app.current_token',
+        setting_value: token,
+        is_local: true,
+      });
+
+      // Fetch order data using token-based access
       const { data: order, error: orderError } = await supabase
         .from('orders')
         .select(`

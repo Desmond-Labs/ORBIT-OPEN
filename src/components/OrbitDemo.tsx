@@ -106,6 +106,12 @@ export const OrbitDemo: React.FC<OrbitDemoProps> = ({ className = '' }) => {
           let userImage: any;
           let canvasWidth: number, canvasHeight: number;
           let imageArea: any, metadataArea: any;
+          let reportStartFrame = 0;
+          let reportProgress = 0;
+          let reportSections: any[] = [];
+          let showRawJson = false;
+          let completionEndFrame = 0;
+          let waitingForReport = false;
 
           p.preload = () => {
             userImage = p.loadImage(
@@ -179,6 +185,12 @@ export const OrbitDemo: React.FC<OrbitDemoProps> = ({ className = '' }) => {
             embeddingStartFrame = 0;
             completionInitiated = false;
             imageGlow = 0;
+            reportStartFrame = 0;
+            reportProgress = 0;
+            reportSections = [];
+            showRawJson = false;
+            completionEndFrame = 0;
+            waitingForReport = false;
           }
 
           function getSampleWords(categoryKey: string, count: number) {
@@ -302,9 +314,10 @@ export const OrbitDemo: React.FC<OrbitDemoProps> = ({ className = '' }) => {
               embeddingProgress = 100;
             }
 
-            if (completionInitiated && embeddingParticles.length === 0 && embeddingRipples.length === 0 && currentPhase !== 'complete') {
-              currentPhase = 'complete';
-              triggerCompletionBurst();
+            if (completionInitiated && embeddingParticles.length === 0 && embeddingRipples.length === 0 && currentPhase !== 'report') {
+              currentPhase = 'report';
+              reportStartFrame = p.frameCount;
+              initializeReport();
             }
           }
 
@@ -328,6 +341,41 @@ export const OrbitDemo: React.FC<OrbitDemoProps> = ({ className = '' }) => {
             }
           }
 
+          function initializeReport() {
+            reportSections = [
+              { title: "ORBIT Metadata Report - Enhanced Simple MCP v2.1", type: "header" },
+              { title: "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━", type: "separator" },
+              { title: "Source Image: demo-image.jpg", type: "info" },
+              { title: `Report Generated: ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`, type: "info" },
+              { title: "Analysis Type: Lifestyle", type: "info" },
+              { title: "Processing Time: 2.4 seconds", type: "info" },
+              { title: "", type: "spacer" },
+              { title: "🏠 SCENE OVERVIEW", type: "section", data: METADATA.scene_overview },
+              { title: "👥 HUMAN ELEMENTS", type: "section", data: METADATA.human_elements },
+              { title: "🌍 ENVIRONMENT", type: "section", data: METADATA.environment },
+              { title: "🔑 KEY OBJECTS", type: "section", data: METADATA.key_objects },
+              { title: "🎨 ATMOSPHERIC ELEMENTS", type: "section", data: METADATA.atmospheric_elements },
+              { title: "📖 NARRATIVE ANALYSIS", type: "section", data: METADATA.narrative_analysis },
+              { title: "📷 PHOTOGRAPHIC ELEMENTS", type: "section", data: METADATA.photographic_elements },
+              { title: "🎯 MARKETING POTENTIAL", type: "section", data: METADATA.marketing_potential },
+              { title: "", type: "spacer" },
+              { title: "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━", type: "separator" },
+              { title: "RAW JSON DATA", type: "section-header" },
+              { title: JSON.stringify(METADATA, null, 2), type: "json" }
+            ];
+          }
+
+          function updateReport() {
+            const framesSinceStart = p.frameCount - reportStartFrame;
+            reportProgress = p.min(100, (framesSinceStart / 240) * 100); // 4 seconds to fully reveal
+            
+            // Transition to complete phase after report is finished
+            if (reportProgress >= 100 && framesSinceStart >= 300) { // Wait extra 1 second after report
+              currentPhase = 'complete';
+              triggerCompletionBurst();
+            }
+          }
+
           p.draw = () => {
             p.background(ORBIT_NAVY);
             drawStars();
@@ -338,10 +386,16 @@ export const OrbitDemo: React.FC<OrbitDemoProps> = ({ className = '' }) => {
               updateEmbedding();
             } else if (currentPhase === 'complete') {
               updateComplete();
+            } else if (currentPhase === 'report') {
+              updateReport();
             }
 
             drawImagePanel();
-            drawMetadataPanel();
+            if (currentPhase === 'report') {
+              drawReportPanel();
+            } else {
+              drawMetadataPanel();
+            }
             drawAnimations();
             drawStatus();
           };
@@ -536,6 +590,99 @@ export const OrbitDemo: React.FC<OrbitDemoProps> = ({ className = '' }) => {
             p.pop();
           }
 
+          function drawReportPanel() {
+            p.push();
+            
+            // Darker terminal-style background
+            const reportBg = p.color(0, 0, 0, 250);
+            p.fill(reportBg);
+            p.noStroke();
+            p.rect(metadataArea.x, metadataArea.y, metadataArea.w, metadataArea.h, 8);
+            
+            // Terminal border with glow effect
+            p.noFill();
+            p.stroke(0, 255, 100);
+            p.strokeWeight(2);
+            p.rect(metadataArea.x, metadataArea.y, metadataArea.w, metadataArea.h, 8);
+
+            // Draw report content
+            const visibleSections = Math.floor((reportProgress / 100) * reportSections.length);
+            let yOffset = metadataArea.y + 15;
+            const lineHeight = 14;
+            
+            p.textAlign(p.LEFT, p.TOP);
+            p.textFont('Courier New');
+            
+            for (let i = 0; i < Math.min(visibleSections, reportSections.length); i++) {
+              const section = reportSections[i];
+              
+              if (yOffset > metadataArea.y + metadataArea.h - 20) break; // Stop if we run out of space
+              
+              if (section.type === 'header') {
+                p.fill(0, 255, 255); // Bright cyan
+                p.textSize(11);
+                p.text(section.title, metadataArea.x + 10, yOffset);
+                yOffset += lineHeight + 5;
+              } else if (section.type === 'separator') {
+                p.fill(0, 255, 100); // Bright green
+                p.textSize(8);
+                p.text(section.title, metadataArea.x + 10, yOffset);
+                yOffset += lineHeight;
+              } else if (section.type === 'info') {
+                p.fill(150, 150, 150); // Dim gray
+                p.textSize(9);
+                p.text(section.title, metadataArea.x + 10, yOffset);
+                yOffset += lineHeight;
+              } else if (section.type === 'spacer') {
+                yOffset += lineHeight / 2;
+              } else if (section.type === 'section') {
+                p.fill(255, 255, 100); // Bright yellow for emoji sections
+                p.textSize(10);
+                p.text(section.title, metadataArea.x + 10, yOffset);
+                yOffset += lineHeight;
+                
+                if (section.data) {
+                  p.fill(200, 200, 200); // Light gray for data
+                  p.textSize(8);
+                  Object.entries(section.data).forEach(([key, value]) => {
+                    if (yOffset < metadataArea.y + metadataArea.h - 20) {
+                      p.text(`    ${key}: ${value}`, metadataArea.x + 15, yOffset);
+                      yOffset += lineHeight - 2;
+                    }
+                  });
+                }
+                yOffset += 5;
+              } else if (section.type === 'section-header') {
+                p.fill(255, 100, 255); // Bright magenta
+                p.textSize(10);
+                p.text(section.title, metadataArea.x + 10, yOffset);
+                yOffset += lineHeight + 5;
+              } else if (section.type === 'json') {
+                p.fill(100, 200, 255); // Light blue for JSON
+                p.textSize(7);
+                const jsonLines = section.title.split('\n');
+                for (let line of jsonLines.slice(0, 8)) { // Show first 8 lines of JSON
+                  if (yOffset < metadataArea.y + metadataArea.h - 20) {
+                    p.text(line, metadataArea.x + 15, yOffset);
+                    yOffset += lineHeight - 3;
+                  }
+                }
+                if (jsonLines.length > 8) {
+                  p.fill(150, 150, 150);
+                  p.text('... [truncated]', metadataArea.x + 15, yOffset);
+                }
+              }
+            }
+            
+            // Blinking terminal cursor
+            if (visibleSections < reportSections.length && p.frameCount % 60 < 30) {
+              p.fill(0, 255, 100);
+              p.rect(metadataArea.x + 10, yOffset, 8, 12);
+            }
+            
+            p.pop();
+          }
+
           function drawStatus() {
             p.push();
             p.textAlign(p.CENTER, p.CENTER);
@@ -552,6 +699,12 @@ export const OrbitDemo: React.FC<OrbitDemoProps> = ({ className = '' }) => {
             } else if (currentPhase === 'complete') {
               progress = 100;
               statusText = "Analysis Complete!";
+            } else if (currentPhase === 'report') {
+              progress = reportProgress;
+              statusText = `Generating Report... ${Math.floor(progress)}%`;
+              if (progress >= 100) {
+                statusText = "Metadata Report Generated!";
+              }
             }
 
             const statusY = Math.max(imageArea.y + imageArea.h, metadataArea.y + metadataArea.h) + 25;
@@ -572,7 +725,11 @@ export const OrbitDemo: React.FC<OrbitDemoProps> = ({ className = '' }) => {
 
             if (progress > 0) {
               const progressW = barWidth * (progress / 100);
-              p.fill(ORBIT_TEAL);
+              if (currentPhase === 'report') {
+                p.fill(ORBIT_GREEN);
+              } else {
+                p.fill(ORBIT_TEAL);
+              }
               p.rect(barX, barY, progressW, barHeight, 2);
             }
 

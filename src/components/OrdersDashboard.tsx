@@ -25,7 +25,7 @@ const getStatusIcon = (status: UserOrder['orderStatus']) => {
   }
 };
 
-const getStatusBadge = (status: UserOrder['orderStatus']) => {
+const getStatusBadge = (status: UserOrder['orderStatus'], processingStage?: string) => {
   const variants = {
     pending: 'secondary',
     processing: 'default',
@@ -40,10 +40,27 @@ const getStatusBadge = (status: UserOrder['orderStatus']) => {
     failed: 'text-red-600 bg-red-100'
   };
 
+  const getStatusText = () => {
+    switch (status) {
+      case 'completed':
+        return '🚀 Mission Complete';
+      case 'processing':
+        return '🛰️ In ORBIT';
+      case 'failed':
+        return '❌ Mission Failed';
+      default:
+        // Check if it's "getting ready for launch" phase
+        if (processingStage === 'preparing' || processingStage === 'queued') {
+          return '🚀 Getting Ready';
+        }
+        return '⏳ Mission Pending';
+    }
+  };
+
   return (
     <Badge variant={variants[status]} className={colors[status]}>
       {getStatusIcon(status)}
-      <span className="ml-1 capitalize">{status}</span>
+      <span className="ml-1">{getStatusText()}</span>
     </Badge>
   );
 };
@@ -138,7 +155,7 @@ export const OrdersDashboard: React.FC<OrdersDashboardProps> = ({
                           <CreditCard className="w-3 h-3 mr-1" />
                           Paid
                         </Badge>
-                        {getStatusBadge(order.orderStatus)}
+                        {getStatusBadge(order.orderStatus, order.processingStage)}
                       </div>
                     </div>
                   </CardHeader>
@@ -196,7 +213,7 @@ export const OrdersDashboard: React.FC<OrdersDashboardProps> = ({
                           <CreditCard className="w-3 h-3 mr-1" />
                           Paid
                         </Badge>
-                        {getStatusBadge(order.orderStatus)}
+                        {getStatusBadge(order.orderStatus, order.processingStage)}
                       </div>
                     </div>
                   </CardHeader>
@@ -248,7 +265,7 @@ export const OrdersDashboard: React.FC<OrdersDashboardProps> = ({
                           <CreditCard className="w-3 h-3 mr-1" />
                           Paid
                         </Badge>
-                        {getStatusBadge(order.orderStatus)}
+                        {getStatusBadge(order.orderStatus, order.processingStage)}
                       </div>
                     </div>
                   </CardHeader>

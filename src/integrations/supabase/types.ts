@@ -399,8 +399,59 @@ export type Database = {
         }
         Relationships: []
       }
+      order_access_tokens: {
+        Row: {
+          created_at: string | null
+          current_uses: number | null
+          expires_at: string
+          id: string
+          is_active: boolean | null
+          max_uses: number | null
+          metadata: Json | null
+          order_id: string
+          token: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          current_uses?: number | null
+          expires_at: string
+          id?: string
+          is_active?: boolean | null
+          max_uses?: number | null
+          metadata?: Json | null
+          order_id: string
+          token: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          current_uses?: number | null
+          expires_at?: string
+          id?: string
+          is_active?: boolean | null
+          max_uses?: number | null
+          metadata?: Json | null
+          order_id?: string
+          token?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_access_tokens_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       orders: {
         Row: {
+          access_token: string | null
           base_cost: number
           batch_id: string
           completed_at: string | null
@@ -421,6 +472,9 @@ export type Database = {
           stripe_payment_intent_id: string | null
           stripe_payment_intent_id_actual: string | null
           tier_discount: number | null
+          token_expires_at: string | null
+          token_max_uses: number | null
+          token_used_count: number | null
           total_cost: number
           updated_at: string
           user_id: string
@@ -428,6 +482,7 @@ export type Database = {
           webhook_events: Json | null
         }
         Insert: {
+          access_token?: string | null
           base_cost?: number
           batch_id: string
           completed_at?: string | null
@@ -448,6 +503,9 @@ export type Database = {
           stripe_payment_intent_id?: string | null
           stripe_payment_intent_id_actual?: string | null
           tier_discount?: number | null
+          token_expires_at?: string | null
+          token_max_uses?: number | null
+          token_used_count?: number | null
           total_cost?: number
           updated_at?: string
           user_id: string
@@ -455,6 +513,7 @@ export type Database = {
           webhook_events?: Json | null
         }
         Update: {
+          access_token?: string | null
           base_cost?: number
           batch_id?: string
           completed_at?: string | null
@@ -475,6 +534,9 @@ export type Database = {
           stripe_payment_intent_id?: string | null
           stripe_payment_intent_id_actual?: string | null
           tier_discount?: number | null
+          token_expires_at?: string | null
+          token_max_uses?: number | null
+          token_used_count?: number | null
           total_cost?: number
           updated_at?: string
           user_id?: string
@@ -586,6 +648,44 @@ export type Database = {
           },
         ]
       }
+      token_usage_audit: {
+        Row: {
+          action: string
+          created_at: string | null
+          id: string
+          ip_address: unknown | null
+          metadata: Json | null
+          token_id: string | null
+          user_agent: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string | null
+          id?: string
+          ip_address?: unknown | null
+          metadata?: Json | null
+          token_id?: string | null
+          user_agent?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string | null
+          id?: string
+          ip_address?: unknown | null
+          metadata?: Json | null
+          token_id?: string | null
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "token_usage_audit_token_id_fkey"
+            columns: ["token_id"]
+            isOneToOne: false
+            referencedRelation: "order_access_tokens"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -599,17 +699,63 @@ export type Database = {
         }
         Returns: Json
       }
+      cleanup_expired_tokens: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
+      deactivate_token: {
+        Args: { token_param: string; reason?: string }
+        Returns: boolean
+      }
+      generate_order_access_token: {
+        Args: { order_id_param: string; expires_in_hours?: number }
+        Returns: {
+          token: string
+          expires_at: string
+          max_uses: number
+        }[]
+      }
       generate_order_number: {
         Args: Record<PropertyKey, never>
         Returns: string
+      }
+      increment_token_usage: {
+        Args: { token_param: string }
+        Returns: boolean
       }
       increment_user_stats: {
         Args: { user_id: string; images_count: number; amount: number }
         Returns: undefined
       }
+      log_token_usage: {
+        Args: {
+          token_param: string
+          action_param: string
+          metadata_param?: Json
+        }
+        Returns: boolean
+      }
+      set_config: {
+        Args: {
+          setting_name: string
+          setting_value: string
+          is_local?: boolean
+        }
+        Returns: string
+      }
       setup_user_buckets: {
         Args: { user_id: string }
         Returns: undefined
+      }
+      validate_order_token: {
+        Args: { token_param: string; order_id_param: string }
+        Returns: {
+          valid: boolean
+          order_id: string
+          user_id: string
+          expires_at: string
+          uses_remaining: number
+        }[]
       }
     }
     Enums: {

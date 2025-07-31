@@ -130,11 +130,8 @@ serve(async (req) => {
           .from("orders")
           .update({
             payment_status: "completed",
-            order_status: "processing",
+            order_status: "paid",
             stripe_payment_intent_id_actual: paymentIntent.id,
-            processing_stage: "initializing",
-            processing_started_at: new Date().toISOString(),
-            processing_completion_percentage: 10,
             webhook_events: [...currentOrderEvents, event],
             webhook_event_ids: [...currentOrderEventIds, eventId],
             last_webhook_at: new Date().toISOString(),
