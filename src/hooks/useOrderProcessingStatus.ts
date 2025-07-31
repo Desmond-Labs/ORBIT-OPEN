@@ -10,7 +10,7 @@ export interface ProcessingStatus {
   imageCount: number;
   processedCount: number;
   failedCount: number;
-  orderStatus: 'pending' | 'processing' | 'completed' | 'failed';
+  orderStatus: 'pending' | 'paid' | 'processing' | 'completed' | 'failed';
   processingStage: string;
   processingProgress: number;
   images: any[];
@@ -63,15 +63,8 @@ export const useOrderProcessingStatus = (orderId: string | null) => {
         imageStatuses: images?.map(img => ({ id: img.id, status: img.processing_status }))
       });
 
-      // Determine overall order status
-      let orderStatus: ProcessingStatus['orderStatus'] = 'pending';
-      if (order.order_status === 'completed' || processedImages === totalImages) {
-        orderStatus = 'completed';
-      } else if (processingImages > 0 || order.order_status === 'processing') {
-        orderStatus = 'processing';
-      } else if (failedImages === totalImages) {
-        orderStatus = 'failed';
-      }
+      // Use order status directly from database
+      const orderStatus = order.order_status as ProcessingStatus['orderStatus'];
 
       // Calculate progress percentage
       const progressPercentage = totalImages > 0 ? Math.round((processedImages / totalImages) * 100) : 0;

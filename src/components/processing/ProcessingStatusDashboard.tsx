@@ -100,11 +100,9 @@ export const ProcessingStatusDashboard: React.FC<ProcessingStatusDashboardProps>
         return <Loader2 className="w-8 h-8 text-accent animate-spin" />;
       case 'failed':
         return <XCircle className="w-8 h-8 text-destructive" />;
+      case 'paid':
+        return <Upload className="w-8 h-8 text-amber-500" />;
       default:
-        // Check if it's "getting ready for launch" phase
-        if (status.processingStage === 'preparing' || status.processingStage === 'queued') {
-          return <Upload className="w-8 h-8 text-amber-500" />;
-        }
         return <Clock className="w-8 h-8 text-muted-foreground" />;
     }
   };
@@ -117,16 +115,14 @@ export const ProcessingStatusDashboard: React.FC<ProcessingStatusDashboardProps>
         return <Badge variant="default" className="bg-blue-500 text-white">🛰️ In ORBIT</Badge>;
       case 'failed':
         return <Badge variant="destructive">❌ Mission Failed</Badge>;
+      case 'paid':
+        return (
+          <div className="text-center">
+            <Badge variant="default" className="bg-amber-500 text-white mb-1">🚀 Getting Ready for Launch</Badge>
+            <div className="text-xs text-muted-foreground">Please allow 24 hrs for processing</div>
+          </div>
+        );
       default:
-        // Check if it's "getting ready for launch" phase
-        if (status.processingStage === 'preparing' || status.processingStage === 'queued') {
-          return (
-            <div className="text-center">
-              <Badge variant="default" className="bg-amber-500 text-white mb-1">🚀 Getting Ready for Launch</Badge>
-              <div className="text-xs text-muted-foreground">Please allow 24 hrs for processing</div>
-            </div>
-          );
-        }
         return <Badge variant="secondary">⏳ Mission Pending</Badge>;
     }
   };
@@ -139,11 +135,9 @@ export const ProcessingStatusDashboard: React.FC<ProcessingStatusDashboardProps>
         return 'ORBIT is analyzing and enhancing your images in space';
       case 'failed':
         return 'Mission encountered an error. Please contact mission control.';
+      case 'paid':
+        return 'Mission is preparing for launch - systems check in progress';
       default:
-        // Check if it's "getting ready for launch" phase
-        if (status.processingStage === 'preparing' || status.processingStage === 'queued') {
-          return 'Mission is preparing for launch - systems check in progress';
-        }
         return 'Mission queued for launch - awaiting clearance';
     }
   };
