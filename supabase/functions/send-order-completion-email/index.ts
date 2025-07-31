@@ -15,9 +15,6 @@ interface OrderCompletionEmailRequest {
   userEmail: string;
   userName?: string;
   imageCount: number;
-  errorCount?: number;
-  status?: string;
-  accessToken?: string;
   downloadUrl?: string;
 }
 
@@ -32,15 +29,11 @@ const handler = async (req: Request): Promise<Response> => {
     console.log('📧 Request method:', req.method);
     console.log('📧 Request headers:', Object.fromEntries(req.headers.entries()));
     
-    const { orderId, userEmail, userName, imageCount, errorCount = 0, status = 'completed', accessToken, downloadUrl }: OrderCompletionEmailRequest = await req.json();
+    const { orderId, userEmail, userName, imageCount, downloadUrl }: OrderCompletionEmailRequest = await req.json();
 
     console.log('📧 Sending order completion email for order:', orderId);
     console.log('📧 Email recipient:', userEmail);
     console.log('📧 Image count:', imageCount);
-    console.log('📧 Error count:', errorCount);
-    console.log('📧 Status:', status);
-    console.log('📧 Has access token:', !!accessToken);
-    console.log('📧 Download URL:', downloadUrl);
     
     // Check environment variables
     const resendKey = Deno.env.get("RESEND_API_KEY");
@@ -199,7 +192,7 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     const emailResponse = await resend.emails.send({
-      from: "ORBIT <noreply@resend.dev>",
+      from: "ORBIT <update.desmondlabs.com>",
       to: [userEmail],
       subject: `🚀 Your ORBIT order is ready! - ${orderNumber}`,
       html: `
@@ -223,18 +216,13 @@ const handler = async (req: Request): Promise<Response> => {
 
           <!-- Main Content -->
           <div style="background: #f8fafc; border-radius: 12px; padding: 32px; margin-bottom: 24px;">
-            <h2 style="color: #1e293b; margin-top: 0; font-size: 24px;">
-              ${status === 'completed_with_errors' && errorCount > 0 ? '⚠️ Your order is partially complete!' : '🎉 Your order is complete!'}
-            </h2>
+            <h2 style="color: #1e293b; margin-top: 0; font-size: 24px;">🎉 Your order is complete!</h2>
             
             ${userName ? `<p style="font-size: 16px; margin-bottom: 24px;">Hi ${userName},</p>` : ''}
             
             <p style="font-size: 16px; margin-bottom: 24px;">
-              ${status === 'completed_with_errors' && errorCount > 0 ? 
-                `Your ORBIT image processing order has been completed with some issues. 
-                ${imageCount} of ${imageCount + errorCount} ${imageCount + errorCount === 1 ? 'image was' : 'images were'} successfully processed, while ${errorCount} ${errorCount === 1 ? 'image' : 'images'} encountered processing errors.` :
-                `Great news! Your ORBIT image processing order has been completed successfully. 
-                Your ${imageCount} ${imageCount === 1 ? 'image has' : 'images have'} been processed and enhanced using our advanced AI technology.`}
+              Great news! Your ORBIT image processing order has been completed successfully. 
+              Your ${imageCount} ${imageCount === 1 ? 'image has' : 'images have'} been processed and enhanced using our advanced AI technology.
             </p>
 
             <!-- Order Details -->
@@ -253,12 +241,6 @@ const handler = async (req: Request): Promise<Response> => {
                   <td style="padding: 8px 0; color: #64748b; font-weight: 500;">Images Processed:</td>
                   <td style="padding: 8px 0; font-weight: 600;">${imageCount}</td>
                 </tr>
-                ${errorCount > 0 ? `
-                <tr>
-                  <td style="padding: 8px 0; color: #dc2626; font-weight: 500;">Processing Errors:</td>
-                  <td style="padding: 8px 0; font-weight: 600; color: #dc2626;">${errorCount}</td>
-                </tr>
-                ` : ''}
                 <tr>
                   <td style="padding: 8px 0; color: #64748b; font-weight: 500;">Total Cost:</td>
                   <td style="padding: 8px 0; font-weight: 600;">$${totalCost}</td>
@@ -268,22 +250,23 @@ const handler = async (req: Request): Promise<Response> => {
 
             ${analysisReportsHtml}
 
-            <!-- Download Section -->
+            ${downloadUrl ? `
+            <!-- Download Button -->
             <div style="text-align: center; margin: 32px 0;">
-              <a href="${downloadUrl || `${Deno.env.get('FRONTEND_URL') || 'https://orbit-image-forge.lovable.app'}/?step=processing&order=${orderId}`}" 
+              <a href="${downloadUrl}" 
                  style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-decoration: none; padding: 16px 32px; border-radius: 8px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);">
-                ${downloadUrl ? '📥 Download Your Processed Images' : '🚀 View & Download Results'}
+                📥 Download Your Processed Images
               </a>
-              
-              ${accessToken ? `
-              <div style="background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 6px; padding: 12px; margin-top: 16px;">
-                <p style="color: #0369a1; font-size: 12px; margin: 0; font-weight: 500;">
-                  🔐 Secure Access: This link provides direct access to your order results without requiring login. 
-                  It expires in 7 days and can be used up to 10 times for downloads.
-                </p>
-              </div>
-              ` : ''}
             </div>
+            ` : `
+            <!-- Login to Download -->
+            <div style="text-align: center; margin: 32px 0;">
+              <a href="${Deno.env.get('FRONTEND_URL') || 'https://ufdcvxmizlzlnyyqpfck.supabase.co'}/processing?order=${orderId}&step=processing" 
+                 style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-decoration: none; padding: 16px 32px; border-radius: 8px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);">
+                🚀 View & Download Results
+              </a>
+            </div>
+            `}
 
             <div style="background: #f1f5f9; border-radius: 8px; padding: 20px; margin: 24px 0;">
               <h4 style="margin-top: 0; color: #475569; font-size: 16px;">✨ What we've enhanced:</h4>
@@ -294,24 +277,13 @@ const handler = async (req: Request): Promise<Response> => {
                 <li>Consistent formatting and sizing</li>
               </ul>
             </div>
-            
-            ${accessToken ? `
-            <!-- Security Notice -->
-            <div style="background: #e0f2fe; border-radius: 8px; padding: 16px; margin: 24px 0; border-left: 4px solid #0ea5e9;">
-              <h4 style="margin-top: 0; color: #0c4a6e; font-size: 14px;">🔒 Secure Access</h4>
-              <p style="margin: 8px 0 0 0; color: #075985; font-size: 12px;">
-                This link provides secure access to your order results for 7 days. 
-                You can download your files up to 10 times without creating an account.
-              </p>
-            </div>
-            ` : ''}
           </div>
 
           <!-- Footer -->
           <div style="text-align: center; color: #64748b; font-size: 14px; border-top: 1px solid #e2e8f0; padding-top: 24px;">
             <p style="margin: 8px 0;">Need help? Contact our support team</p>
             <p style="margin: 8px 0;">
-              <a href="${Deno.env.get('FRONTEND_URL') || 'https://orbit-image-forge.lovable.app'}" 
+              <a href="${Deno.env.get('FRONTEND_URL') || 'https://ufdcvxmizlzlnyyqpfck.supabase.co'}" 
                  style="color: #667eea; text-decoration: none;">Visit ORBIT</a>
             </p>
             <p style="margin: 16px 0 0 0; font-size: 12px; color: #94a3b8;">
@@ -326,14 +298,11 @@ const handler = async (req: Request): Promise<Response> => {
     });
 
     console.log("Order completion email sent successfully:", emailResponse);
-    console.log("✅ Email includes secure access token:", !!accessToken);
 
     return new Response(JSON.stringify({ 
       success: true, 
       emailId: emailResponse.data?.id,
-      accessToken: accessToken,
-      hasToken: !!accessToken,
-      message: "Order completion email sent successfully with secure access link" 
+      message: "Order completion email sent successfully" 
     }), {
       status: 200,
       headers: {

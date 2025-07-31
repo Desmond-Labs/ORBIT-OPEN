@@ -89,7 +89,7 @@ export const OrdersDashboard: React.FC<OrdersDashboardProps> = ({
   console.log('🎯 Missing order in paid orders:', paidOrders.some(o => o.id === 'c4c85a5a-2624-4865-a6db-05eab17a7981'));
   
   const activeOrders = paidOrders.filter(order => 
-    order.orderStatus === 'processing' || order.orderStatus === 'pending'
+    order.orderStatus === 'processing' || order.orderStatus === 'pending' || order.orderStatus === 'paid'
   );
   const completedOrders = paidOrders.filter(order => order.orderStatus === 'completed');
   const failedOrders = paidOrders.filter(order => order.orderStatus === 'failed');
