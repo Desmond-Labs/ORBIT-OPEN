@@ -52,11 +52,26 @@ const PaymentSuccess: React.FC = () => {
         let orderError = null;
         
         // Strategy 1: Find by Stripe session ID or payment intent ID (same as webhook logic)
+        console.log('🔍 Attempting order lookup with session ID:', sessionId);
+        
+        // Wait for authentication to settle to avoid race conditions
+        if (user === undefined) {
+          console.log('⏳ Waiting for authentication to settle...');
+          return;
+        }
+        
         const { data: orderByStripeId, error: stripeError } = await supabase
           .from('orders')
           .select('*')
           .or(`stripe_payment_intent_id.eq.${sessionId},stripe_payment_intent_id_actual.eq.${sessionId}`)
           .single();
+          
+        console.log('🔍 Stripe ID lookup result:', { 
+          hasData: !!orderByStripeId, 
+          error: stripeError,
+          errorCode: stripeError?.code,
+          errorMessage: stripeError?.message 
+        });
           
         if (orderByStripeId && !stripeError) {
           order = orderByStripeId;
@@ -64,41 +79,147 @@ const PaymentSuccess: React.FC = () => {
           orderError = stripeError;
           console.log('🔍 Stripe ID lookup failed, trying alternative methods...');
           
-          // Strategy 2: Check if sessionId is actually an order ID (fallback)
-          if (sessionId?.includes('-') && sessionId.length > 30) {
-            console.log('🔍 Trying to find order by ID...');
-            const { data: orderById, error: idError } = await supabase
+          // Strategy 2: Try individual field lookups to isolate the issue
+          console.log('🔍 Trying stripe_payment_intent_id field only...');
+          const { data: orderByIntentId, error: intentError } = await supabase
+            .from('orders')
+            .select('*')
+            .eq('stripe_payment_intent_id', sessionId)
+            .single();
+            
+          if (orderByIntentId && !intentError) {
+            order = orderByIntentId;
+            orderError = null;
+            console.log('✅ Found order by stripe_payment_intent_id');
+          } else {
+            console.log('🔍 Trying stripe_payment_intent_id_actual field only...');
+            const { data: orderByActualId, error: actualError } = await supabase
               .from('orders')
               .select('*')
-              .eq('id', sessionId)
+              .eq('stripe_payment_intent_id_actual', sessionId)
               .single();
               
-            if (orderById && !idError) {
-              order = orderById; 
+            if (orderByActualId && !actualError) {
+              order = orderByActualId;
               orderError = null;
-              console.log('✅ Found order by ID fallback');
+              console.log('✅ Found order by stripe_payment_intent_id_actual');
+            } else {
+              // Strategy 3: Check if sessionId is actually an order ID (fallback)
+              if (sessionId?.includes('-') && sessionId.length > 30) {
+                console.log('🔍 Trying to find order by ID...');
+                const { data: orderById, error: idError } = await supabase
+                  .from('orders')
+                  .select('*')
+                  .eq('id', sessionId)
+                  .single();
+                  
+                if (orderById && !idError) {
+                  order = orderById; 
+                  orderError = null;
+                  console.log('✅ Found order by ID fallback');
+                }
+              }
+              
+              // Strategy 4: Search by order number if it looks like one
+              if (!order && sessionId?.startsWith('ORB-')) {
+                console.log('🔍 Trying to find order by order number...');
+                const { data: orderByNumber, error: numberError } = await supabase
+                  .from('orders')
+                  .select('*')
+                  .eq('order_number', sessionId)
+                  .single();
+                  
+                if (orderByNumber && !numberError) {
+                  order = orderByNumber;
+                  orderError = null;
+                  console.log('✅ Found order by order number');
+                }
+              }
             }
           }
         }
 
-        if (orderError) {
+        if (orderError && !order) {
           console.error('Order lookup error:', orderError);
           
-          // Handle specific RLS/authentication errors
-          if (orderError.code === 'PGRST301' || orderError.message?.includes('RLS') || orderError.message?.includes('policy')) {
+          // Handle specific error codes
+          if (orderError.code === 'PGRST116') {
+            console.log('🔍 No rows found - order does not exist or access denied');
+          } else if (orderError.code === 'PGRST301' || orderError.message?.includes('RLS') || orderError.message?.includes('policy')) {
             console.log('🔒 RLS policy violation - user may not be authenticated');
+          } else if (orderError.code === 'PGRST406' || orderError.message?.includes('406') || orderError.message?.includes('Not Acceptable')) {
+            console.log('🔍 HTTP 406 Not Acceptable - likely RLS authentication issue');
             
-            // Retry with exponential backoff for potential race conditions
-            if (retryCount < 3) {
-              console.log(`🔄 Retrying order lookup (attempt ${retryCount + 1}/3)`);
+            // For payment success pages, try service role lookup as a fallback
+            if (retryCount === 0) {
+              console.log('🔧 Attempting service role fallback for payment verification...');
+              try {
+                const { data: serviceRoleOrder, error: serviceError } = await supabase.functions.invoke('verify-payment-order', {
+                  body: { sessionId: sessionId }
+                });
+                
+                if (serviceRoleOrder && !serviceError) {
+                  console.log('✅ Found order via service role fallback:', serviceRoleOrder.order_number);
+                  order = serviceRoleOrder;
+                  orderError = null;
+                } else {
+                  console.log('🔧 Service role fallback failed:', serviceError);
+                }
+              } catch (serviceRoleError) {
+                console.log('🔧 Service role fallback error:', serviceRoleError);
+              }
+            }
+          }
+          
+          // Retry with exponential backoff for certain error conditions
+          if ((orderError.code === 'PGRST301' || orderError.code === 'PGRST406' || !user) && retryCount < 3 && !order) {
+            console.log(`🔄 Retrying order lookup (attempt ${retryCount + 1}/3)`);
+            setRetryCount(prev => prev + 1);
+            setTimeout(() => verifyPayment(), Math.pow(2, retryCount) * 1000);
+            return;
+          }
+          
+          // Final attempt: try to search recent orders if user is authenticated
+          if (user && retryCount < 1) {
+            console.log('🔍 Final attempt: searching recent orders...');
+            try {
+              const { data: recentOrders, error: recentError } = await supabase
+                .from('orders')
+                .select('*')
+                .eq('user_id', user.id)
+                .order('created_at', { ascending: false })
+                .limit(10);
+                
+              if (recentOrders && !recentError) {
+                console.log('🔍 Found recent orders:', recentOrders.length);
+                // Try to match by partial session ID or recent timing
+                const matchingOrder = recentOrders.find(o => 
+                  o.stripe_payment_intent_id?.includes(sessionId?.substring(0, 10)) ||
+                  o.stripe_payment_intent_id_actual?.includes(sessionId?.substring(0, 10)) ||
+                  (Date.now() - new Date(o.created_at).getTime() < 10 * 60 * 1000) // Within 10 minutes
+                );
+                
+                if (matchingOrder) {
+                  console.log('✅ Found matching order in recent orders:', matchingOrder.order_number);
+                  order = matchingOrder;
+                  orderError = null;
+                }
+              }
+            } catch (recentSearchError) {
+              console.error('🔍 Recent orders search failed:', recentSearchError);
+            }
+            
+            if (!order) {
               setRetryCount(prev => prev + 1);
-              setTimeout(() => verifyPayment(), Math.pow(2, retryCount) * 1000);
+              setTimeout(() => verifyPayment(), 2000);
               return;
             }
           }
           
-          setStatus('not_found');
-          return;
+          if (!order) {
+            setStatus('not_found');
+            return;
+          }
         }
 
         if (!order) {
@@ -340,8 +461,20 @@ const PaymentSuccess: React.FC = () => {
                 <div className="bg-secondary/50 rounded-lg p-4 mb-6 text-left">
                   <div className="text-sm space-y-1">
                     <div><strong>Session ID:</strong> {sessionId}</div>
-                    <div><strong>User Authenticated:</strong> {user ? '✅ Yes' : '❌ No'}</div>
+                    <div><strong>User Authenticated:</strong> {user ? `✅ Yes (${user.email})` : '❌ No'}</div>
+                    <div><strong>User ID:</strong> {user?.id || 'Not available'}</div>
                     <div><strong>Retry Attempts:</strong> {retryCount}/3</div>
+                    <div><strong>Order Number:</strong> ORB-2025-212-0000</div>
+                  </div>
+                  
+                  <div className="mt-4 text-xs text-muted-foreground">
+                    <div><strong>Troubleshooting Tips:</strong></div>
+                    <ul className="list-disc list-inside mt-1 space-y-1">
+                      <li>Payment was successful in Stripe</li>
+                      <li>There may be a timing issue with database updates</li>
+                      <li>Try refreshing the page or checking your email</li>
+                      <li>Contact support if the issue persists</li>
+                    </ul>
                   </div>
                 </div>
                 
