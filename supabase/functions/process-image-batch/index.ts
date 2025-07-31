@@ -190,7 +190,7 @@ serve(async (req) => {
 
     console.log(`Processing ${images.length} images for batch ${batch.id}`);
 
-    // 4. Update batch status to processing
+    // 4. Update batch status to processing and order processing stage to analyzing
     await supabase
       .from('batches')
       .update({
@@ -198,6 +198,15 @@ serve(async (req) => {
         processing_start_time: new Date().toISOString()
       })
       .eq('id', batch.id);
+
+    // Update order processing stage to indicate active AI analysis
+    await supabase
+      .from('orders')
+      .update({
+        processing_stage: 'analyzing',
+        processing_completion_percentage: 20
+      })
+      .eq('id', orderId);
 
     // 5. Process each image
     const processedResults = [];
@@ -276,6 +285,16 @@ serve(async (req) => {
           error_count: errorCount
         })
         .eq('id', batch.id);
+
+      // Update order processing progress
+      const totalProcessed = successCount + errorCount;
+      const progressPercentage = Math.round(20 + (totalProcessed / images.length) * 70); // 20% base + 70% for processing
+      await supabase
+        .from('orders')
+        .update({
+          processing_completion_percentage: progressPercentage
+        })
+        .eq('id', orderId);
     }
 
     // 6. Update final batch status
@@ -292,11 +311,13 @@ serve(async (req) => {
       })
       .eq('id', batch.id);
 
-    // 7. Update order status
+    // 7. Update order status and processing stage
     await supabase
       .from('orders')
       .update({
         order_status: finalStatus === 'completed' ? 'completed' : 'completed_with_errors',
+        processing_stage: 'completed',
+        processing_completion_percentage: 100,
         completed_at: new Date().toISOString()
       })
       .eq('id', orderId);

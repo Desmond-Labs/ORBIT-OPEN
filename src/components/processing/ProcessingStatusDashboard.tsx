@@ -16,7 +16,9 @@ import {
   Upload,
   ArrowLeft,
   CreditCard,
-  XCircle
+  XCircle,
+  Rocket,
+  Satellite
 } from 'lucide-react';
 import { ProcessingStatus } from '@/hooks/useOrderProcessingStatus';
 import { useDownloadProcessedImages } from '@/hooks/useDownloadProcessedImages';
@@ -99,51 +101,122 @@ export const ProcessingStatusDashboard: React.FC<ProcessingStatusDashboardProps>
   const getStatusIcon = () => {
     switch (status.orderStatus) {
       case 'completed':
+      case 'completed_with_errors':
         return <CheckCircle className="w-8 h-8 text-success" />;
       case 'processing':
-        return <Loader2 className="w-8 h-8 text-accent animate-spin" />;
-      case 'failed':
-        return <XCircle className="w-8 h-8 text-destructive" />;
+        return <Satellite className="w-8 h-8 text-purple-500 animate-pulse" />;
       case 'paid':
-        return <Upload className="w-8 h-8 text-amber-500" />;
+      case 'images_uploaded':
+        return <Rocket className="w-8 h-8 text-blue-500" />;
+      case 'failed':
+      case 'upload_failed':
+        return <AlertCircle className="w-8 h-8 text-destructive" />;
+      case 'payment_pending':
       default:
-        return <Clock className="w-8 h-8 text-muted-foreground" />;
+        return <Clock className="w-8 h-8 text-yellow-500" />;
+    }
+  };
+
+  // Unified function to get mission-themed status based on order status and processing stage
+  const getMissionStatus = () => {
+    // For processing orders, use the processing stage for more specific status
+    if (status.orderStatus === 'processing') {
+      switch (status.processingStage) {
+        case 'analyzing':
+          return {
+            label: 'In ORBIT',
+            description: 'AI systems are analyzing and enhancing your images',
+            colorClass: 'text-purple-600 bg-purple-100',
+            icon: 'satellite'
+          };
+        case 'initializing':
+          return {
+            label: 'Getting Ready for Launch',
+            description: 'Preparing your images for AI analysis',
+            colorClass: 'text-blue-600 bg-blue-100',
+            icon: 'rocket',
+            subtitle: 'Please allow 24 hrs'
+          };
+        case 'completed':
+          return {
+            label: 'Mission Complete',
+            description: 'All images have been processed successfully',
+            colorClass: 'text-green-600 bg-green-100',
+            icon: 'check-circle'
+          };
+        default:
+          return {
+            label: 'In ORBIT',
+            description: 'Processing your images with advanced AI',
+            colorClass: 'text-purple-600 bg-purple-100',
+            icon: 'satellite'
+          };
+      }
+    }
+
+    // For non-processing orders, use order status
+    switch (status.orderStatus) {
+      case 'payment_pending':
+        return {
+          label: 'Mission Pending',
+          description: 'Payment confirmation required to begin processing',
+          colorClass: 'text-yellow-600 bg-yellow-100',
+          icon: 'clock'
+        };
+      case 'paid':
+      case 'images_uploaded':
+        return {
+          label: 'Getting Ready for Launch',
+          description: 'Your order is queued and will begin processing shortly',
+          colorClass: 'text-blue-600 bg-blue-100',
+          icon: 'rocket',
+          subtitle: 'Please allow 24 hrs'
+        };
+      case 'completed':
+      case 'completed_with_errors':
+        return {
+          label: 'Mission Complete',
+          description: 'All images have been processed successfully',
+          colorClass: 'text-green-600 bg-green-100',
+          icon: 'check-circle'
+        };
+      case 'failed':
+      case 'upload_failed':
+        return {
+          label: 'Mission Failed',
+          description: 'Processing failed. Please contact support.',
+          colorClass: 'text-red-600 bg-red-100',
+          icon: 'alert-circle'
+        };
+      default:
+        return {
+          label: 'Mission Pending',
+          description: 'Preparing to begin your mission',
+          colorClass: 'text-yellow-600 bg-yellow-100',
+          icon: 'clock'
+        };
     }
   };
 
   const getStatusBadge = () => {
-    switch (status.orderStatus) {
-      case 'completed':
-        return <Badge variant="default" className="bg-green-500 text-white">🚀 Mission Complete</Badge>;
-      case 'processing':
-        return <Badge variant="default" className="bg-blue-500 text-white">🛰️ In ORBIT</Badge>;
-      case 'failed':
-        return <Badge variant="destructive">❌ Mission Failed</Badge>;
-      case 'paid':
-        return (
-          <div className="text-center">
-            <Badge variant="default" className="bg-amber-500 text-white mb-1">🚀 Getting Ready for Launch</Badge>
-            <div className="text-xs text-muted-foreground">Please allow 24 hrs for processing</div>
-          </div>
-        );
-      default:
-        return <Badge variant="secondary">⏳ Mission Pending</Badge>;
-    }
+    const missionStatus = getMissionStatus();
+
+    return (
+      <div className="flex flex-col items-center">
+        <Badge variant="outline" className={missionStatus.colorClass}>
+          {getStatusIcon()}
+          <span className="ml-2 font-medium">{missionStatus.label}</span>
+        </Badge>
+        {missionStatus.subtitle && (
+          <span className="text-xs text-muted-foreground italic mt-1">{missionStatus.subtitle}</span>
+        )}
+      </div>
+    );
   };
 
   const getStatusDescription = () => {
-    switch (status.orderStatus) {
-      case 'completed':
-        return 'ORBIT analysis complete - your enhanced images are ready for download';
-      case 'processing':
-        return 'ORBIT is analyzing and enhancing your images in space';
-      case 'failed':
-        return 'Mission encountered an error. Please contact mission control.';
-      case 'paid':
-        return 'Mission is preparing for launch - systems check in progress';
-      default:
-        return 'Mission queued for launch - awaiting clearance';
-    }
+    const missionStatus = getMissionStatus();
+    return missionStatus.description;
   };
 
   return (
@@ -234,14 +307,35 @@ export const ProcessingStatusDashboard: React.FC<ProcessingStatusDashboardProps>
         </div>
       </Card>
 
-      {/* Processing Stage */}
-      {status.orderStatus === 'processing' && (
+      {/* Current Mission Stage */}
+      {(status.orderStatus === 'processing' || status.orderStatus === 'paid' || status.orderStatus === 'images_uploaded') && (
         <Card className="bg-secondary/50 p-6">
-          <h4 className="text-lg font-semibold mb-4">Current Stage</h4>
+          <h4 className="text-lg font-semibold mb-4">Current Mission Stage</h4>
           <div className="flex items-center gap-3">
-            <Loader2 className="w-5 h-5 text-accent animate-spin" />
-            <span className="capitalize">{status.processingStage}</span>
+            {status.orderStatus === 'processing' ? (
+              <Satellite className="w-5 h-5 text-purple-500 animate-pulse" />
+            ) : (
+              <Rocket className="w-5 h-5 text-blue-500" />
+            )}
+            <div className="flex flex-col">
+              <span className="font-medium">{getMissionStatus().label}</span>
+              <span className="text-sm text-muted-foreground">{getMissionStatus().description}</span>
+            </div>
           </div>
+          {status.processingCompletionPercentage !== undefined && status.processingCompletionPercentage > 0 && (
+            <div className="mt-4">
+              <div className="flex justify-between text-sm mb-2">
+                <span>Progress</span>
+                <span>{status.processingCompletionPercentage}%</span>
+              </div>
+              <div className="w-full bg-secondary rounded-full h-2">
+                <div 
+                  className="bg-gradient-primary h-2 rounded-full transition-all duration-300"
+                  style={{ width: `${status.processingCompletionPercentage}%` }}
+                />
+              </div>
+            </div>
+          )}
         </Card>
       )}
 

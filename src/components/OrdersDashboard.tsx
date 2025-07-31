@@ -2,8 +2,9 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Loader2, Clock, CheckCircle, XCircle, ArrowRight, Upload, CreditCard } from 'lucide-react';
+import { Loader2, Clock, CheckCircle, XCircle, ArrowRight, Upload, Rocket, Satellite } from 'lucide-react';
 import { UserOrder } from '@/hooks/useAllUserOrders';
+import { OrderStatusLegend } from './OrderStatusLegend';
 
 interface OrdersDashboardProps {
   orders: UserOrder[];
@@ -15,53 +16,67 @@ interface OrdersDashboardProps {
 const getStatusIcon = (status: UserOrder['orderStatus']) => {
   switch (status) {
     case 'completed':
+    case 'completed_with_errors':
       return <CheckCircle className="w-4 h-4 text-green-500" />;
     case 'processing':
-      return <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />;
+      return <Satellite className="w-4 h-4 text-purple-500 animate-pulse" />;
+    case 'paid':
+    case 'images_uploaded':
+      return <Rocket className="w-4 h-4 text-blue-500" />;
     case 'failed':
+    case 'upload_failed':
       return <XCircle className="w-4 h-4 text-red-500" />;
+    case 'payment_pending':
     default:
       return <Clock className="w-4 h-4 text-yellow-500" />;
   }
 };
 
-const getStatusBadge = (status: UserOrder['orderStatus'], processingStage?: string) => {
-  const variants = {
-    pending: 'secondary',
-    processing: 'default',
-    completed: 'default',
-    failed: 'destructive'
-  } as const;
+const getStatusBadge = (status: UserOrder['orderStatus']) => {
+  let label: string;
+  let colorClass: string;
+  let subtitle: string | undefined;
 
-  const colors = {
-    pending: 'text-yellow-600 bg-yellow-100',
-    processing: 'text-blue-600 bg-blue-100',
-    completed: 'text-green-600 bg-green-100',
-    failed: 'text-red-600 bg-red-100'
-  };
-
-  const getStatusText = () => {
-    switch (status) {
-      case 'completed':
-        return '🚀 Mission Complete';
-      case 'processing':
-        return '🛰️ In ORBIT';
-      case 'failed':
-        return '❌ Mission Failed';
-      default:
-        // Check if it's "getting ready for launch" phase
-        if (processingStage === 'preparing' || processingStage === 'queued') {
-          return '🚀 Getting Ready';
-        }
-        return '⏳ Mission Pending';
-    }
-  };
+  switch (status) {
+    case 'payment_pending':
+      label = 'Mission Pending';
+      colorClass = 'text-yellow-600 bg-yellow-100';
+      break;
+    case 'paid':
+    case 'images_uploaded':
+      label = 'Getting Ready for Launch';
+      subtitle = 'Please allow 24 hrs';
+      colorClass = 'text-blue-600 bg-blue-100';
+      break;
+    case 'processing':
+      label = 'In ORBIT';
+      colorClass = 'text-purple-600 bg-purple-100';
+      break;
+    case 'completed':
+    case 'completed_with_errors':
+      label = 'Mission Complete';
+      colorClass = 'text-green-600 bg-green-100';
+      break;
+    case 'failed':
+    case 'upload_failed':
+      label = 'Mission Failed';
+      colorClass = 'text-red-600 bg-red-100';
+      break;
+    default:
+      label = 'Mission Pending';
+      colorClass = 'text-yellow-600 bg-yellow-100';
+  }
 
   return (
-    <Badge variant={variants[status]} className={colors[status]}>
-      {getStatusIcon(status)}
-      <span className="ml-1">{getStatusText()}</span>
-    </Badge>
+    <div className="flex flex-col items-end">
+      <Badge variant="outline" className={colorClass}>
+        {getStatusIcon(status)}
+        <span className="ml-2 font-medium">{label}</span>
+      </Badge>
+      {subtitle && (
+        <span className="text-xs text-muted-foreground italic mt-1">{subtitle}</span>
+      )}
+    </div>
   );
 };
 
@@ -100,6 +115,11 @@ export const OrdersDashboard: React.FC<OrdersDashboardProps> = ({
         <div className="mb-8">
           <h1 className="text-3xl font-bold gradient-text mb-2">Your Processing Dashboard</h1>
           <p className="text-muted-foreground">Manage and track all your image processing orders</p>
+        </div>
+
+        {/* Status Legend */}
+        <div className="mb-8">
+          <OrderStatusLegend />
         </div>
 
         {/* Quick Actions */}
@@ -150,13 +170,7 @@ export const OrdersDashboard: React.FC<OrdersDashboardProps> = ({
                   <CardHeader className="pb-3">
                     <div className="flex items-center justify-between">
                       <CardTitle className="text-lg">{order.orderNumber}</CardTitle>
-                      <div className="flex gap-2">
-                        <Badge variant="outline" className="text-green-600 bg-green-50">
-                          <CreditCard className="w-3 h-3 mr-1" />
-                          Paid
-                        </Badge>
-                        {getStatusBadge(order.orderStatus, order.processingStage)}
-                      </div>
+                      {getStatusBadge(order.orderStatus)}
                     </div>
                   </CardHeader>
                   <CardContent>
@@ -208,13 +222,7 @@ export const OrdersDashboard: React.FC<OrdersDashboardProps> = ({
                   <CardHeader className="pb-3">
                     <div className="flex items-center justify-between">
                       <CardTitle className="text-lg">{order.orderNumber}</CardTitle>
-                      <div className="flex gap-2">
-                        <Badge variant="outline" className="text-green-600 bg-green-50">
-                          <CreditCard className="w-3 h-3 mr-1" />
-                          Paid
-                        </Badge>
-                        {getStatusBadge(order.orderStatus, order.processingStage)}
-                      </div>
+                      {getStatusBadge(order.orderStatus)}
                     </div>
                   </CardHeader>
                   <CardContent>
@@ -260,13 +268,7 @@ export const OrdersDashboard: React.FC<OrdersDashboardProps> = ({
                   <CardHeader className="pb-3">
                     <div className="flex items-center justify-between">
                       <CardTitle className="text-lg">{order.orderNumber}</CardTitle>
-                      <div className="flex gap-2">
-                        <Badge variant="outline" className="text-green-600 bg-green-50">
-                          <CreditCard className="w-3 h-3 mr-1" />
-                          Paid
-                        </Badge>
-                        {getStatusBadge(order.orderStatus, order.processingStage)}
-                      </div>
+                      {getStatusBadge(order.orderStatus)}
                     </div>
                   </CardHeader>
                   <CardContent>

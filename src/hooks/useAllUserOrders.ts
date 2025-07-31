@@ -7,7 +7,7 @@ export interface UserOrder {
   orderNumber: string;
   totalCost: number;
   imageCount: number;
-  orderStatus: 'pending' | 'processing' | 'completed' | 'failed';
+  orderStatus: 'payment_pending' | 'paid' | 'images_uploaded' | 'upload_failed' | 'processing' | 'completed' | 'completed_with_errors' | 'failed';
   processingStage: string;
   createdAt: string;
   completedAt?: string;
