@@ -9,6 +9,7 @@ CREATE OR REPLACE FUNCTION public.set_config(
 RETURNS VOID
 LANGUAGE plpgsql
 SECURITY DEFINER
+
 AS $$
 BEGIN
     -- Set the configuration parameter for the current session
