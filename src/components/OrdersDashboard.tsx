@@ -60,6 +60,7 @@ export const OrdersDashboard: React.FC<OrdersDashboardProps> = ({
   onViewOrder,
   onNewUpload
 }) => {
+  console.log('🎯 OrdersDashboard component rendered with:', { ordersLength: orders.length, loading });
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 flex items-center justify-center">
