@@ -40,6 +40,7 @@ const handler = async (req: Request): Promise<Response> => {
     console.log('📧 Error count:', errorCount);
     console.log('📧 Status:', status);
     console.log('📧 Has access token:', !!accessToken);
+    console.log('📧 Download URL:', downloadUrl);
     
     // Check environment variables
     const resendKey = Deno.env.get("RESEND_API_KEY");
@@ -89,21 +90,6 @@ const handler = async (req: Request): Promise<Response> => {
     }
     const orderNumber = order.order_number;
     const totalCost = order.total_cost;
-    
-    // Generate secure access token for this order
-    console.log('📧 Generating access token for order:', orderId);
-    const { data: tokenData, error: tokenError } = await supabase.rpc('generate_order_access_token', {
-      order_id_param: orderId,
-      expires_in_hours: 168 // 7 days
-    });
-    
-    if (tokenError) {
-      console.error('❌ Failed to generate access token:', tokenError);
-      // Don't fail the email - just use fallback URL
-    }
-    
-    const accessToken = tokenData;
-    console.log('✅ Access token generated:', accessToken ? 'SUCCESS' : 'FAILED');
 
     // Get processed images with analysis reports
     const { data: processedImages, error: imagesError } = await supabase
@@ -282,18 +268,21 @@ const handler = async (req: Request): Promise<Response> => {
 
             ${analysisReportsHtml}
 
-            <!-- Secure Token Access -->
+            <!-- Download Section -->
             <div style="text-align: center; margin: 32px 0;">
-              <a href="${downloadUrl}" 
+              <a href="${downloadUrl || `${Deno.env.get('FRONTEND_URL') || 'https://orbit-image-forge.lovable.app'}/?step=processing&order=${orderId}`}" 
                  style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-decoration: none; padding: 16px 32px; border-radius: 8px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);">
-                🚀 View & Download Results
+                ${downloadUrl ? '📥 Download Your Processed Images' : '🚀 View & Download Results'}
               </a>
+              
+              ${accessToken ? `
               <div style="background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 6px; padding: 12px; margin-top: 16px;">
                 <p style="color: #0369a1; font-size: 12px; margin: 0; font-weight: 500;">
                   🔐 Secure Access: This link provides direct access to your order results without requiring login. 
                   It expires in 7 days and can be used up to 10 times for downloads.
                 </p>
               </div>
+              ` : ''}
             </div>
 
             <div style="background: #f1f5f9; border-radius: 8px; padding: 20px; margin: 24px 0;">
@@ -322,7 +311,7 @@ const handler = async (req: Request): Promise<Response> => {
           <div style="text-align: center; color: #64748b; font-size: 14px; border-top: 1px solid #e2e8f0; padding-top: 24px;">
             <p style="margin: 8px 0;">Need help? Contact our support team</p>
             <p style="margin: 8px 0;">
-              <a href="${Deno.env.get('FRONTEND_URL') || 'https://ufdcvxmizlzlnyyqpfck.supabase.co'}" 
+              <a href="${Deno.env.get('FRONTEND_URL') || 'https://orbit-image-forge.lovable.app'}" 
                  style="color: #667eea; text-decoration: none;">Visit ORBIT</a>
             </p>
             <p style="margin: 16px 0 0 0; font-size: 12px; color: #94a3b8;">
