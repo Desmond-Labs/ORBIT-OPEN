@@ -341,10 +341,10 @@ serve(async (req) => {
         const accessToken = tokenData[0].token;
         console.log(`🔐 Access token generated successfully: ${accessToken.substring(0, 8)}... for order: ${orderId}`);
 
-        // Get user email from orbit_users table using the order's user_id
+        // Get user email and name from orbit_users table using the order's user_id
         const { data: userProfile, error: userError } = await supabase
           .from('orbit_users')
-          .select('email')
+          .select('email, name')
           .eq('id', order.user_id)
           .single();
 
@@ -356,10 +356,8 @@ serve(async (req) => {
             body: {
               orderId: orderId,
               userEmail: userProfile.email,
+              userName: userProfile.name,
               imageCount: successCount,
-              errorCount: errorCount,
-              status: finalStatus,
-              accessToken: accessToken,
               downloadUrl: `${Deno.env.get('FRONTEND_URL') || 'https://orbit-image-forge.lovable.app'}/?token=${accessToken}&order=${orderId}&step=processing`
             }
           });

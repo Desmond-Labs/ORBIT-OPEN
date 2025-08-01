@@ -29,11 +29,17 @@ const handler = async (req: Request): Promise<Response> => {
     console.log('📧 Request method:', req.method);
     console.log('📧 Request headers:', Object.fromEntries(req.headers.entries()));
     
-    const { orderId, userEmail, userName, imageCount, downloadUrl }: OrderCompletionEmailRequest = await req.json();
+    const requestBody = await req.json();
+    console.log('📧 Raw request body:', JSON.stringify(requestBody, null, 2));
+    
+    const { orderId, userEmail, userName, imageCount, downloadUrl }: OrderCompletionEmailRequest = requestBody;
 
-    console.log('📧 Sending order completion email for order:', orderId);
-    console.log('📧 Email recipient:', userEmail);
-    console.log('📧 Image count:', imageCount);
+    console.log('📧 Parsed parameters:');
+    console.log('📧 - Order ID:', orderId);
+    console.log('📧 - Email recipient:', userEmail);
+    console.log('📧 - User name:', userName);
+    console.log('📧 - Image count:', imageCount);
+    console.log('📧 - Download URL:', downloadUrl);
     
     // Check environment variables
     const resendKey = Deno.env.get("RESEND_API_KEY");
@@ -84,113 +90,77 @@ const handler = async (req: Request): Promise<Response> => {
     const orderNumber = order.order_number;
     const totalCost = order.total_cost;
 
-    // Get processed images with analysis reports
-    const { data: processedImages, error: imagesError } = await supabase
-      .from('images')
-      .select('id, original_filename, storage_path_processed, gemini_analysis_raw')
-      .eq('order_id', orderId)
-      .eq('processing_status', 'complete')
-      .limit(5); // Limit to 5 images to avoid email size issues
-
-    // Fetch .txt report files from storage
+    // Try to get processed images for analysis reports, but don't fail if this fails
     let analysisReportsHtml = '';
-    if (processedImages && processedImages.length > 0) {
-      console.log(`Found ${processedImages.length} processed images for analysis reports`);
-      
-      const reportPromises = processedImages.map(async (image, index) => {
+    try {
+      console.log('📧 Attempting to fetch processed images for reports...');
+      const { data: processedImages, error: imagesError } = await supabase
+        .from('images')
+        .select('id, original_filename, storage_path_processed, gemini_analysis_raw')
+        .eq('order_id', orderId)
+        .eq('processing_status', 'complete')
+        .limit(3); // Limit to 3 images to avoid email size issues
+
+      if (imagesError) {
+        console.warn('📧 Could not fetch processed images:', imagesError);
+      } else if (processedImages && processedImages.length > 0) {
+        console.log(`📧 Found ${processedImages.length} processed images`);
+        
+        // Simple report generation - don't fail email if this fails
         try {
-          // Construct the expected .txt file path
-          // Pattern: {timestamp}_{index}_{filename}_report.txt
-          // Storage path format: {order_id}_{user_id}/processed/
-          if (!image.storage_path_processed) return null;
-          
-          const pathParts = image.storage_path_processed.split('/');
-          if (pathParts.length < 2) return null;
-          
-          const folderPath = pathParts[0]; // e.g., "7e661994-ecbf-4d8a-943c-f7511e824798_7e55b358-63be-4d24-9cc7-c90cff52b0c6"
-          const filename = pathParts[1];
-          const baseFilename = filename.split('.')[0]; // Remove extension
-          
-          // Try to find the corresponding .txt report file
-          // Pattern: {timestamp}_{index}_{baseFilename}_report.txt
-          const reportFilePath = `${folderPath}/processed/`;
-          
-          // List files in the processed folder to find the matching report
-          const { data: files, error: listError } = await supabase.storage
-            .from('processed_images')
-            .list(reportFilePath);
-          
-          if (listError || !files) {
-            console.warn(`Could not list files in ${reportFilePath}:`, listError);
+          const reportPromises = processedImages.slice(0, 2).map(async (image, index) => {
+            // Use gemini_analysis_raw if available, otherwise try to fetch report file
+            if (image.gemini_analysis_raw) {
+              return {
+                filename: image.original_filename,
+                content: JSON.stringify(image.gemini_analysis_raw, null, 2).substring(0, 500),
+                index: index + 1
+              };
+            }
             return null;
-          }
+          });
           
-          // Find the .txt file that contains the base filename
-          const reportFile = files.find(file => 
-            file.name.endsWith('_report.txt') && 
-            file.name.includes(baseFilename)
-          );
+          const reports = await Promise.all(reportPromises);
+          const validReports = reports.filter(report => report !== null);
           
-          if (!reportFile) {
-            console.warn(`No report file found for ${baseFilename}`);
-            return null;
-          }
-          
-          // Download the .txt file content
-          const { data: fileData, error: downloadError } = await supabase.storage
-            .from('processed_images')
-            .download(`${reportFilePath}${reportFile.name}`);
-          
-          if (downloadError || !fileData) {
-            console.warn(`Could not download ${reportFile.name}:`, downloadError);
-            return null;
-          }
-          
-          const reportContent = await fileData.text();
-          
-          return {
-            filename: image.original_filename,
-            content: reportContent,
-            index: index + 1
-          };
-        } catch (error) {
-          console.warn(`Error processing report for ${image.original_filename}:`, error);
-          return null;
-        }
-      });
-      
-      const reports = await Promise.all(reportPromises);
-      const validReports = reports.filter(report => report !== null);
-      
-      if (validReports.length > 0) {
-        analysisReportsHtml = `
-          <!-- Analysis Reports Section -->
-          <div style="background: white; border-radius: 8px; padding: 24px; margin: 24px 0; border: 1px solid #e2e8f0;">
-            <h3 style="margin-top: 0; color: #475569; font-size: 18px;">📊 AI Analysis Reports</h3>
-            <p style="color: #64748b; margin-bottom: 20px;">Detailed analysis for each processed image:</p>
-            
-            ${validReports.map(report => `
-              <div style="border: 1px solid #e2e8f0; border-radius: 6px; padding: 16px; margin-bottom: 16px; background: #f8fafc;">
-                <h4 style="margin-top: 0; margin-bottom: 12px; color: #334155; font-size: 14px; font-weight: 600;">
-                  ${report.index}. ${report.filename}
-                </h4>
-                <div style="background: white; border-radius: 4px; padding: 12px; font-family: monospace; font-size: 12px; line-height: 1.4; color: #475569; max-height: 200px; overflow-y: auto; border: 1px solid #e2e8f0;">
-                  ${report.content.replace(/\n/g, '<br>').substring(0, 1000)}${report.content.length > 1000 ? '...<br><em>[Content truncated for email]</em>' : ''}
+          if (validReports.length > 0) {
+            analysisReportsHtml = `
+              <!-- Analysis Summary Section -->
+              <div style="background: white; border-radius: 8px; padding: 20px; margin: 20px 0; border: 1px solid #e2e8f0;">
+                <h3 style="margin-top: 0; color: #475569; font-size: 16px;">📊 Processing Summary</h3>
+                <p style="color: #64748b; margin-bottom: 16px;">Your images have been successfully processed with AI analysis.</p>
+                <div style="background: #f8fafc; border-radius: 4px; padding: 12px; border: 1px solid #e2e8f0;">
+                  <p style="margin: 0; color: #475569; font-size: 14px;">
+                    ✅ ${imageCount} ${imageCount === 1 ? 'image' : 'images'} processed<br>
+                    🤖 AI analysis completed<br>
+                    📁 Files ready for download
+                  </p>
                 </div>
               </div>
-            `).join('')}
-            
-            ${validReports.length < processedImages.length ? `
-              <p style="color: #64748b; font-size: 12px; font-style: italic;">
-                Note: Showing ${validReports.length} of ${processedImages.length} analysis reports. 
-                Download your files to view all reports.
-              </p>
-            ` : ''}
-          </div>
-        `;
+            `;
+          }
+        } catch (reportError) {
+          console.warn('📧 Report generation failed, continuing without reports:', reportError);
+        }
       }
+    } catch (fetchError) {
+      console.warn('📧 Could not fetch image data for reports, continuing without:', fetchError);
     }
 
+    // Validate email parameters before sending
+    if (!userEmail || !userEmail.includes('@')) {
+      throw new Error(`Invalid email address: ${userEmail}`);
+    }
+    
+    if (!orderNumber) {
+      throw new Error('Order number is missing');
+    }
+    
+    console.log('📧 Sending email via Resend...');
+    console.log('📧 From: ORBIT <update.desmondlabs.com>');
+    console.log('📧 To:', userEmail);
+    console.log('📧 Subject: 🚀 Your ORBIT order is ready! - ' + orderNumber);
+    
     const emailResponse = await resend.emails.send({
       from: "ORBIT <update.desmondlabs.com>",
       to: [userEmail],
@@ -261,7 +231,7 @@ const handler = async (req: Request): Promise<Response> => {
             ` : `
             <!-- Login to Download -->
             <div style="text-align: center; margin: 32px 0;">
-              <a href="${Deno.env.get('FRONTEND_URL') || 'https://ufdcvxmizlzlnyyqpfck.supabase.co'}/processing?order=${orderId}&step=processing" 
+              <a href="${downloadUrl || `${Deno.env.get('FRONTEND_URL') || 'https://preview--orbit-image-forge.lovable.app'}/?order=${orderId}&step=processing`}" 
                  style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-decoration: none; padding: 16px 32px; border-radius: 8px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);">
                 🚀 View & Download Results
               </a>
@@ -283,7 +253,7 @@ const handler = async (req: Request): Promise<Response> => {
           <div style="text-align: center; color: #64748b; font-size: 14px; border-top: 1px solid #e2e8f0; padding-top: 24px;">
             <p style="margin: 8px 0;">Need help? Contact our support team</p>
             <p style="margin: 8px 0;">
-              <a href="${Deno.env.get('FRONTEND_URL') || 'https://ufdcvxmizlzlnyyqpfck.supabase.co'}" 
+              <a href="${Deno.env.get('FRONTEND_URL') || 'https://preview--orbit-image-forge.lovable.app'}" 
                  style="color: #667eea; text-decoration: none;">Visit ORBIT</a>
             </p>
             <p style="margin: 16px 0 0 0; font-size: 12px; color: #94a3b8;">
@@ -297,12 +267,26 @@ const handler = async (req: Request): Promise<Response> => {
       `,
     });
 
-    console.log("Order completion email sent successfully:", emailResponse);
+    console.log("📧 Resend API response:", emailResponse);
+    
+    if (emailResponse.error) {
+      console.error("📧 Resend API returned error:", emailResponse.error);
+      throw new Error(`Resend API error: ${emailResponse.error.message || emailResponse.error}`);
+    }
+    
+    if (!emailResponse.data?.id) {
+      console.error("📧 Resend API response missing email ID:", emailResponse);
+      throw new Error('Email sent but no ID returned from Resend API');
+    }
+
+    console.log("📧 ✅ Order completion email sent successfully! Email ID:", emailResponse.data.id);
 
     return new Response(JSON.stringify({ 
       success: true, 
-      emailId: emailResponse.data?.id,
-      message: "Order completion email sent successfully" 
+      emailId: emailResponse.data.id,
+      message: "Order completion email sent successfully",
+      orderId: orderId,
+      recipient: userEmail
     }), {
       status: 200,
       headers: {
