@@ -84,7 +84,7 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
 
   // Token authentication hooks
   const tokenAuth = useTokenAuth(tokenFromUrl, orderIdFromUrl);
-  const tokenOrderStatus = useTokenOrderStatus(orderIdFromUrl, tokenAuth.hasValidToken);
+  const tokenOrderStatus = useTokenOrderStatus(orderIdFromUrl, !!tokenAuth.hasValidToken);
 
   const { setupRealTimeSubscription } = useRealTimeOrderUpdates(
     setRealTimeOrderData,

@@ -28,7 +28,7 @@ export const MissionFilterBar: React.FC<MissionFilterBarProps> = ({
       case 'launch':
         return orders.filter(order => 
           (order.paymentStatus === 'completed' || order.paymentStatus === 'succeeded') &&
-          (order.orderStatus === 'paid' || order.orderStatus === 'pending')
+          (order.orderStatus === 'paid' || order.orderStatus === 'payment_pending')
         ).length;
       case 'orbit':
         return orders.filter(order => order.orderStatus === 'processing').length;

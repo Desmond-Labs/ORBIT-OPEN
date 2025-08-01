@@ -195,7 +195,10 @@ export const OrbitDemo: React.FC<OrbitDemoProps> = ({ className = '' }) => {
 
           function getSampleWords(categoryKey: string, count: number) {
             const categoryData = METADATA[categoryKey as keyof typeof METADATA];
-            if (!categoryData) return [];
+            if (!categoryData) {
+              console.log(`No data for category: ${categoryKey}`);
+              return [];
+            }
             
             let words: string[] = [];
             Object.values(categoryData).forEach((value: any) => {
@@ -204,6 +207,7 @@ export const OrbitDemo: React.FC<OrbitDemoProps> = ({ className = '' }) => {
               }
             });
             
+            console.log(`Category ${categoryKey} generated words:`, words);
             return p.shuffle(words).slice(0, count);
           }
 
@@ -369,11 +373,8 @@ export const OrbitDemo: React.FC<OrbitDemoProps> = ({ className = '' }) => {
             const framesSinceStart = p.frameCount - reportStartFrame;
             reportProgress = p.min(100, (framesSinceStart / 240) * 100); // 4 seconds to fully reveal
             
-            // Transition to complete phase after report is finished
-            if (reportProgress >= 100 && framesSinceStart >= 300) { // Wait extra 1 second after report
-              currentPhase = 'complete';
-              triggerCompletionBurst();
-            }
+            // Keep the report as the final state - no transition to complete phase
+            // This ensures the report remains visible as the final frame
           }
 
           p.draw = () => {
@@ -384,10 +385,10 @@ export const OrbitDemo: React.FC<OrbitDemoProps> = ({ className = '' }) => {
               updateAnalysis();
             } else if (currentPhase === 'embedding') {
               updateEmbedding();
-            } else if (currentPhase === 'complete') {
-              updateComplete();
             } else if (currentPhase === 'report') {
               updateReport();
+            } else if (currentPhase === 'complete') {
+              updateComplete();
             }
 
             drawImagePanel();
@@ -619,35 +620,35 @@ export const OrbitDemo: React.FC<OrbitDemoProps> = ({ className = '' }) => {
               if (yOffset > metadataArea.y + metadataArea.h - 20) break; // Stop if we run out of space
               
               if (section.type === 'header') {
-                p.fill(0, 255, 255); // Bright cyan
-                p.textSize(11);
+                p.fill(255, 255, 255); // White for better readability
+                p.textSize(12);
                 p.text(section.title, metadataArea.x + 10, yOffset);
                 yOffset += lineHeight + 5;
               } else if (section.type === 'separator') {
-                p.fill(0, 255, 100); // Bright green
+                p.fill(100, 255, 150); // Brighter green
                 p.textSize(8);
                 p.text(section.title, metadataArea.x + 10, yOffset);
                 yOffset += lineHeight;
               } else if (section.type === 'info') {
-                p.fill(150, 150, 150); // Dim gray
-                p.textSize(9);
+                p.fill(200, 200, 200); // Lighter gray for better readability
+                p.textSize(10);
                 p.text(section.title, metadataArea.x + 10, yOffset);
                 yOffset += lineHeight;
               } else if (section.type === 'spacer') {
                 yOffset += lineHeight / 2;
               } else if (section.type === 'section') {
-                p.fill(255, 255, 100); // Bright yellow for emoji sections
-                p.textSize(10);
+                p.fill(255, 220, 100); // Bright yellow for emoji sections  
+                p.textSize(11);
                 p.text(section.title, metadataArea.x + 10, yOffset);
                 yOffset += lineHeight;
                 
                 if (section.data) {
-                  p.fill(200, 200, 200); // Light gray for data
-                  p.textSize(8);
+                  p.fill(240, 240, 240); // Very light gray for better contrast
+                  p.textSize(9);
                   Object.entries(section.data).forEach(([key, value]) => {
                     if (yOffset < metadataArea.y + metadataArea.h - 20) {
                       p.text(`    ${key}: ${value}`, metadataArea.x + 15, yOffset);
-                      yOffset += lineHeight - 2;
+                      yOffset += lineHeight - 1;
                     }
                   });
                 }

@@ -121,7 +121,7 @@ export const OrdersDashboard: React.FC<OrdersDashboardProps> = ({
       case 'launch':
         return orders.filter(order => 
           (order.paymentStatus === 'completed' || order.paymentStatus === 'succeeded') &&
-          (order.orderStatus === 'paid' || order.orderStatus === 'pending')
+          (order.orderStatus === 'paid' || order.orderStatus === 'payment_pending')
         );
       case 'orbit':
         return orders.filter(order => order.orderStatus === 'processing');
@@ -157,7 +157,7 @@ export const OrdersDashboard: React.FC<OrdersDashboardProps> = ({
   
   // Categorize paid orders
   const activeOrders = paidOrders.filter(order => 
-    order.orderStatus === 'processing' || order.orderStatus === 'pending' || order.orderStatus === 'paid'
+    order.orderStatus === 'processing' || order.orderStatus === 'payment_pending' || order.orderStatus === 'paid'
   );
   const completedOrders = paidOrders.filter(order => order.orderStatus === 'completed');
   const failedOrders = paidOrders.filter(order => order.orderStatus === 'failed');
