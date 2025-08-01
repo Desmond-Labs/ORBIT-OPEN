@@ -1,8 +1,10 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { ArrowRight, Sparkles, Upload, BarChart3, LogOut, User } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { ArrowRight, Sparkles, Upload, BarChart3, LogOut, User, CheckCircle, Satellite, Rocket, AlertCircle, Clock } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { UserOrder } from '@/hooks/useAllUserOrders';
+import { getUnifiedOrderStatus } from '@/utils/orderStatus';
 
 interface AuthenticatedHeroPageProps {
   userEmail: string;
@@ -10,6 +12,7 @@ interface AuthenticatedHeroPageProps {
   recentOrders: UserOrder[];
   onNewUpload: () => void;
   onViewDashboard: () => void;
+  onViewOrder: (orderId: string) => void;
   onSignOut: () => void;
 }
 
@@ -19,8 +22,48 @@ export const AuthenticatedHeroPage: React.FC<AuthenticatedHeroPageProps> = ({
   recentOrders,
   onNewUpload,
   onViewDashboard,
+  onViewOrder,
   onSignOut
 }) => {
+  const getStatusIcon = (iconType: string) => {
+    switch (iconType) {
+      case 'check-circle':
+        return <CheckCircle className="w-4 h-4 text-green-500" />;
+      case 'satellite':
+        return <Satellite className="w-4 h-4 text-purple-500 animate-pulse" />;
+      case 'rocket':
+        return <Rocket className="w-4 h-4 text-blue-500" />;
+      case 'alert-circle':
+        return <AlertCircle className="w-4 h-4 text-red-500" />;
+      case 'clock':
+      default:
+        return <Clock className="w-4 h-4 text-yellow-500" />;
+    }
+  };
+
+  const getStatusBadge = (order: UserOrder) => {
+    // Get unified status information
+    const unifiedStatus = getUnifiedOrderStatus({
+      orderStatus: order.orderStatus,
+      paymentStatus: order.paymentStatus,
+      processingStage: order.processingStage,
+      processedCount: order.processedCount,
+      imageCount: order.imageCount,
+      failedCount: order.failedCount
+    });
+
+    return (
+      <div className="flex flex-col items-end">
+        <Badge variant="outline" className={unifiedStatus.colorClass}>
+          {getStatusIcon(unifiedStatus.icon)}
+          <span className="ml-2 font-medium">{unifiedStatus.label}</span>
+        </Badge>
+        {unifiedStatus.subtitle && (
+          <span className="text-xs text-muted-foreground italic mt-1">{unifiedStatus.subtitle}</span>
+        )}
+      </div>
+    );
+  };
   return (
     <div className="min-h-screen relative overflow-hidden">
       {/* Cosmic Background */}
@@ -131,19 +174,17 @@ export const AuthenticatedHeroPage: React.FC<AuthenticatedHeroPageProps> = ({
               <h2 className="text-2xl font-bold mb-6">Recent Activity</h2>
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 {recentOrders.slice(0, 3).map((order) => (
-                  <Card key={order.id} className="cosmic-border hover:border-accent/40 transition-colors">
+                  <Card 
+                    key={order.id} 
+                    className="cosmic-border hover:border-accent/40 transition-colors cursor-pointer group"
+                    onClick={() => onViewOrder(order.id)}
+                  >
                     <CardHeader className="pb-3">
                       <div className="flex items-center justify-between">
-                        <CardTitle className="text-lg">{order.orderNumber}</CardTitle>
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                          order.orderStatus === 'completed' 
-                            ? 'bg-green-100 text-green-600' 
-                            : order.orderStatus === 'processing'
-                            ? 'bg-blue-100 text-blue-600'
-                            : 'bg-yellow-100 text-yellow-600'
-                        }`}>
-                          {order.orderStatus}
-                        </span>
+                        <CardTitle className="text-lg group-hover:text-accent transition-colors">
+                          {order.orderNumber}
+                        </CardTitle>
+                        {getStatusBadge(order)}
                       </div>
                     </CardHeader>
                     <CardContent>
@@ -159,6 +200,12 @@ export const AuthenticatedHeroPage: React.FC<AuthenticatedHeroPageProps> = ({
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Progress:</span>
                           <span>{order.processedCount}/{order.imageCount}</span>
+                        </div>
+                      </div>
+                      <div className="mt-3 pt-3 border-t border-accent/10">
+                        <div className="flex items-center justify-between text-xs text-muted-foreground">
+                          <span>Click to view details</span>
+                          <ArrowRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
                         </div>
                       </div>
                     </CardContent>

@@ -1,11 +1,13 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Loader2, Clock, CheckCircle, XCircle, ArrowRight, Upload, Rocket, Satellite, AlertCircle } from 'lucide-react';
+import { Loader2, Clock, CheckCircle, XCircle, ArrowRight, Upload, Rocket, Satellite, AlertCircle, CreditCard } from 'lucide-react';
 import { UserOrder } from '@/hooks/useAllUserOrders';
 import { OrderStatusLegend } from './OrderStatusLegend';
+import { MissionFilterBar, MissionFilter } from './MissionFilterBar';
 import { getUnifiedOrderStatus } from '@/utils/orderStatus';
+import { useToast } from '@/hooks/use-toast';
 
 interface OrdersDashboardProps {
   orders: UserOrder[];
@@ -60,7 +62,77 @@ export const OrdersDashboard: React.FC<OrdersDashboardProps> = ({
   onViewOrder,
   onNewUpload
 }) => {
-  console.log('🎯 OrdersDashboard component rendered with:', { ordersLength: orders.length, loading });
+  const [activeFilter, setActiveFilter] = useState<MissionFilter>('all');
+  const [paymentLoading, setPaymentLoading] = useState<string | null>(null);
+  const { toast } = useToast();
+
+  const handlePayForOrder = async (order: UserOrder) => {
+    setPaymentLoading(order.id);
+    
+    try {
+      console.log('🔄 Initiating payment for existing order:', order.id);
+      
+      // Create Stripe checkout session using Supabase edge function
+      const { data, error } = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-payment-intent`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
+        },
+        body: JSON.stringify({
+          orderId: order.id,
+          orderNumber: order.orderNumber,
+          imageCount: order.imageCount,
+          totalCost: order.totalCost,
+          returnUrl: `${window.location.origin}/?view=dashboard`
+        })
+      }).then(res => res.json());
+
+      if (error) {
+        throw new Error(error.message || 'Failed to create payment session');
+      }
+      
+      if (data?.url) {
+        // Redirect to Stripe checkout
+        window.location.href = data.url;
+      } else {
+        throw new Error('No checkout URL received from payment service');
+      }
+      
+    } catch (error: any) {
+      console.error('❌ Payment initiation failed:', error);
+      toast({
+        title: "Payment Error", 
+        description: error.message || "Failed to initiate payment. Please try again.",
+        variant: "destructive"
+      });
+      setPaymentLoading(null);
+    }
+  };
+
+  const filterOrders = (orders: UserOrder[], filter: MissionFilter): UserOrder[] => {
+    switch (filter) {
+      case 'all':
+        return orders;
+      case 'pending':
+        return orders.filter(order => 
+          order.paymentStatus !== 'completed' && order.paymentStatus !== 'succeeded'
+        );
+      case 'launch':
+        return orders.filter(order => 
+          (order.paymentStatus === 'completed' || order.paymentStatus === 'succeeded') &&
+          (order.orderStatus === 'paid' || order.orderStatus === 'pending')
+        );
+      case 'orbit':
+        return orders.filter(order => order.orderStatus === 'processing');
+      case 'complete':
+        return orders.filter(order => order.orderStatus === 'completed');
+      case 'failed':
+        return orders.filter(order => order.orderStatus === 'failed');
+      default:
+        return orders;
+    }
+  };
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 flex items-center justify-center">
@@ -72,34 +144,23 @@ export const OrdersDashboard: React.FC<OrdersDashboardProps> = ({
     );
   }
 
-  // Filter orders by payment status as well - only show paid orders
-  console.log('🎯 Dashboard filtering - total orders received:', orders.length);
-  console.log('🎯 Sample order payment/order status:', orders.slice(0, 3).map(o => ({ 
-    id: o.id.substring(0, 8), 
-    orderNumber: o.orderNumber,
-    paymentStatus: o.paymentStatus, 
-    orderStatus: o.orderStatus 
-  })));
+  // Apply filters to orders
+  const filteredOrders = filterOrders(orders, activeFilter);
   
-  const paidOrders = orders.filter(order => 
+  // Separate orders by payment status
+  const paidOrders = filteredOrders.filter(order => 
     order.paymentStatus === 'completed' || order.paymentStatus === 'succeeded'
   );
+  const unpaidOrders = filteredOrders.filter(order =>
+    order.paymentStatus !== 'completed' && order.paymentStatus !== 'succeeded'
+  );
   
-  console.log('🎯 After payment status filter:', paidOrders.length);
-  console.log('🎯 Missing order in paid orders:', paidOrders.some(o => o.id === 'c4c85a5a-2624-4865-a6db-05eab17a7981'));
-  
+  // Categorize paid orders
   const activeOrders = paidOrders.filter(order => 
     order.orderStatus === 'processing' || order.orderStatus === 'pending' || order.orderStatus === 'paid'
   );
   const completedOrders = paidOrders.filter(order => order.orderStatus === 'completed');
   const failedOrders = paidOrders.filter(order => order.orderStatus === 'failed');
-  
-  console.log('🎯 Order categorization:', {
-    active: activeOrders.length,
-    completed: completedOrders.length, 
-    failed: failedOrders.length,
-    total: activeOrders.length + completedOrders.length + failedOrders.length
-  });
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
@@ -115,6 +176,13 @@ export const OrdersDashboard: React.FC<OrdersDashboardProps> = ({
           <OrderStatusLegend />
         </div>
 
+        {/* Mission Filter Bar */}
+        <MissionFilterBar 
+          orders={orders}
+          activeFilter={activeFilter}
+          onFilterChange={setActiveFilter}
+        />
+
         {/* Quick Actions */}
         <div className="mb-8">
           <Button 
@@ -128,8 +196,85 @@ export const OrdersDashboard: React.FC<OrdersDashboardProps> = ({
           </Button>
         </div>
 
+        {/* Mission Pending Orders (Unpaid) */}
+        {unpaidOrders.length > 0 && (
+          <div className="mb-8">
+            <h2 className="text-xl font-semibold mb-4 flex items-center">
+              <Clock className="w-5 h-5 text-yellow-500 mr-2" />
+              Mission Pending ({unpaidOrders.length})
+            </h2>
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {unpaidOrders.map((order) => (
+                <Card key={order.id} className="cosmic-border border-amber-200 hover:border-amber-300 transition-colors">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-lg">{order.orderNumber}</CardTitle>
+                      {getStatusBadge(order)}
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Images:</span>
+                        <span>{order.imageCount}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Cost:</span>
+                        <span className="font-medium">${order.totalCost.toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Created:</span>
+                        <span>{new Date(order.createdAt).toLocaleDateString()}</span>
+                      </div>
+                      
+                      <div className="pt-2 border-t border-amber-100">
+                        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-3">
+                          <p className="text-xs text-amber-800 mb-2">
+                            <strong>Payment Required:</strong> Complete your payment to begin processing
+                          </p>
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <Button 
+                            onClick={() => handlePayForOrder(order)}
+                            variant="default"
+                            size="sm"
+                            className="w-full bg-gradient-primary hover:opacity-90"
+                            disabled={paymentLoading === order.id}
+                          >
+                            {paymentLoading === order.id ? (
+                              <>
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                Processing...
+                              </>
+                            ) : (
+                              <>
+                                <CreditCard className="w-4 h-4" />
+                                Complete Payment
+                              </>
+                            )}
+                          </Button>
+                          
+                          <Button 
+                            onClick={() => onViewOrder(order.id)}
+                            variant="outline"
+                            size="sm"
+                            className="w-full"
+                          >
+                            View Details <ArrowRight className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* No Orders State */}
-        {paidOrders.length === 0 && (
+        {filteredOrders.length === 0 && (
           <div className="text-center py-16">
             <div className="w-24 h-24 bg-gradient-primary rounded-full flex items-center justify-center mx-auto mb-6">
               <Upload className="w-12 h-12 text-foreground" />

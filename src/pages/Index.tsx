@@ -123,6 +123,7 @@ const Index = () => {
           recentOrders={orders}
           onNewUpload={handleNewUpload}
           onViewDashboard={handleViewDashboard}
+          onViewOrder={handleViewOrder}
           onSignOut={handleSignOut}
         />
       )}

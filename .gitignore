@@ -27,3 +27,6 @@ dist-ssr
 # Claude Code
 CLAUDE.md
 .claude
+
+# Internal Planning Documents
+PUBLIC_BETA_READINESS.md
