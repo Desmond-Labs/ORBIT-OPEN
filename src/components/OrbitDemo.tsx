@@ -295,7 +295,8 @@ export const OrbitDemo: React.FC<OrbitDemoProps> = ({ className = '' }) => {
             
             const currentCategoryIdx = p.floor((analysisProgress / 100) * CATEGORIES.length);
 
-            if (currentCategoryIdx > activeCategoryIndex && currentCategoryIdx < CATEGORIES.length) {
+            if (currentCategoryIdx > activeCategoryIndex && currentCategoryIdx <= CATEGORIES.length - 1) {
+              console.log(`🎯 Processing category ${currentCategoryIdx} (${CATEGORIES[currentCategoryIdx]?.title})`);
               activeCategoryIndex = currentCategoryIdx;
               revealedCategories.add(CATEGORIES[activeCategoryIndex].key);
               spawnConstellationWords(activeCategoryIndex);
