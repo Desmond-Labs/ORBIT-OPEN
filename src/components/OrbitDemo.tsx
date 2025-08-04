@@ -893,11 +893,19 @@ export const OrbitDemo: React.FC<OrbitDemoProps> = ({ className = '' }) => {
             const easeT = 0.5 - 0.5 * p.cos(t * p.PI);
             this.pos = (p as any).constructor.Vector.lerp(this.initialPos, this.targetPos, easeT);
                 this.alpha = p.map(easeT, 0.8, 1, 255, 0);
-                if (t >= 1) {
+                
+                // Force completion after move duration OR if target is outside bounds
+                const targetOutOfBounds = this.targetPos.y > metadataArea.y + metadataArea.h - 20;
+                if (t >= 1 || targetOutOfBounds) {
                   this.state = 'done';
                   // Debug for Photo category completion
                   if (this.categoryIndex === 6) {
-                    console.log(`📸 Photo word "${this.text}" transition: moving → done`);
+                    console.log(`📸 Photo word "${this.text}" transition: moving → done`, {
+                      completedNormally: t >= 1,
+                      forcedDueToOutOfBounds: targetOutOfBounds,
+                      targetY: this.targetPos.y,
+                      panelBottom: metadataArea.y + metadataArea.h
+                    });
                   }
                 }
               }
