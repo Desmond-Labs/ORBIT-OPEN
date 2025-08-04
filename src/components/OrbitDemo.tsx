@@ -162,6 +162,22 @@ export const OrbitDemo: React.FC<OrbitDemoProps> = ({ className = '' }) => {
               w: canvasWidth - imageArea.x - imageArea.w - 60,
               h: imageHeight
             };
+            
+            // Debug logging for panel dimensions
+            console.log('📏 Panel dimensions:', {
+              canvasHeight,
+              imageHeight,
+              metadataArea: {
+                y: metadataArea.y,
+                h: metadataArea.h,
+                bottom: metadataArea.y + metadataArea.h
+              },
+              categorySpacing: metadataArea.h * 0.125,
+              photocategoryRange: {
+                start: metadataArea.y + (6 * metadataArea.h * 0.125),
+                end: metadataArea.y + (7 * metadataArea.h * 0.125)
+              }
+            });
           }
 
           p.windowResized = () => {
@@ -238,6 +254,23 @@ export const OrbitDemo: React.FC<OrbitDemoProps> = ({ className = '' }) => {
             const targetYBase = categoryTop + (categorySpacing * 0.6) + 10;
 
             console.log(`Spawning words for category ${categoryIndex} (${category.title}):`, sampleWords);
+            
+            // Extra debug for Photo category
+            if (categoryIndex === 6) {
+              console.log(`📸 Photo category spawn details:`, {
+                categoryKey: category.key,
+                sampleWords,
+                targetYBase,
+                categoryTop,
+                categorySpacing,
+                metadataArea: {
+                  y: metadataArea.y,
+                  h: metadataArea.h,
+                  bottom: metadataArea.y + metadataArea.h
+                },
+                isWithinBounds: targetYBase < metadataArea.y + metadataArea.h
+              });
+            }
 
             sampleWords.forEach((word: string, i: number) => {
               const startPos = p.createVector(
@@ -895,6 +928,20 @@ export const OrbitDemo: React.FC<OrbitDemoProps> = ({ className = '' }) => {
               // Position tags in the lower 60% of category space, with 10px offset from title
               this.y = categoryTop + (categorySpacing * 0.6) + 10;
 
+              // Debug logging for Photo category
+              if (categoryIndex === 6) { // Photo category
+                console.log(`📸 Photo MetadataTag created:`, {
+                  text: this.text,
+                  categoryIndex,
+                  metadataArea: { y: metadataArea.y, h: metadataArea.h, bottom: metadataArea.y + metadataArea.h },
+                  categorySpacing,
+                  categoryTop,
+                  calculatedY: this.y,
+                  tagBottom: this.y + this.height,
+                  withinBounds: (this.y + this.height) < (metadataArea.y + metadataArea.h)
+                });
+              }
+
               // Initial position - will be recalculated after all tags are created
               this.x = metadataArea.x + 15;
             }
@@ -937,7 +984,34 @@ export const OrbitDemo: React.FC<OrbitDemoProps> = ({ className = '' }) => {
                   
                   // Ensure tag doesn't overflow the panel vertically
                   if (tag.y + tag.height > metadataArea.y + metadataArea.h - 10) {
+                    const originalY = tag.y;
                     tag.y = metadataArea.y + metadataArea.h - tag.height - 10;
+                    
+                    // Debug logging for Photo category repositioning
+                    if (categoryIndex === 6) {
+                      console.log(`📸 Photo tag vertically repositioned:`, {
+                        text: tag.text,
+                        originalY,
+                        newY: tag.y,
+                        panelBottom: metadataArea.y + metadataArea.h,
+                        boundaryCheck: metadataArea.y + metadataArea.h - 10
+                      });
+                    }
+                  }
+                  
+                  // Debug logging for Photo category final positioning
+                  if (categoryIndex === 6) {
+                    console.log(`📸 Photo tag final position:`, {
+                      text: tag.text,
+                      x: tag.x,
+                      y: tag.y,
+                      width: tag.width,
+                      height: tag.height,
+                      withinBounds: {
+                        x: tag.x >= metadataArea.x && tag.x + tag.width <= metadataArea.x + metadataArea.w,
+                        y: tag.y >= metadataArea.y && tag.y + tag.height <= metadataArea.y + metadataArea.h
+                      }
+                    });
                   }
                 }
               }
