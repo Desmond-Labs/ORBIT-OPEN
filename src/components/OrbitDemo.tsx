@@ -232,7 +232,8 @@ export const OrbitDemo: React.FC<OrbitDemoProps> = ({ className = '' }) => {
             activeConstellationWords = [];
             const category = CATEGORIES[categoryIndex];
             const sampleWords = getSampleWords(category.key, WORDS_PER_CATEGORY);
-            const targetYBase = metadataArea.y + (metadataArea.h / CATEGORIES.length) * (categoryIndex + 0.5);
+            const categorySpacing = metadataArea.h * 0.10; // 10% of panel height per category
+            const targetYBase = metadataArea.y + categorySpacing * (categoryIndex + 0.5);
 
             console.log(`Spawning words for category ${categoryIndex} (${category.title}):`, sampleWords);
 
@@ -463,7 +464,7 @@ export const OrbitDemo: React.FC<OrbitDemoProps> = ({ className = '' }) => {
             // Draw category titles
             p.textSize(12);
             p.textAlign(p.LEFT, p.CENTER);
-            const categorySpacing = metadataArea.h / CATEGORIES.length;
+            const categorySpacing = metadataArea.h * 0.10; // 10% of panel height per category
             
             for (let i = 0; i < CATEGORIES.length; i++) {
               const category = CATEGORIES[i];
@@ -884,7 +885,7 @@ export const OrbitDemo: React.FC<OrbitDemoProps> = ({ className = '' }) => {
               this.width = textW + 12;
               this.height = 16;
 
-              const categorySpacing = metadataArea.h / CATEGORIES.length;
+              const categorySpacing = metadataArea.h * 0.10; // 10% of panel height per category
               const categoryY = metadataArea.y + categoryIndex * categorySpacing;
               this.y = categoryY + (categorySpacing / 2) + 5;
 
