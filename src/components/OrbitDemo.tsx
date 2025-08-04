@@ -232,8 +232,10 @@ export const OrbitDemo: React.FC<OrbitDemoProps> = ({ className = '' }) => {
             activeConstellationWords = [];
             const category = CATEGORIES[categoryIndex];
             const sampleWords = getSampleWords(category.key, WORDS_PER_CATEGORY);
-            const categorySpacing = metadataArea.h * 0.10; // 10% of panel height per category
-            const targetYBase = metadataArea.y + categorySpacing * (categoryIndex + 0.5);
+            const categorySpacing = metadataArea.h * 0.125; // 12.5% of panel height per category
+            const categoryTop = metadataArea.y + categoryIndex * categorySpacing;
+            // Target the tag area (lower 60% of category space)
+            const targetYBase = categoryTop + (categorySpacing * 0.6) + 10;
 
             console.log(`Spawning words for category ${categoryIndex} (${category.title}):`, sampleWords);
 
@@ -464,11 +466,12 @@ export const OrbitDemo: React.FC<OrbitDemoProps> = ({ className = '' }) => {
             // Draw category titles
             p.textSize(12);
             p.textAlign(p.LEFT, p.CENTER);
-            const categorySpacing = metadataArea.h * 0.10; // 10% of panel height per category
+            const categorySpacing = metadataArea.h * 0.125; // 12.5% of panel height per category
             
             for (let i = 0; i < CATEGORIES.length; i++) {
               const category = CATEGORIES[i];
-              const yPos = metadataArea.y + i * categorySpacing;
+              const categoryTop = metadataArea.y + i * categorySpacing;
+              const titleYPos = categoryTop + (categorySpacing * 0.25); // Position title at 25% of category space
               
               let titleColor = TEXT_COLOR_DIM;
               if (revealedCategories.has(category.key) || currentPhase !== 'analyzing') {
@@ -481,11 +484,11 @@ export const OrbitDemo: React.FC<OrbitDemoProps> = ({ className = '' }) => {
                 pulseColor.setAlpha(pulseAlpha * 100);
                 p.fill(pulseColor);
                 p.noStroke();
-                p.rect(metadataArea.x + 2, yPos, metadataArea.w - 4, categorySpacing, 3);
+                p.rect(metadataArea.x + 2, categoryTop, metadataArea.w - 4, categorySpacing, 3);
               }
               
               p.fill(titleColor);
-              p.text(category.title, metadataArea.x + 15, yPos + (categorySpacing / 2) - 5);
+              p.text(category.title, metadataArea.x + 15, titleYPos);
             }
 
             // Draw metadata tags
@@ -590,7 +593,9 @@ export const OrbitDemo: React.FC<OrbitDemoProps> = ({ className = '' }) => {
 
           function drawStreamingTrail() {
             const currentCategory = CATEGORIES[activeCategoryIndex];
-            const categoryYCenter = metadataArea.y + (metadataArea.h / CATEGORIES.length) * (activeCategoryIndex + 0.5);
+            const categorySpacing = metadataArea.h * 0.125; // 12.5% of panel height per category
+            const categoryTop = metadataArea.y + activeCategoryIndex * categorySpacing;
+            const categoryYCenter = categoryTop + (categorySpacing * 0.6) + 10;
             
             p.push();
             p.strokeWeight(2);
@@ -885,9 +890,10 @@ export const OrbitDemo: React.FC<OrbitDemoProps> = ({ className = '' }) => {
               this.width = textW + 12;
               this.height = 16;
 
-              const categorySpacing = metadataArea.h * 0.10; // 10% of panel height per category
-              const categoryY = metadataArea.y + categoryIndex * categorySpacing;
-              this.y = categoryY + (categorySpacing / 2) + 5;
+              const categorySpacing = metadataArea.h * 0.125; // 12.5% of panel height per category
+              const categoryTop = metadataArea.y + categoryIndex * categorySpacing;
+              // Position tags in the lower 60% of category space, with 10px offset from title
+              this.y = categoryTop + (categorySpacing * 0.6) + 10;
 
               // Initial position - will be recalculated after all tags are created
               this.x = metadataArea.x + 15;
