@@ -196,18 +196,37 @@ export const OrbitDemo: React.FC<OrbitDemoProps> = ({ className = '' }) => {
           function getSampleWords(categoryKey: string, count: number) {
             const categoryData = METADATA[categoryKey as keyof typeof METADATA];
             if (!categoryData) {
-              console.log(`No data for category: ${categoryKey}`);
+              console.warn(`No data found for category: ${categoryKey}`);
               return [];
             }
             
             let words: string[] = [];
             Object.values(categoryData).forEach((value: any) => {
               if (typeof value === 'string') {
-                words.push(value);
+                // Split compound phrases and take meaningful words
+                const splitWords = value.split(/[\s,&]+/).filter(word => word.length > 2);
+                words.push(...splitWords);
               }
             });
             
-            console.log(`Category ${categoryKey} generated words:`, words);
+            // Remove duplicates and ensure we have words
+            words = [...new Set(words)];
+            
+            // Add fallback words if category has no valid content
+            if (words.length === 0) {
+              const fallbacks: { [key: string]: string[] } = {
+                'marketing_potential': ['Social media', 'Brand appeal', 'Target audience'],
+                'scene_overview': ['Indoor', 'Outdoor', 'Setting'],
+                'human_elements': ['People', 'Activity', 'Emotion'],
+                'environment': ['Location', 'Context', 'Atmosphere'],
+                'key_objects': ['Items', 'Products', 'Elements'],
+                'atmospheric_elements': ['Lighting', 'Mood', 'Ambiance'],
+                'narrative_analysis': ['Story', 'Theme', 'Message'],
+                'photographic_elements': ['Composition', 'Style', 'Quality']
+              };
+              words = fallbacks[categoryKey] || ['Analysis', 'Data', 'Content'];
+            }
+            
             return p.shuffle(words).slice(0, count);
           }
 
@@ -216,6 +235,8 @@ export const OrbitDemo: React.FC<OrbitDemoProps> = ({ className = '' }) => {
             const category = CATEGORIES[categoryIndex];
             const sampleWords = getSampleWords(category.key, WORDS_PER_CATEGORY);
             const targetYBase = metadataArea.y + (metadataArea.h / CATEGORIES.length) * (categoryIndex + 0.5);
+
+            console.log(`Spawning words for category ${categoryIndex} (${category.title}):`, sampleWords);
 
             sampleWords.forEach((word: string, i: number) => {
               const startPos = p.createVector(
@@ -608,11 +629,12 @@ export const OrbitDemo: React.FC<OrbitDemoProps> = ({ className = '' }) => {
 
             // Draw report content
             const visibleSections = Math.floor((reportProgress / 100) * reportSections.length);
-            let yOffset = metadataArea.y + 15;
-            const lineHeight = 14;
+            let yOffset = metadataArea.y + 12;
+            const lineHeight = 16; // Increased line height for better readability
             
             p.textAlign(p.LEFT, p.TOP);
-            p.textFont('Courier New');
+            // Use a lighter, more readable font setup
+            p.textFont('Monaco, Consolas, monospace');
             
             for (let i = 0; i < Math.min(visibleSections, reportSections.length); i++) {
               const section = reportSections[i];
@@ -620,65 +642,66 @@ export const OrbitDemo: React.FC<OrbitDemoProps> = ({ className = '' }) => {
               if (yOffset > metadataArea.y + metadataArea.h - 20) break; // Stop if we run out of space
               
               if (section.type === 'header') {
-                p.fill(255, 255, 255); // White for better readability
+                p.fill(100, 255, 255); // Softer cyan, more readable
                 p.textSize(12);
                 p.text(section.title, metadataArea.x + 10, yOffset);
-                yOffset += lineHeight + 5;
+                yOffset += lineHeight + 4;
               } else if (section.type === 'separator') {
-                p.fill(100, 255, 150); // Brighter green
-                p.textSize(8);
+                p.fill(80, 200, 80); // Softer green
+                p.textSize(9);
                 p.text(section.title, metadataArea.x + 10, yOffset);
-                yOffset += lineHeight;
+                yOffset += lineHeight - 2;
               } else if (section.type === 'info') {
-                p.fill(200, 200, 200); // Lighter gray for better readability
+                p.fill(180, 180, 180); // Lighter gray for better contrast
                 p.textSize(10);
                 p.text(section.title, metadataArea.x + 10, yOffset);
                 yOffset += lineHeight;
               } else if (section.type === 'spacer') {
                 yOffset += lineHeight / 2;
               } else if (section.type === 'section') {
-                p.fill(255, 220, 100); // Bright yellow for emoji sections  
+                p.fill(255, 200, 100); // Softer yellow-orange
                 p.textSize(11);
                 p.text(section.title, metadataArea.x + 10, yOffset);
                 yOffset += lineHeight;
                 
                 if (section.data) {
-                  p.fill(240, 240, 240); // Very light gray for better contrast
+                  p.fill(220, 220, 220); // Brighter gray for data
                   p.textSize(9);
                   Object.entries(section.data).forEach(([key, value]) => {
                     if (yOffset < metadataArea.y + metadataArea.h - 20) {
-                      p.text(`    ${key}: ${value}`, metadataArea.x + 15, yOffset);
+                      p.text(`    ${key}: ${value}`, metadataArea.x + 20, yOffset);
                       yOffset += lineHeight - 1;
                     }
                   });
                 }
-                yOffset += 5;
+                yOffset += 3;
               } else if (section.type === 'section-header') {
-                p.fill(255, 100, 255); // Bright magenta
-                p.textSize(10);
+                p.fill(255, 150, 255); // Softer magenta
+                p.textSize(11);
                 p.text(section.title, metadataArea.x + 10, yOffset);
-                yOffset += lineHeight + 5;
+                yOffset += lineHeight + 3;
               } else if (section.type === 'json') {
-                p.fill(100, 200, 255); // Light blue for JSON
-                p.textSize(7);
+                p.fill(150, 220, 255); // Softer blue for JSON
+                p.textSize(8);
                 const jsonLines = section.title.split('\n');
                 for (let line of jsonLines.slice(0, 8)) { // Show first 8 lines of JSON
                   if (yOffset < metadataArea.y + metadataArea.h - 20) {
-                    p.text(line, metadataArea.x + 15, yOffset);
-                    yOffset += lineHeight - 3;
+                    p.text(line, metadataArea.x + 20, yOffset);
+                    yOffset += lineHeight - 2;
                   }
                 }
                 if (jsonLines.length > 8) {
-                  p.fill(150, 150, 150);
-                  p.text('... [truncated]', metadataArea.x + 15, yOffset);
+                  p.fill(180, 180, 180);
+                  p.text('... [truncated]', metadataArea.x + 20, yOffset);
                 }
               }
             }
             
-            // Blinking terminal cursor
+            // Blinking terminal cursor - softer and less intrusive
             if (visibleSections < reportSections.length && p.frameCount % 60 < 30) {
-              p.fill(0, 255, 100);
-              p.rect(metadataArea.x + 10, yOffset, 8, 12);
+              p.fill(120, 255, 120, 180); // Semi-transparent green
+              p.noStroke();
+              p.rect(metadataArea.x + 10, yOffset - 2, 6, 14);
             }
             
             p.pop();
@@ -873,8 +896,8 @@ export const OrbitDemo: React.FC<OrbitDemoProps> = ({ className = '' }) => {
 
             // Method to position all tags in a category evenly
             static positionTagsInCategories(tags: MetadataTag[]) {
-              const spacingBetweenTags = 8;
-              const availableWidth = metadataArea.w - 30; // Leave some margin
+              const spacingBetweenTags = 6; // Reduced spacing for better fit
+              const availableWidth = metadataArea.w - 40; // More margin
 
               // Group tags by category
               for (let categoryIndex = 0; categoryIndex < CATEGORIES.length; categoryIndex++) {
@@ -888,14 +911,24 @@ export const OrbitDemo: React.FC<OrbitDemoProps> = ({ className = '' }) => {
                 const totalTagsWidth = categoryTags.reduce((sum, tag) => sum + tag.width, 0);
                 const totalSpacingWidth = (categoryTags.length - 1) * spacingBetweenTags;
                 
-                // Calculate starting position to center all tags
-                const startX = metadataArea.x + 15 + Math.max(0, (availableWidth - totalTagsWidth - totalSpacingWidth) / 2);
+                // If tags don't fit, start from left edge; otherwise center them
+                let startX;
+                if (totalTagsWidth + totalSpacingWidth > availableWidth) {
+                  startX = metadataArea.x + 15;
+                } else {
+                  startX = metadataArea.x + 15 + (availableWidth - totalTagsWidth - totalSpacingWidth) / 2;
+                }
                 
                 // Position each tag
                 let currentX = startX;
                 for (const tag of categoryTags) {
                   tag.x = currentX;
                   currentX += tag.width + spacingBetweenTags;
+                  
+                  // Ensure tag doesn't overflow the panel
+                  if (tag.x + tag.width > metadataArea.x + metadataArea.w - 10) {
+                    tag.x = metadataArea.x + metadataArea.w - tag.width - 10;
+                  }
                 }
               }
             }
