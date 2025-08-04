@@ -64,8 +64,7 @@ export const OrbitDemo: React.FC<OrbitDemoProps> = ({ className = '' }) => {
             "key_objects": { "food": "Pretzel with sauce", "drinks": "Beer & cocktails", "furniture": "Tables & chairs" },
             "atmospheric_elements": { "lighting": "Natural daylight", "colors": "Earth tones", "mood": "Social" },
             "narrative_analysis": { "story": "Friends gathering", "values": "Social connection", "culture": "Casual dining" },
-            "photographic_elements": { "composition": "Horizontal", "focus": "Foreground", "style": "Candid" },
-            "marketing_potential": { "target": "Urban millennials", "appeal": "Social dining", "brands": "Craft beer" }
+            "photographic_elements": { "composition": "Horizontal", "focus": "Foreground", "style": "Candid" }
           };
 
           const CATEGORIES = [
@@ -75,8 +74,7 @@ export const OrbitDemo: React.FC<OrbitDemoProps> = ({ className = '' }) => {
             { key: 'key_objects', title: 'Objects', color: ORBIT_GOLD },
             { key: 'atmospheric_elements', title: 'Atmospheric', color: ORBIT_PURPLE },
             { key: 'narrative_analysis', title: 'Narrative', color: ORBIT_BLUE },
-            { key: 'photographic_elements', title: 'Photo', color: ORBIT_PURPLE },
-            { key: 'marketing_potential', title: 'Marketing', color: ORBIT_TEAL }
+            { key: 'photographic_elements', title: 'Photo', color: ORBIT_PURPLE }
           ];
 
           // Animation constants
@@ -157,14 +155,12 @@ export const OrbitDemo: React.FC<OrbitDemoProps> = ({ className = '' }) => {
               h: imageHeight
             };
 
-            // Increase metadata panel height to accommodate all 8 categories
-            const metadataHeight = Math.max(imageHeight, CATEGORIES.length * 35); // Ensure minimum 35px per category
-            
+            // Use standard image height since we now have 7 evenly spaced categories
             metadataArea = {
               x: imageArea.x + imageArea.w + 30,
               y: 30,
               w: canvasWidth - imageArea.x - imageArea.w - 60,
-              h: metadataHeight
+              h: imageHeight
             };
           }
 
@@ -218,7 +214,6 @@ export const OrbitDemo: React.FC<OrbitDemoProps> = ({ className = '' }) => {
             // Add fallback words if category has no valid content
             if (words.length === 0) {
               const fallbacks: { [key: string]: string[] } = {
-                'marketing_potential': ['Social media', 'Brand appeal', 'Target audience'],
                 'scene_overview': ['Indoor', 'Outdoor', 'Setting'],
                 'human_elements': ['People', 'Activity', 'Emotion'],
                 'environment': ['Location', 'Context', 'Atmosphere'],
@@ -240,21 +235,6 @@ export const OrbitDemo: React.FC<OrbitDemoProps> = ({ className = '' }) => {
             const targetYBase = metadataArea.y + (metadataArea.h / CATEGORIES.length) * (categoryIndex + 0.5);
 
             console.log(`Spawning words for category ${categoryIndex} (${category.title}):`, sampleWords);
-            
-            // Extra debug for marketing category
-            if (categoryIndex === 7) {
-              console.log(`🎯 Marketing category details:`, {
-                categoryKey: category.key,
-                sampleWords,
-                targetYBase,
-                metadataArea: {
-                  y: metadataArea.y,
-                  h: metadataArea.h,
-                  bottom: metadataArea.y + metadataArea.h
-                },
-                isWithinBounds: targetYBase < metadataArea.y + metadataArea.h
-              });
-            }
 
             sampleWords.forEach((word: string, i: number) => {
               const startPos = p.createVector(
@@ -908,18 +888,6 @@ export const OrbitDemo: React.FC<OrbitDemoProps> = ({ className = '' }) => {
               const categoryY = metadataArea.y + categoryIndex * categorySpacing;
               this.y = categoryY + (categorySpacing / 2) + 5;
 
-              // Debug logging for marketing category
-              if (categoryIndex === 7) { // Marketing category
-                console.log(`🎯 Marketing MetadataTag created:`, {
-                  text: this.text,
-                  categoryIndex,
-                  metadataArea: { h: metadataArea.h, y: metadataArea.y },
-                  categorySpacing,
-                  calculatedY: this.y,
-                  withinBounds: this.y < metadataArea.y + metadataArea.h
-                });
-              }
-
               // Initial position - will be recalculated after all tags are created
               this.x = metadataArea.x + 15;
             }
@@ -963,28 +931,6 @@ export const OrbitDemo: React.FC<OrbitDemoProps> = ({ className = '' }) => {
                   // Ensure tag doesn't overflow the panel vertically
                   if (tag.y + tag.height > metadataArea.y + metadataArea.h - 10) {
                     tag.y = metadataArea.y + metadataArea.h - tag.height - 10;
-                    if (categoryIndex === 7) { // Marketing category debug
-                      console.log(`🔧 Marketing tag vertically repositioned:`, {
-                        originalY: metadataArea.y + categoryIndex * (metadataArea.h / CATEGORIES.length) + ((metadataArea.h / CATEGORIES.length) / 2) + 5,
-                        newY: tag.y,
-                        panelBottom: metadataArea.y + metadataArea.h
-                      });
-                    }
-                  }
-                  
-                  // Debug logging for marketing category positioning
-                  if (categoryIndex === 7) {
-                    console.log(`🎯 Marketing tag positioned:`, {
-                      text: tag.text,
-                      x: tag.x,
-                      y: tag.y,
-                      width: tag.width,
-                      height: tag.height,
-                      withinBounds: {
-                        x: tag.x >= metadataArea.x && tag.x + tag.width <= metadataArea.x + metadataArea.w,
-                        y: tag.y >= metadataArea.y && tag.y + tag.height <= metadataArea.y + metadataArea.h
-                      }
-                    });
                   }
                 }
               }
