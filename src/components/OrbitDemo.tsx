@@ -307,6 +307,17 @@ export const OrbitDemo: React.FC<OrbitDemoProps> = ({ className = '' }) => {
               constellationWords[i].update();
               if (constellationWords[i].isDone()) {
                 const word = constellationWords[i];
+                
+                // Debug logging for Photo category word completion
+                if (word.categoryIndex === 6) {
+                  console.log(`📸 Photo constellation word completed:`, {
+                    text: word.text,
+                    categoryIndex: word.categoryIndex,
+                    wordIndex: word.wordIndex,
+                    aboutToCreateTag: true
+                  });
+                }
+                
                 metadataTags.push(new MetadataTag(word.text, word.color, word.categoryIndex, word.wordIndex));
                 constellationWords.splice(i, 1);
                 
@@ -859,11 +870,23 @@ export const OrbitDemo: React.FC<OrbitDemoProps> = ({ className = '' }) => {
                 if (this.timer > WORD_APPEAR_DURATION) {
                   this.state = 'stationary';
                   this.timer = 0;
+                  // Debug for Photo category state transitions
+                  if (this.categoryIndex === 6) {
+                    console.log(`📸 Photo word "${this.text}" transition: appearing → stationary`);
+                  }
                 }
               } else if (this.state === 'stationary') {
                 if (this.timer > WORD_STATIONARY_DURATION) {
                   this.state = 'moving';
                   this.timer = 0;
+                  // Debug for Photo category state transitions
+                  if (this.categoryIndex === 6) {
+                    console.log(`📸 Photo word "${this.text}" transition: stationary → moving, target:`, {
+                      x: this.targetPos.x,
+                      y: this.targetPos.y,
+                      withinBounds: this.targetPos.y < metadataArea.y + metadataArea.h
+                    });
+                  }
                 }
               } else if (this.state === 'moving') {
                 const t = this.timer / WORD_MOVE_DURATION;
@@ -872,6 +895,10 @@ export const OrbitDemo: React.FC<OrbitDemoProps> = ({ className = '' }) => {
                 this.alpha = p.map(easeT, 0.8, 1, 255, 0);
                 if (t >= 1) {
                   this.state = 'done';
+                  // Debug for Photo category completion
+                  if (this.categoryIndex === 6) {
+                    console.log(`📸 Photo word "${this.text}" transition: moving → done`);
+                  }
                 }
               }
             }
