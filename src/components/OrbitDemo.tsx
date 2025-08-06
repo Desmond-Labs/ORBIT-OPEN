@@ -172,10 +172,10 @@ export const OrbitDemo: React.FC<OrbitDemoProps> = ({ className = '' }) => {
                 h: metadataArea.h,
                 bottom: metadataArea.y + metadataArea.h
               },
-              categorySpacing: metadataArea.h * 0.125,
+              categorySpacing: metadataArea.h * 0.13,
               photocategoryRange: {
-                start: metadataArea.y + (6 * metadataArea.h * 0.125),
-                end: metadataArea.y + (7 * metadataArea.h * 0.125)
+                start: metadataArea.y + (6 * metadataArea.h * 0.13),
+                end: metadataArea.y + (7 * metadataArea.h * 0.13)
               }
             });
           }
@@ -248,10 +248,17 @@ export const OrbitDemo: React.FC<OrbitDemoProps> = ({ className = '' }) => {
             activeConstellationWords = [];
             const category = CATEGORIES[categoryIndex];
             const sampleWords = getSampleWords(category.key, WORDS_PER_CATEGORY);
-            const categorySpacing = metadataArea.h * 0.125; // 12.5% of panel height per category
+            const categorySpacing = metadataArea.h * 0.13; // 13% of panel height per category for even distribution
             const categoryTop = metadataArea.y + categoryIndex * categorySpacing;
-            // Target the tag area (lower 60% of category space)
-            const targetYBase = categoryTop + (categorySpacing * 0.6) + 10;
+            // Target the tag area consistently across all categories
+            const targetOffsetRatio = 0.65; // Match the MetadataTag positioning
+            let targetYBase = categoryTop + (categorySpacing * targetOffsetRatio);
+            
+            // Ensure all categories stay within panel bounds
+            const maxY = metadataArea.y + metadataArea.h - 20;
+            if (targetYBase > maxY) {
+              targetYBase = maxY;
+            }
 
             console.log(`Spawning words for category ${categoryIndex} (${category.title}):`, sampleWords);
             
@@ -281,6 +288,16 @@ export const OrbitDemo: React.FC<OrbitDemoProps> = ({ className = '' }) => {
                 metadataArea.x + 30 + p.random(-10, 10),
                 targetYBase + p.random(-10, 10)
               );
+              
+              // Debug Photo category word creation
+              if (categoryIndex === 6) {
+                console.log(`📸 Creating Photo constellation word "${word}":`, {
+                  startPos: { x: startPos.x, y: startPos.y },
+                  targetPos: { x: targetPos.x, y: targetPos.y },
+                  targetYBase,
+                  withinBounds: targetPos.y < metadataArea.y + metadataArea.h
+                });
+              }
               
               const newWord = new ConstellationWord(startPos, targetPos, category.color, word, categoryIndex, i);
               constellationWords.push(newWord);
@@ -328,10 +345,17 @@ export const OrbitDemo: React.FC<OrbitDemoProps> = ({ className = '' }) => {
 
             activeConstellationWords = activeConstellationWords.filter((word: any) => !word.isDone());
 
-            if (analysisProgress >= 100) {
+            // Give Photo category extra time to complete before switching phases
+            const photoWordsStillAnimating = constellationWords.some(word => word.categoryIndex === 6 && !word.isDone());
+            const analysisComplete = analysisProgress >= 100;
+            
+            if (analysisComplete && !photoWordsStillAnimating) {
+              console.log(`🎯 Analysis phase complete, transitioning to embedding. Photo words completed.`);
               currentPhase = 'embedding';
               activeCategoryIndex = 0;
               embeddingStartFrame = p.frameCount;
+            } else if (analysisComplete && photoWordsStillAnimating) {
+              console.log(`🎯 Analysis progress at 100% but Photo words still animating, waiting...`);
             }
           }
 
@@ -342,7 +366,10 @@ export const OrbitDemo: React.FC<OrbitDemoProps> = ({ className = '' }) => {
             
             // Create streaming particles
             if (categoryFrameCount < EMBED_DURATION_PER_CATEGORY - 30 && !completionInitiated) {
-              const categoryYCenter = metadataArea.y + (metadataArea.h / CATEGORIES.length) * (activeCategoryIndex + 0.5);
+              const categorySpacing = metadataArea.h * 0.13; // 13% of panel height per category for even distribution
+              const categoryTop = metadataArea.y + activeCategoryIndex * categorySpacing;
+              const tagOffsetRatio = 0.65; // Consistent with tag positioning
+              const categoryYCenter = categoryTop + (categorySpacing * tagOffsetRatio);
               for (let i = 0; i < 3; i++) {
                 const startPos = p.createVector(
                   metadataArea.x + metadataArea.w - 10 + p.random(-5, 5),
@@ -511,12 +538,12 @@ export const OrbitDemo: React.FC<OrbitDemoProps> = ({ className = '' }) => {
             // Draw category titles
             p.textSize(12);
             p.textAlign(p.LEFT, p.CENTER);
-            const categorySpacing = metadataArea.h * 0.125; // 12.5% of panel height per category
+            const categorySpacing = metadataArea.h * 0.13; // 13% of panel height per category for even distribution
             
             for (let i = 0; i < CATEGORIES.length; i++) {
               const category = CATEGORIES[i];
               const categoryTop = metadataArea.y + i * categorySpacing;
-              const titleYPos = categoryTop + (categorySpacing * 0.25); // Position title at 25% of category space
+              const titleYPos = categoryTop + (categorySpacing * 0.20); // Position title at 20% of category space for better alignment
               
               let titleColor = TEXT_COLOR_DIM;
               if (revealedCategories.has(category.key) || currentPhase !== 'analyzing') {
@@ -638,9 +665,10 @@ export const OrbitDemo: React.FC<OrbitDemoProps> = ({ className = '' }) => {
 
           function drawStreamingTrail() {
             const currentCategory = CATEGORIES[activeCategoryIndex];
-            const categorySpacing = metadataArea.h * 0.125; // 12.5% of panel height per category
+            const categorySpacing = metadataArea.h * 0.13; // 13% of panel height per category for even distribution
             const categoryTop = metadataArea.y + activeCategoryIndex * categorySpacing;
-            const categoryYCenter = categoryTop + (categorySpacing * 0.6) + 10;
+            const tagOffsetRatio = activeCategoryIndex >= 5 ? 0.5 : 0.6; // Consistent with tag positioning
+            const categoryYCenter = categoryTop + (categorySpacing * tagOffsetRatio) + 8;
             
             p.push();
             p.strokeWeight(2);
@@ -894,8 +922,19 @@ export const OrbitDemo: React.FC<OrbitDemoProps> = ({ className = '' }) => {
             this.pos = (p as any).constructor.Vector.lerp(this.initialPos, this.targetPos, easeT);
                 this.alpha = p.map(easeT, 0.8, 1, 255, 0);
                 
-                // Force completion after move duration OR if target is outside bounds
-                const targetOutOfBounds = this.targetPos.y > metadataArea.y + metadataArea.h - 20;
+                // Enhanced debug for Photo category during movement
+                if (this.categoryIndex === 6 && this.timer % 10 === 0) { // Log every 10 frames
+                  console.log(`📸 Photo word "${this.text}" moving progress:`, {
+                    timer: this.timer,
+                    t: t,
+                    moveDistance: WORD_MOVE_DURATION,
+                    willComplete: t >= 1
+                  });
+                }
+                
+                // Force completion after move duration OR if target is outside bounds (but be more forgiving for Photo category)
+                const boundaryMargin = this.categoryIndex === 6 ? 5 : 20; // Smaller margin for Photo category
+                const targetOutOfBounds = this.targetPos.y > metadataArea.y + metadataArea.h - boundaryMargin;
                 if (t >= 1 || targetOutOfBounds) {
                   this.state = 'done';
                   // Debug for Photo category completion
@@ -904,7 +943,9 @@ export const OrbitDemo: React.FC<OrbitDemoProps> = ({ className = '' }) => {
                       completedNormally: t >= 1,
                       forcedDueToOutOfBounds: targetOutOfBounds,
                       targetY: this.targetPos.y,
-                      panelBottom: metadataArea.y + metadataArea.h
+                      panelBottom: metadataArea.y + metadataArea.h,
+                      timer: this.timer,
+                      t: t
                     });
                   }
                 }
@@ -959,22 +1000,35 @@ export const OrbitDemo: React.FC<OrbitDemoProps> = ({ className = '' }) => {
               this.width = textW + 12;
               this.height = 16;
 
-              const categorySpacing = metadataArea.h * 0.125; // 12.5% of panel height per category
+              const categorySpacing = metadataArea.h * 0.13; // 13% of panel height per category for even distribution
               const categoryTop = metadataArea.y + categoryIndex * categorySpacing;
-              // Position tags in the lower 60% of category space, with 10px offset from title
-              this.y = categoryTop + (categorySpacing * 0.6) + 10;
+              // Position tags consistently in the lower portion of category space for better alignment
+              const tagOffsetRatio = 0.65; // Consistent positioning for all categories at 65% of space
+              this.y = categoryTop + (categorySpacing * tagOffsetRatio);
+
+              // Boundary check for all categories
+              const panelBottom = metadataArea.y + metadataArea.h;
+              if (this.y + this.height > panelBottom - 5) {
+                // Keep tags within panel bounds
+                this.y = panelBottom - this.height - 5;
+                if (categoryIndex === 6) {
+                  console.log(`📸 Repositioned Photo tag "${this.text}" for visibility: y=${this.y}`);
+                }
+              }
 
               // Debug logging for Photo category
               if (categoryIndex === 6) { // Photo category
                 console.log(`📸 Photo MetadataTag created:`, {
                   text: this.text,
                   categoryIndex,
-                  metadataArea: { y: metadataArea.y, h: metadataArea.h, bottom: metadataArea.y + metadataArea.h },
+                  metadataArea: { y: metadataArea.y, h: metadataArea.h, bottom: panelBottom },
                   categorySpacing,
                   categoryTop,
                   calculatedY: this.y,
                   tagBottom: this.y + this.height,
-                  withinBounds: (this.y + this.height) < (metadataArea.y + metadataArea.h)
+                  withinBounds: (this.y + this.height) < panelBottom,
+                  tagOffsetRatio,
+                  adjustedForVisibility: this.y !== categoryTop + (categorySpacing * tagOffsetRatio) + 8
                 });
               }
 
@@ -1018,19 +1072,26 @@ export const OrbitDemo: React.FC<OrbitDemoProps> = ({ className = '' }) => {
                     tag.x = metadataArea.x + metadataArea.w - tag.width - 10;
                   }
                   
-                  // Ensure tag doesn't overflow the panel vertically
-                  if (tag.y + tag.height > metadataArea.y + metadataArea.h - 10) {
+                  // Final overflow handling - ensure tag doesn't overflow the panel vertically
+                  const panelBottom = metadataArea.y + metadataArea.h;
+                  const availableSpace = panelBottom - 5; // Minimal margin needed
+                  
+                  if (tag.y + tag.height > availableSpace) {
                     const originalY = tag.y;
-                    tag.y = metadataArea.y + metadataArea.h - tag.height - 10;
                     
-                    // Debug logging for Photo category repositioning
+                    // Simple repositioning for all categories
+                    tag.y = availableSpace - tag.height;
+                    
+                    // Debug logging for repositioning
                     if (categoryIndex === 6) {
-                      console.log(`📸 Photo tag vertically repositioned:`, {
+                      console.log(`📸 Photo tag vertically repositioned (enhanced):`, {
                         text: tag.text,
                         originalY,
                         newY: tag.y,
-                        panelBottom: metadataArea.y + metadataArea.h,
-                        boundaryCheck: metadataArea.y + metadataArea.h - 10
+                        panelBottom,
+                        availableSpace,
+                        tagHeight: tag.height,
+                        willBeVisible: tag.y >= metadataArea.y && tag.y + tag.height <= panelBottom
                       });
                     }
                   }
