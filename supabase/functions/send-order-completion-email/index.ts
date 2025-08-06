@@ -10,6 +10,22 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
+// Helper function to get frontend URL with fallback
+const getFrontendUrl = (): string => {
+  const envUrl = Deno.env.get('FRONTEND_URL');
+  if (envUrl) {
+    return envUrl;
+  }
+  
+  // Fallback based on environment
+  const supabaseUrl = Deno.env.get('SUPABASE_URL');
+  if (supabaseUrl?.includes('localhost') || supabaseUrl?.includes('127.0.0.1')) {
+    return 'http://localhost:5173'; // Local development
+  }
+  
+  return 'https://preview--orbit-image-forge.lovable.app'; // Production fallback
+};
+
 interface OrderCompletionEmailRequest {
   orderId: string;
   userEmail: string;
@@ -162,7 +178,7 @@ const handler = async (req: Request): Promise<Response> => {
     console.log('📧 Subject: 🚀 Your ORBIT order is ready! - ' + orderNumber);
     
     const emailResponse = await resend.emails.send({
-      from: "ORBIT <update.desmondlabs.com>",
+      from: "ORBIT <updates@desmondlabs.com>",
       to: [userEmail],
       subject: `🚀 Your ORBIT order is ready! - ${orderNumber}`,
       html: `
@@ -231,7 +247,7 @@ const handler = async (req: Request): Promise<Response> => {
             ` : `
             <!-- Login to Download -->
             <div style="text-align: center; margin: 32px 0;">
-              <a href="${downloadUrl || `${Deno.env.get('FRONTEND_URL') || 'https://preview--orbit-image-forge.lovable.app'}/?order=${orderId}&step=processing`}" 
+              <a href="${downloadUrl || `${getFrontendUrl()}/?order=${orderId}&step=processing`}" 
                  style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-decoration: none; padding: 16px 32px; border-radius: 8px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);">
                 🚀 View & Download Results
               </a>
@@ -253,7 +269,7 @@ const handler = async (req: Request): Promise<Response> => {
           <div style="text-align: center; color: #64748b; font-size: 14px; border-top: 1px solid #e2e8f0; padding-top: 24px;">
             <p style="margin: 8px 0;">Need help? Contact our support team</p>
             <p style="margin: 8px 0;">
-              <a href="${Deno.env.get('FRONTEND_URL') || 'https://preview--orbit-image-forge.lovable.app'}" 
+              <a href="${getFrontendUrl()}" 
                  style="color: #667eea; text-decoration: none;">Visit ORBIT</a>
             </p>
             <p style="margin: 16px 0 0 0; font-size: 12px; color: #94a3b8;">

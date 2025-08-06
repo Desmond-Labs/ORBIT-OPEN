@@ -21,3 +21,15 @@ verify_jwt = true
 
 [functions.get-thumbnails]
 verify_jwt = true
+
+[functions.send-order-completion-email]
+verify_jwt = true
+
+[functions.upload-order-images-direct]
+verify_jwt = true
+
+[functions.debug-order-lookup]
+verify_jwt = true
+
+[functions.verify-payment-order]
+verify_jwt = true

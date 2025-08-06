@@ -338,7 +338,12 @@ serve(async (req) => {
           throw tokenError;
         }
 
-        const accessToken = tokenData[0].token;
+        // Extract token from the returned table result
+        const accessToken = tokenData && tokenData[0] ? tokenData[0].token : null;
+        if (!accessToken) {
+          throw new Error('Failed to extract access token from function result');
+        }
+        
         console.log(`🔐 Access token generated successfully: ${accessToken.substring(0, 8)}... for order: ${orderId}`);
 
         // Get user email and name from orbit_users table using the order's user_id
@@ -358,7 +363,7 @@ serve(async (req) => {
               userEmail: userProfile.email,
               userName: userProfile.name,
               imageCount: successCount,
-              downloadUrl: `${Deno.env.get('FRONTEND_URL') || 'https://orbit-image-forge.lovable.app'}/?token=${accessToken}&order=${orderId}&step=processing`
+              downloadUrl: `${Deno.env.get('FRONTEND_URL') || (Deno.env.get('SUPABASE_URL')?.includes('localhost') ? 'http://localhost:5173' : 'https://preview--orbit-image-forge.lovable.app')}/?token=${accessToken}&order=${orderId}&step=processing`
             }
           });
 
