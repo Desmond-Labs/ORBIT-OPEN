@@ -28,9 +28,9 @@ const getFrontendUrl = (): string => {
 
 interface OrderCompletionEmailRequest {
   orderId: string;
-  userEmail: string;
+  userEmail?: string; // Optional - will fetch from database if not provided
   userName?: string;
-  imageCount: number;
+  imageCount?: number; // Optional - will fetch from database if not provided
   downloadUrl?: string;
 }
 
@@ -79,16 +79,28 @@ const handler = async (req: Request): Promise<Response> => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Get order details from database
-    const { data: order, error: orderError } = await supabase
+    // Get order details with user information from database
+    const { data: orderWithUser, error: orderError } = await supabase
       .from('orders')
-      .select('*')
+      .select(`
+        *,
+        orbit_users (
+          email
+        )
+      `)
       .eq('id', orderId)
       .single();
 
-    if (orderError || !order) {
+    if (orderError || !orderWithUser) {
       throw new Error(`Order not found: ${orderError?.message}`);
     }
+
+    const order = orderWithUser;
+    
+    // Use provided userEmail or fetch from database
+    const finalUserEmail = userEmail || order.orbit_users?.email;
+    const finalUserName = userName; // No name field in orbit_users table
+    const finalImageCount = imageCount || order.image_count || 0;
 
     // Get batch info if available
     let batchName = `Order ${order.order_number}`;
@@ -147,7 +159,7 @@ const handler = async (req: Request): Promise<Response> => {
                 <p style="color: #64748b; margin-bottom: 16px;">Your images have been successfully processed with AI analysis.</p>
                 <div style="background: #f8fafc; border-radius: 4px; padding: 12px; border: 1px solid #e2e8f0;">
                   <p style="margin: 0; color: #475569; font-size: 14px;">
-                    ✅ ${imageCount} ${imageCount === 1 ? 'image' : 'images'} processed<br>
+                    ✅ ${finalImageCount} ${finalImageCount === 1 ? 'image' : 'images'} processed<br>
                     🤖 AI analysis completed<br>
                     📁 Files ready for download
                   </p>
@@ -164,8 +176,8 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     // Validate email parameters before sending
-    if (!userEmail || !userEmail.includes('@')) {
-      throw new Error(`Invalid email address: ${userEmail}`);
+    if (!finalUserEmail || !finalUserEmail.includes('@')) {
+      throw new Error(`Invalid email address: ${finalUserEmail}`);
     }
     
     if (!orderNumber) {
@@ -173,13 +185,13 @@ const handler = async (req: Request): Promise<Response> => {
     }
     
     console.log('📧 Sending email via Resend...');
-    console.log('📧 From: ORBIT <update.desmondlabs.com>');
-    console.log('📧 To:', userEmail);
+    console.log('📧 From: ORBIT <onboarding@resend.dev>');
+    console.log('📧 To:', finalUserEmail);
     console.log('📧 Subject: 🚀 Your ORBIT order is ready! - ' + orderNumber);
     
     const emailResponse = await resend.emails.send({
-      from: "ORBIT <updates@desmondlabs.com>",
-      to: [userEmail],
+      from: "ORBIT <onboarding@resend.dev>",
+      to: [finalUserEmail],
       subject: `🚀 Your ORBIT order is ready! - ${orderNumber}`,
       html: `
         <!DOCTYPE html>
@@ -204,11 +216,11 @@ const handler = async (req: Request): Promise<Response> => {
           <div style="background: #f8fafc; border-radius: 12px; padding: 32px; margin-bottom: 24px;">
             <h2 style="color: #1e293b; margin-top: 0; font-size: 24px;">🎉 Your order is complete!</h2>
             
-            ${userName ? `<p style="font-size: 16px; margin-bottom: 24px;">Hi ${userName},</p>` : ''}
+            ${finalUserName ? `<p style="font-size: 16px; margin-bottom: 24px;">Hi ${finalUserName},</p>` : ''}
             
             <p style="font-size: 16px; margin-bottom: 24px;">
               Great news! Your ORBIT image processing order has been completed successfully. 
-              Your ${imageCount} ${imageCount === 1 ? 'image has' : 'images have'} been processed and enhanced using our advanced AI technology.
+              Your ${finalImageCount} ${finalImageCount === 1 ? 'image has' : 'images have'} been processed and enhanced using our advanced AI technology.
             </p>
 
             <!-- Order Details -->
@@ -225,7 +237,7 @@ const handler = async (req: Request): Promise<Response> => {
                 </tr>
                 <tr>
                   <td style="padding: 8px 0; color: #64748b; font-weight: 500;">Images Processed:</td>
-                  <td style="padding: 8px 0; font-weight: 600;">${imageCount}</td>
+                  <td style="padding: 8px 0; font-weight: 600;">${finalImageCount}</td>
                 </tr>
                 <tr>
                   <td style="padding: 8px 0; color: #64748b; font-weight: 500;">Total Cost:</td>
@@ -286,8 +298,11 @@ const handler = async (req: Request): Promise<Response> => {
     console.log("📧 Resend API response:", emailResponse);
     
     if (emailResponse.error) {
-      console.error("📧 Resend API returned error:", emailResponse.error);
-      throw new Error(`Resend API error: ${emailResponse.error.message || emailResponse.error}`);
+      console.error("📧 Resend API returned error:", JSON.stringify(emailResponse.error, null, 2));
+      console.error("📧 Resend API error type:", typeof emailResponse.error);
+      console.error("📧 Resend API error message:", emailResponse.error.message);
+      console.error("📧 Resend API error details:", emailResponse.error);
+      throw new Error(`Resend API error: ${JSON.stringify(emailResponse.error)}`);
     }
     
     if (!emailResponse.data?.id) {
@@ -302,7 +317,7 @@ const handler = async (req: Request): Promise<Response> => {
       emailId: emailResponse.data.id,
       message: "Order completion email sent successfully",
       orderId: orderId,
-      recipient: userEmail
+      recipient: finalUserEmail
     }), {
       status: 200,
       headers: {
