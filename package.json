@@ -8,7 +8,11 @@
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "llm:start": "cd litellm && chmod +x *.sh && ./start.sh",
+    "llm:stop": "cd litellm && ./stop.sh",
+    "llm:test": "cd litellm && ./test-models.sh",
+    "llm:logs": "cd litellm && docker-compose logs -f"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
