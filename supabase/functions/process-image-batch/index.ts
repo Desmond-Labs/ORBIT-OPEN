@@ -349,7 +349,7 @@ serve(async (req) => {
         // Get user email and name from orbit_users table using the order's user_id
         const { data: userProfile, error: userError } = await supabase
           .from('orbit_users')
-          .select('email, name')
+          .select('email')
           .eq('id', order.user_id)
           .single();
 
@@ -361,7 +361,7 @@ serve(async (req) => {
             body: {
               orderId: orderId,
               userEmail: userProfile.email,
-              userName: userProfile.name,
+              userName: null,
               imageCount: successCount,
               downloadUrl: `${Deno.env.get('FRONTEND_URL') || (Deno.env.get('SUPABASE_URL')?.includes('localhost') ? 'http://localhost:5173' : 'https://preview--orbit-image-forge.lovable.app')}/?token=${accessToken}&order=${orderId}&step=processing`
             }
