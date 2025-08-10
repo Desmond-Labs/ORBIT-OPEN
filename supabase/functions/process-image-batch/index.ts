@@ -322,66 +322,28 @@ serve(async (req) => {
       })
       .eq('id', orderId);
 
-    // 7.5. Generate access token and send completion email for both complete and partial success
+    // 7.5. Send completion email for both complete and partial success
     if (finalStatus === 'completed' || finalStatus === 'completed_with_errors') {
       try {
-        // Generate access token for email link
-        console.log(`🔐 Generating access token for order: ${orderId}`);
-        const { data: tokenData, error: tokenError } = await supabase
-          .rpc('generate_order_access_token', {
-            order_id_param: orderId,
-            expires_in_hours: 168 // 7 days
-          });
-
-        if (tokenError) {
-          console.error('🔐 Failed to generate access token:', tokenError);
-          throw tokenError;
-        }
-
-        // Extract token from the returned table result
-        const accessToken = tokenData && tokenData[0] ? tokenData[0].token : null;
-        if (!accessToken) {
-          throw new Error('Failed to extract access token from function result');
-        }
+        console.log(`📧 Sending completion email for order: ${orderId}`);
+        console.log(`📧 Image count: ${successCount}, Error count: ${errorCount}`);
         
-        console.log(`🔐 Access token generated successfully: ${accessToken.substring(0, 8)}... for order: ${orderId}`);
-
-        // Get user email and name from orbit_users table using the order's user_id
-        const { data: userProfile, error: userError } = await supabase
-          .from('orbit_users')
-          .select('email')
-          .eq('id', order.user_id)
-          .single();
-
-        if (!userError && userProfile?.email) {
-          console.log(`📧 Sending completion email to: ${userProfile.email}`);
-          console.log(`📧 Order ID: ${orderId}, Image count: ${successCount}, Error count: ${errorCount}`);
-          
-          const emailResult = await supabase.functions.invoke('send-order-completion-email', {
-            body: {
-              orderId: orderId,
-              userEmail: userProfile.email,
-              userName: null,
-              imageCount: successCount,
-              downloadUrl: `${Deno.env.get('FRONTEND_URL') || (Deno.env.get('SUPABASE_URL')?.includes('localhost') ? 'http://localhost:5173' : 'https://preview--orbit-image-forge.lovable.app')}/?token=${accessToken}&order=${orderId}&step=processing`
-            }
-          });
-
-          console.log(`📧 Email function response:`, emailResult);
-          
-          if (emailResult.error) {
-            console.error('📧 Failed to send completion email:', emailResult.error);
-            console.error('📧 Error details:', JSON.stringify(emailResult.error, null, 2));
-          } else {
-            console.log('📧 Completion email sent successfully:', emailResult.data);
+        const emailResult = await supabase.functions.invoke('send-order-completion-email', {
+          body: {
+            orderId: orderId
           }
+        });
+
+        console.log(`📧 Email function response:`, emailResult);
+        
+        if (emailResult.error) {
+          console.error('📧 Failed to send completion email:', emailResult.error);
+          console.error('📧 Error details:', JSON.stringify(emailResult.error, null, 2));
         } else {
-          console.warn('📧 Could not find user email for completion notification');
-          console.warn('📧 User error:', userError);
-          console.warn('📧 User profile:', userProfile);
+          console.log('📧 Completion email sent successfully:', emailResult.data);
         }
       } catch (emailError) {
-        console.error('❌ Error in email/token process:', emailError);
+        console.error('❌ Error in email process:', emailError);
         console.error('❌ Email error stack:', emailError.stack);
         // Don't fail the entire process if email fails - batch results should still be recorded
       }
