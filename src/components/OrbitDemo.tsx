@@ -64,7 +64,8 @@ export const OrbitDemo: React.FC<OrbitDemoProps> = ({ className = '' }) => {
             "key_objects": { "food": "Pretzel with sauce", "drinks": "Beer & cocktails", "furniture": "Tables & chairs" },
             "atmospheric_elements": { "lighting": "Natural daylight", "colors": "Earth tones", "mood": "Social" },
             "narrative_analysis": { "story": "Friends gathering", "values": "Social connection", "culture": "Casual dining" },
-            "photographic_elements": { "composition": "Horizontal", "focus": "Foreground", "style": "Candid" }
+            "photographic_elements": { "composition": "Horizontal", "focus": "Foreground", "style": "Candid" },
+            "marketing_potential": { "audience_fit": "Young urban professionals", "use_cases": "Social ads, menu highlights", "value_props": "Authentic, social, appetizing" }
           };
 
           const CATEGORIES = [

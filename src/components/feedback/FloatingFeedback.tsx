@@ -3,6 +3,7 @@ import React from "react";
 import { useLocation } from "react-router-dom";
 import { Plus, MessageSquare } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger } from "@/components/ui/sheet";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -72,17 +73,24 @@ export const FloatingFeedback: React.FC = () => {
     <>
       {/* Floating + button (Orbit-themed) */}
       <Sheet open={open} onOpenChange={setOpen}>
-        <SheetTrigger asChild>
-          <button
-            aria-label="Open feedback"
-            className="fixed bottom-5 right-5 z-50 rounded-full shadow-lg ring-1 ring-border
-                       bg-gradient-to-br from-primary to-primary/80 text-primary-foreground
-                       hover:opacity-95 transition focus:outline-none focus:ring-2 focus:ring-ring
-                       w-14 h-14 flex items-center justify-center"
-          >
-            <Plus className="h-6 w-6" />
-          </button>
-        </SheetTrigger>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <SheetTrigger asChild>
+              <button
+                aria-label="Open feedback"
+                className="fixed bottom-5 right-5 z-50 rounded-full shadow-lg ring-1 ring-border
+                           bg-gradient-to-br from-primary to-primary/80 text-primary-foreground
+                           hover:opacity-95 transition focus:outline-none focus:ring-2 focus:ring-ring
+                           w-14 h-14 flex items-center justify-center"
+              >
+                <Plus className="h-6 w-6" />
+              </button>
+            </SheetTrigger>
+          </TooltipTrigger>
+          <TooltipContent side="left">
+            Click to leave feedback or comments
+          </TooltipContent>
+        </Tooltip>
 
         <SheetContent side="right" className="w-full sm:max-w-md">
           <SheetHeader>
