@@ -79,28 +79,51 @@ const handler = async (req: Request): Promise<Response> => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Get order details with user information from database
-    const { data: orderWithUser, error: orderError } = await supabase
+    // Get order details from database
+    const { data: order, error: orderError } = await supabase
       .from('orders')
-      .select(`
-        *,
-        orbit_users (
-          email
-        )
-      `)
+      .select('*')
       .eq('id', orderId)
       .single();
 
-    if (orderError || !orderWithUser) {
+    if (orderError || !order) {
       throw new Error(`Order not found: ${orderError?.message}`);
     }
 
-    const order = orderWithUser;
+    // Get user email separately
+    const { data: userProfile, error: userError } = await supabase
+      .from('orbit_users')
+      .select('email')
+      .eq('id', order.user_id)
+      .single();
+
+    if (userError || !userProfile?.email) {
+      throw new Error(`User email not found: ${userError?.message}`);
+    }
     
+    // Generate access token for secure download link
+    const { data: tokenData, error: tokenError } = await supabase
+      .rpc('generate_order_access_token', {
+        order_id_param: orderId,
+        expires_in_hours: 168 // 7 days
+      });
+
+    if (tokenError) {
+      throw new Error(`Failed to generate access token: ${tokenError.message}`);
+    }
+
+    const accessToken = tokenData && tokenData[0] ? tokenData[0].token : null;
+    if (!accessToken) {
+      throw new Error('Failed to extract access token from function result');
+    }
+
     // Use provided userEmail or fetch from database
-    const finalUserEmail = userEmail || order.orbit_users?.email;
+    const finalUserEmail = userEmail || userProfile.email;
     const finalUserName = userName; // No name field in orbit_users table
     const finalImageCount = imageCount || order.image_count || 0;
+    
+    // Generate secure download URL with token
+    const secureDownloadUrl = downloadUrl || `${getFrontendUrl()}/?token=${accessToken}&order=${orderId}&step=processing`;
 
     // Get batch info if available
     let batchName = `Order ${order.order_number}`;
@@ -248,23 +271,13 @@ const handler = async (req: Request): Promise<Response> => {
 
             ${analysisReportsHtml}
 
-            ${downloadUrl ? `
             <!-- Download Button -->
             <div style="text-align: center; margin: 32px 0;">
-              <a href="${downloadUrl}" 
+              <a href="${secureDownloadUrl}" 
                  style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-decoration: none; padding: 16px 32px; border-radius: 8px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);">
                 📥 Download Your Processed Images
               </a>
             </div>
-            ` : `
-            <!-- Login to Download -->
-            <div style="text-align: center; margin: 32px 0;">
-              <a href="${downloadUrl || `${getFrontendUrl()}/?order=${orderId}&step=processing`}" 
-                 style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-decoration: none; padding: 16px 32px; border-radius: 8px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);">
-                🚀 View & Download Results
-              </a>
-            </div>
-            `}
 
             <div style="background: #f1f5f9; border-radius: 8px; padding: 20px; margin: 24px 0;">
               <h4 style="margin-top: 0; color: #475569; font-size: 16px;">✨ What we've enhanced:</h4>
