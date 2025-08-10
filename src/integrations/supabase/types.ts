@@ -110,6 +110,45 @@ export type Database = {
           },
         ]
       }
+      feedback_submissions: {
+        Row: {
+          created_at: string
+          email: string | null
+          feedback: string
+          id: string
+          metadata: Json
+          page_path: string
+          page_url: string | null
+          resolved: boolean
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          feedback: string
+          id?: string
+          metadata?: Json
+          page_path: string
+          page_url?: string | null
+          resolved?: boolean
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          feedback?: string
+          id?: string
+          metadata?: Json
+          page_path?: string
+          page_url?: string | null
+          resolved?: boolean
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       file_downloads: {
         Row: {
           access_token: string | null
@@ -746,6 +785,16 @@ export type Database = {
       setup_user_buckets: {
         Args: { user_id: string }
         Returns: undefined
+      }
+      submit_feedback: {
+        Args: {
+          page_path: string
+          feedback_text: string
+          email?: string
+          page_url?: string
+          user_agent?: string
+        }
+        Returns: string
       }
       validate_order_token: {
         Args: { token_param: string; order_id_param: string }
