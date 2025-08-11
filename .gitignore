@@ -22,7 +22,14 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+# MCP Configuration - Contains sensitive API keys
 .mcp.json
+
+# Environment Variables - Contains API keys and secrets
+.env
+.env.local
+.env.production
+.env.development
 
 # Claude Code
 CLAUDE.md
@@ -30,3 +37,16 @@ CLAUDE.md
 
 # Internal Planning Documents
 PUBLIC_BETA_READINESS.md
+
+# Security - Never commit these files
+*.key
+*.pem
+*.p12
+*secret*
+*password*
+*token*
+
+# Backup files that might contain sensitive data
+*.backup
+*.bak
+*.orig
