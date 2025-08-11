@@ -331,6 +331,9 @@ serve(async (req) => {
         const emailResult = await supabase.functions.invoke('send-order-completion-email', {
           body: {
             orderId: orderId
+          },
+          headers: {
+            Authorization: `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`
           }
         });
 
