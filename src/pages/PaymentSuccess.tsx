@@ -64,7 +64,7 @@ const PaymentSuccess: React.FC = () => {
           .from('orders')
           .select('*')
           .or(`stripe_payment_intent_id.eq.${sessionId},stripe_payment_intent_id_actual.eq.${sessionId}`)
-          .single();
+          .maybeSingle();
           
         console.log('🔍 Stripe ID lookup result:', { 
           hasData: !!orderByStripeId, 
@@ -85,7 +85,7 @@ const PaymentSuccess: React.FC = () => {
             .from('orders')
             .select('*')
             .eq('stripe_payment_intent_id', sessionId)
-            .single();
+             .maybeSingle();
             
           if (orderByIntentId && !intentError) {
             order = orderByIntentId;
@@ -97,7 +97,7 @@ const PaymentSuccess: React.FC = () => {
               .from('orders')
               .select('*')
               .eq('stripe_payment_intent_id_actual', sessionId)
-              .single();
+               .maybeSingle();
               
             if (orderByActualId && !actualError) {
               order = orderByActualId;
@@ -111,7 +111,7 @@ const PaymentSuccess: React.FC = () => {
                   .from('orders')
                   .select('*')
                   .eq('id', sessionId)
-                  .single();
+                   .maybeSingle();
                   
                 if (orderById && !idError) {
                   order = orderById; 
@@ -127,7 +127,7 @@ const PaymentSuccess: React.FC = () => {
                   .from('orders')
                   .select('*')
                   .eq('order_number', sessionId)
-                  .single();
+                  .maybeSingle();
                   
                 if (orderByNumber && !numberError) {
                   order = orderByNumber;
@@ -217,15 +217,26 @@ const PaymentSuccess: React.FC = () => {
           }
           
           if (!order) {
-            setStatus('not_found');
-            return;
+            // If unauthenticated, try service-role edge function as final fallback
+            if (!user) {
+              try {
+                console.log('🔧 Final unauthenticated fallback via verify-payment-order');
+                const { data: serviceRoleOrder, error: serviceError } = await supabase.functions.invoke('verify-payment-order', {
+                  body: { sessionId }
+                });
+                if (serviceRoleOrder && !serviceError) {
+                  console.log('✅ Found order via service role fallback:', serviceRoleOrder.order_number);
+                  order = serviceRoleOrder;
+                }
+              } catch (e) {
+                console.log('🔧 Service role fallback error (final):', e);
+              }
+            }
+            if (!order) {
+              setStatus('not_found');
+              return;
+            }
           }
-        }
-
-        if (!order) {
-          console.error('Order not found with session ID:', sessionId);
-          setStatus('not_found');
-          return;
         }
         
         console.log('✅ Order found:', { id: order.id, order_number: order.order_number, payment_status: order.payment_status });
