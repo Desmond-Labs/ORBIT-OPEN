@@ -292,15 +292,6 @@ export const ProcessingStatusDashboard: React.FC<ProcessingStatusDashboardProps>
           </Button>
         )}
         
-        {/* Token user additional information */}
-        {isTokenUser && status.orderStatus === 'completed' && (
-          <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-            <p className="text-sm text-amber-800">
-              💡 <strong>Want to process more images?</strong> Create a free account to access additional features and manage all your orders.
-            </p>
-          </div>
-        )}
-        
         <div className="flex gap-3">
           {onProcessMore && (
             <Button 
