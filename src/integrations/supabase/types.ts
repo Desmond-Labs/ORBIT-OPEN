@@ -496,6 +496,9 @@ export type Database = {
           completed_at: string | null
           cost_breakdown: Json | null
           created_at: string
+          email_id: string | null
+          email_sent: boolean | null
+          email_sent_at: string | null
           estimated_completion_time: string | null
           id: string
           image_count: number
@@ -527,6 +530,9 @@ export type Database = {
           completed_at?: string | null
           cost_breakdown?: Json | null
           created_at?: string
+          email_id?: string | null
+          email_sent?: boolean | null
+          email_sent_at?: string | null
           estimated_completion_time?: string | null
           id?: string
           image_count?: number
@@ -558,6 +564,9 @@ export type Database = {
           completed_at?: string | null
           cost_breakdown?: Json | null
           created_at?: string
+          email_id?: string | null
+          email_sent?: boolean | null
+          email_sent_at?: string | null
           estimated_completion_time?: string | null
           id?: string
           image_count?: number
