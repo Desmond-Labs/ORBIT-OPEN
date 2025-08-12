@@ -206,7 +206,8 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
       }
 
       // Use direct fetch to upload FormData
-      const response = await fetch(`https://ufdcvxmizlzlnyyqpfck.supabase.co/functions/v1/upload-order-images-direct`, {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const response = await fetch(`${supabaseUrl}/functions/v1/upload-order-images-direct`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${authToken}`,

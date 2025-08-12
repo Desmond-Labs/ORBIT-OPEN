@@ -22,9 +22,11 @@ export const useDownloadProcessedImages = () => {
       console.log('Starting download for order:', orderId);
       console.log('Token auth provided:', !!tokenAuth);
 
+      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      
       let authHeaders: any = {
         'Content-Type': 'application/json',
-        'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVmZGN2eG1pemx6bG55eXFwZmNrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDYyMzM1NzMsImV4cCI6MjA2MTgwOTU3M30.bpYLwFpQxq5tAw4uvRrHPi9WeFmxHnLjQaZraZqa3Bs'
+        'apikey': supabaseAnonKey
       };
 
       let requestBody: any = { orderId };
@@ -53,7 +55,8 @@ export const useDownloadProcessedImages = () => {
       }
 
       // Call the edge function directly to get the ZIP file
-      const response = await fetch(`https://ufdcvxmizlzlnyyqpfck.supabase.co/functions/v1/download-processed-images`, {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const response = await fetch(`${supabaseUrl}/functions/v1/download-processed-images`, {
         method: 'POST',
         headers: authHeaders,
         body: JSON.stringify(requestBody)

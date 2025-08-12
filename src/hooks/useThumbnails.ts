@@ -29,12 +29,15 @@ export const useThumbnails = (images: Array<{ id: string; storage_path_processed
         }
 
         // Call the edge function to get thumbnails
-        const response = await fetch(`https://ufdcvxmizlzlnyyqpfck.supabase.co/functions/v1/get-thumbnails`, {
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+        const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+        
+        const response = await fetch(`${supabaseUrl}/functions/v1/get-thumbnails`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${session.access_token}`,
-            'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVmZGN2eG1pemx6bG55eXFwZmNrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDYyMzM1NzMsImV4cCI6MjA2MTgwOTU3M30.bpYLwFpQxq5tAw4uvRrHPi9WeFmxHnLjQaZraZqa3Bs'
+            'apikey': supabaseAnonKey
           },
           body: JSON.stringify({ images })
         });
