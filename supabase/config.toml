@@ -1,5 +1,6 @@
 
-project_id = "ufdcvxmizlzlnyyqpfck"
+# Project ID - Configure via Supabase CLI: supabase link --project-ref YOUR_PROJECT_ID
+project_id = "your-project-id-here"
 
 [functions.orbit-gemini-analysis]
 verify_jwt = true
