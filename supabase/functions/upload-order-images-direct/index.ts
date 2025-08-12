@@ -229,6 +229,7 @@ serve(async (req) => {
           .from("images")
           .insert({
             order_id: orderId,
+            batch_id: order.batch_id,
             user_id: user.id,
             original_filename: file.name,
             storage_path_original: filePath,
