@@ -39,7 +39,8 @@ export const useDownloadProcessedImages = () => {
         const actualToken = urlParams.get('token');
         if (actualToken) {
           requestBody.accessToken = actualToken;
-          authHeaders['Authorization'] = `Bearer ${actualToken}`;
+          // Note: Don't set Authorization header with access token - it's not a JWT
+          // The access token in request body is sufficient for token-based authentication
         } else {
           throw new Error('Token not found in URL');
         }
