@@ -45,6 +45,7 @@ CLAUDE.md
 
 # Internal Planning Documents
 PUBLIC_BETA_READINESS.md
+orbit_prompt.md
 
 # Security - Never commit these files
 *.key
