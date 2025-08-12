@@ -27,9 +27,17 @@ dist-ssr
 
 # Environment Variables - Contains API keys and secrets
 .env
+.env.*
 .env.local
 .env.production
 .env.development
+.env.debug
+
+# Debug and Test Scripts - May contain sensitive data
+debug*.js
+debug*.sh
+test*.js
+validate*.js
 
 # Claude Code
 CLAUDE.md
