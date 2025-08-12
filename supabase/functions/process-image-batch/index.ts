@@ -190,7 +190,7 @@ serve(async (req) => {
 
     console.log(`Processing ${images.length} images for batch ${batch.id}`);
 
-    // 4. Update batch status to processing and order processing stage to analyzing
+    // 4. Update batch status to processing and order processing stage to processing
     await supabase
       .from('batches')
       .update({
@@ -199,12 +199,12 @@ serve(async (req) => {
       })
       .eq('id', batch.id);
 
-    // Update order processing stage to indicate active AI analysis
+    // Update order processing stage to indicate active processing
     await supabase
       .from('orders')
       .update({
-        processing_stage: 'analyzing',
-        processing_completion_percentage: 20
+        processing_stage: 'processing',
+        processing_completion_percentage: 10
       })
       .eq('id', orderId);
 
@@ -222,6 +222,14 @@ serve(async (req) => {
           .from('images')
           .update({ processing_status: 'processing' })
           .eq('id', image.id);
+
+        // Update order processing stage to analyzing when starting AI analysis
+        await supabase
+          .from('orders')
+          .update({
+            processing_stage: 'analyzing'
+          })
+          .eq('id', orderId);
 
         // Call Gemini analysis function
         const analysisResult = await callGeminiAnalysis({
@@ -288,7 +296,7 @@ serve(async (req) => {
 
       // Update order processing progress
       const totalProcessed = successCount + errorCount;
-      const progressPercentage = Math.round(20 + (totalProcessed / images.length) * 70); // 20% base + 70% for processing
+      const progressPercentage = Math.round(10 + (totalProcessed / images.length) * 80); // 10% base + 80% for processing
       await supabase
         .from('orders')
         .update({

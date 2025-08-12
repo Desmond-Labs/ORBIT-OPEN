@@ -131,6 +131,8 @@ serve(async (req) => {
           .update({
             payment_status: "completed",
             order_status: "paid",
+            processing_stage: "initializing",
+            processing_completion_percentage: 0,
             stripe_payment_intent_id_actual: paymentIntent.id,
             webhook_events: [...currentOrderEvents, event],
             webhook_event_ids: [...currentOrderEventIds, eventId],
@@ -171,40 +173,10 @@ serve(async (req) => {
         }
 
         console.log(`✅ Payment confirmed and order status updated for session: ${checkoutSessionId}, Order ID: ${orderData.id}`);
-        console.log(`📋 Order ready for processing - Payment status: ${orderData.payment_status}, Order status: ${orderData.order_status}`);
-
-        // Trigger automatic processing with defensive timing protection
-        // 5-second delay prevents race condition with file uploads
-        setTimeout(async () => {
-          try {
-            console.log(`🚀 Triggering automatic processing for order: ${orderData.id}`);
-            
-            const processingResponse = await fetch(
-              `${Deno.env.get('SUPABASE_URL')}/functions/v1/process-image-batch`,
-              {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
-                },
-                body: JSON.stringify({
-                  orderId: orderData.id,
-                  analysisType: 'product' // Default for webhook-triggered processing
-                })
-              }
-            );
-            
-            if (!processingResponse.ok) {
-              const errorText = await processingResponse.text();
-              console.error(`❌ Processing trigger failed for order ${orderData.id}:`, errorText);
-            } else {
-              console.log(`✅ Processing trigger successful for order: ${orderData.id}`);
-            }
-          } catch (processingError) {
-            console.error(`❌ Processing trigger error for order ${orderData.id}:`, processingError);
-            // Note: Don't throw - webhook should succeed even if processing trigger fails
-          }
-        }, 5000); // 5 second delay to avoid timing race with file uploads
+        console.log(`📋 Order ready for manual processing - Payment status: ${orderData.payment_status}, Order status: ${orderData.order_status}`);
+        console.log(`🔄 Processing stage: ${orderData.processing_stage} (${orderData.processing_completion_percentage}%)`);
+        
+        // Note: Automatic processing removed - orders now require manual trigger for AI analysis
 
         console.log(`✅ Payment webhook completed successfully for intent: ${paymentIntent.id}`);
         break;
