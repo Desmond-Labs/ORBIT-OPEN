@@ -8,6 +8,7 @@ import { OrderStatusLegend } from './OrderStatusLegend';
 import { MissionFilterBar, MissionFilter } from './MissionFilterBar';
 import { getUnifiedOrderStatus } from '@/utils/orderStatus';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 interface OrdersDashboardProps {
   orders: UserOrder[];
@@ -73,28 +74,25 @@ export const OrdersDashboard: React.FC<OrdersDashboardProps> = ({
       console.log('🔄 Initiating payment for existing order:', order.id);
       
       // Create Stripe checkout session using Supabase edge function
-      const { data, error } = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-payment-intent`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
-        },
-        body: JSON.stringify({
+      const { data: paymentData, error: paymentError } = await supabase.functions.invoke('create-payment-intent', {
+        body: {
+          imageCount: order.imageCount,
+          batchName: `Order ${order.orderNumber}`,
+          // extra fields harmless if function ignores them
           orderId: order.id,
           orderNumber: order.orderNumber,
-          imageCount: order.imageCount,
           totalCost: order.totalCost,
           returnUrl: `${window.location.origin}/?view=dashboard`
-        })
-      }).then(res => res.json());
+        }
+      });
 
-      if (error) {
-        throw new Error(error.message || 'Failed to create payment session');
+      if (paymentError) {
+        throw new Error(paymentError.message || 'Failed to create payment session');
       }
       
-      if (data?.url) {
+      if (paymentData?.checkout_url) {
         // Redirect to Stripe checkout
-        window.location.href = data.url;
+        window.location.href = paymentData.checkout_url as string;
       } else {
         throw new Error('No checkout URL received from payment service');
       }

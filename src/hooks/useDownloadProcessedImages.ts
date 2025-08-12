@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
 export const useDownloadProcessedImages = () => {
@@ -22,7 +22,7 @@ export const useDownloadProcessedImages = () => {
       console.log('Starting download for order:', orderId);
       console.log('Token auth provided:', !!tokenAuth);
 
-      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      const supabaseAnonKey = SUPABASE_ANON_KEY;
       
       let authHeaders: any = {
         'Content-Type': 'application/json',
@@ -56,8 +56,7 @@ export const useDownloadProcessedImages = () => {
       }
 
       // Call the edge function directly to get the ZIP file
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const response = await fetch(`${supabaseUrl}/functions/v1/download-processed-images`, {
+      const response = await fetch(`${SUPABASE_URL}/functions/v1/download-processed-images`, {
         method: 'POST',
         headers: authHeaders,
         body: JSON.stringify(requestBody)

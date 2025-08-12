@@ -28,27 +28,17 @@ export const useThumbnails = (images: Array<{ id: string; storage_path_processed
           return;
         }
 
-        // Call the edge function to get thumbnails
-        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-        const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-        
-        const response = await fetch(`${supabaseUrl}/functions/v1/get-thumbnails`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session.access_token}`,
-            'apikey': supabaseAnonKey
-          },
-          body: JSON.stringify({ images })
+        // Call the edge function to get thumbnails via Supabase client
+        const { data, error } = await supabase.functions.invoke('get-thumbnails', {
+          body: { images }
         });
 
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error('Edge function response error:', errorText);
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        if (error) {
+          console.error('Edge function get-thumbnails error:', error);
+          throw error;
         }
 
-        const { thumbnails: newThumbnails } = await response.json();
+        const newThumbnails = (data as any)?.thumbnails || {};
         console.log('Received thumbnails from edge function:', Object.keys(newThumbnails).length);
         
         setThumbnails(newThumbnails);

@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { ArrowLeft, Loader2, Shield, Clock, Download } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { AuthPage } from './AuthPage';
 import { ProcessingSteps } from './processing/ProcessingSteps';
@@ -206,21 +206,40 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
       }
 
       // Use direct fetch to upload FormData
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const response = await fetch(`${supabaseUrl}/functions/v1/upload-order-images-direct`, {
+      const response = await fetch(`${SUPABASE_URL}/functions/v1/upload-order-images-direct`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${authToken}`,
+          'apikey': SUPABASE_ANON_KEY,
         },
         body: formData
       });
 
+      const contentType = response.headers.get('content-type') || '';
+
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || `Upload failed with status ${response.status}`);
+        let message = `Upload failed with status ${response.status}`;
+        if (contentType.includes('application/json')) {
+          const errorData = await response.json();
+          message = errorData.error || message;
+        } else {
+          const errorText = await response.text();
+          if (errorText) message = errorText;
+        }
+        throw new Error(message);
       }
 
-      const data = await response.json();
+      let data: any;
+      if (contentType.includes('application/json')) {
+        data = await response.json();
+      } else {
+        const text = await response.text();
+        try {
+          data = JSON.parse(text);
+        } catch {
+          throw new Error('Unexpected non-JSON response from upload function');
+        }
+      }
       console.log('✅ Files uploaded successfully via direct upload:', data);
       return data;
     } catch (error) {
