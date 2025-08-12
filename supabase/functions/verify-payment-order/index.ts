@@ -65,9 +65,40 @@ Deno.serve(async (req: Request) => {
 
     console.log('✅ Service role found order:', order.order_number);
 
-    // Return the order data
+    // Verify the requester owns the order (defense-in-depth)
+    const authHeader = req.headers.get('Authorization') || '';
+    const jwt = authHeader.replace('Bearer ', '');
+    if (jwt) {
+      const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(jwt);
+      if (authError) {
+        console.error('Auth check error:', authError);
+      } else if (user && user.id !== order.user_id) {
+        return new Response(
+          JSON.stringify({ error: 'Forbidden: order does not belong to user' }),
+          {
+            status: 403,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          }
+        );
+      }
+    }
+
+    // Return a sanitized subset of the order data (no tokens or Stripe IDs)
+    const sanitizedOrder = {
+      id: order.id,
+      order_number: order.order_number,
+      image_count: order.image_count,
+      total_cost: order.total_cost,
+      payment_status: order.payment_status,
+      order_status: order.order_status,
+      processing_stage: order.processing_stage,
+      processing_completion_percentage: order.processing_completion_percentage,
+      created_at: order.created_at,
+      updated_at: order.updated_at,
+    };
+
     return new Response(
-      JSON.stringify(order),
+      JSON.stringify(sanitizedOrder),
       { 
         status: 200, 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
