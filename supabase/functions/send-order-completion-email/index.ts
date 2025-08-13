@@ -325,6 +325,29 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log("📧 ✅ Order completion email sent successfully! Email ID:", emailResponse.data.id);
 
+    // Update email tracking fields in database
+    if (emailResponse.data && emailResponse.data.id) {
+      try {
+        console.log("📧 Updating email tracking fields for order:", orderId);
+        const { error: updateError } = await supabase
+          .from('orders')
+          .update({
+            email_sent_at: new Date().toISOString(),
+            email_id: emailResponse.data.id
+          })
+          .eq('id', orderId);
+
+        if (updateError) {
+          console.error('📧 Failed to update email tracking fields:', updateError);
+        } else {
+          console.log('📧 ✅ Email tracking fields updated successfully');
+        }
+      } catch (updateError) {
+        console.error('📧 Failed to update email tracking fields:', updateError);
+        // Don't throw - email was sent successfully
+      }
+    }
+
     return new Response(JSON.stringify({ 
       success: true, 
       emailId: emailResponse.data.id,
