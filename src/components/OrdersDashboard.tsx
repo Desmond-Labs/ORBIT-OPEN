@@ -9,12 +9,16 @@ import { MissionFilterBar, MissionFilter } from './MissionFilterBar';
 import { getUnifiedOrderStatus } from '@/utils/orderStatus';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { UnifiedHeader } from './shared/UnifiedHeader';
 
 interface OrdersDashboardProps {
   orders: UserOrder[];
   loading: boolean;
   onViewOrder: (orderId: string) => void;
   onNewUpload: () => void;
+  userEmail?: string;
+  onBack?: () => void;
+  onSignOut?: () => void;
 }
 
 const getStatusIcon = (iconType: string) => {
@@ -61,7 +65,10 @@ export const OrdersDashboard: React.FC<OrdersDashboardProps> = ({
   orders,
   loading,
   onViewOrder,
-  onNewUpload
+  onNewUpload,
+  userEmail,
+  onBack,
+  onSignOut
 }) => {
   const [activeFilter, setActiveFilter] = useState<MissionFilter>('all');
   const [paymentLoading, setPaymentLoading] = useState<string | null>(null);
@@ -162,11 +169,20 @@ export const OrdersDashboard: React.FC<OrdersDashboardProps> = ({
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
+      {/* Unified Header */}
+      <UnifiedHeader
+        userEmail={userEmail}
+        onBack={onBack}
+        onSignOut={onSignOut}
+        backButtonText="Back to Home"
+        showSignOut={!!userEmail}
+      />
+      
       <div className="container mx-auto px-6 py-8 max-w-6xl">
-        {/* Header */}
+        {/* Page Title */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold gradient-text mb-2">Your Processing Dashboard</h1>
-          <p className="text-muted-foreground">Manage and track all your image processing orders</p>
+          <p className="text-muted-foreground">Track and manage all your orders</p>
         </div>
 
         {/* Status Legend */}
@@ -180,19 +196,6 @@ export const OrdersDashboard: React.FC<OrdersDashboardProps> = ({
           activeFilter={activeFilter}
           onFilterChange={setActiveFilter}
         />
-
-        {/* Quick Actions */}
-        <div className="mb-8">
-          <Button 
-            onClick={onNewUpload}
-            variant="cosmic"
-            size="lg"
-            className="font-semibold"
-          >
-            <Upload className="w-5 h-5" />
-            Upload New Images
-          </Button>
-        </div>
 
         {/* Mission Pending Orders (Unpaid) */}
         {unpaidOrders.length > 0 && (
@@ -344,6 +347,19 @@ export const OrdersDashboard: React.FC<OrdersDashboardProps> = ({
             </div>
           </div>
         )}
+
+        {/* Quick Actions - Upload New Images */}
+        <div className="mb-8">
+          <Button 
+            onClick={onNewUpload}
+            variant="cosmic"
+            size="lg"
+            className="font-semibold"
+          >
+            <Upload className="w-5 h-5" />
+            Upload New Images
+          </Button>
+        </div>
 
         {/* Completed Orders */}
         {completedOrders.length > 0 && (

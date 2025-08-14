@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { ArrowLeft, Loader2, Shield, Clock, Download } from 'lucide-react';
+import { UnifiedHeader } from './shared/UnifiedHeader';
 import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { AuthPage } from './AuthPage';
@@ -311,6 +312,11 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
     setProcessingResults(null);
   };
 
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    onBack(); // Navigate back to home after signing out
+  };
+
   if (showAuthPage) {
     return <AuthPage onBack={() => setShowAuthPage(false)} onAuthenticated={handleAuthSuccess} />;
   }
@@ -333,20 +339,12 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
 
 
       {/* Header */}
-      <header className="relative z-20 px-6 py-6">
-        <div className="max-w-4xl mx-auto flex items-center justify-between">
-          <Button variant="ghost" onClick={onBack} className="gap-2">
-            <ArrowLeft className="w-4 h-4" />
-            Back to Home
-          </Button>
-          <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 bg-gradient-primary rounded-lg flex items-center justify-center">
-              <span className="text-sm font-bold">O</span>
-            </div>
-            <span className="text-lg font-bold gradient-text">ORBIT</span>
-          </div>
-        </div>
-      </header>
+      <UnifiedHeader
+        userEmail={user?.email}
+        onBack={onBack}
+        onSignOut={handleSignOut}
+        showSignOut={!!user}
+      />
 
       {/* Main Content */}
       <main className="relative z-10 px-6 pb-32">

@@ -140,6 +140,9 @@ const Index = () => {
           loading={ordersLoading}
           onViewOrder={handleViewOrder}
           onNewUpload={handleNewUpload}
+          userEmail={user.email}
+          onBack={handleBackToHero}
+          onSignOut={handleSignOut}
         />
       )}
     </>

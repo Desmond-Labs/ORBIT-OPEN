@@ -56,7 +56,7 @@ export const MissionFilterBar: React.FC<MissionFilterBarProps> = ({
     },
     {
       key: 'launch' as MissionFilter,
-      label: 'Ready for Launch',
+      label: 'Getting Ready for Launch',
       icon: <Rocket className="w-4 h-4" />,
       colorClass: 'text-blue-600'
     },

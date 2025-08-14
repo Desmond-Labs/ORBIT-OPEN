@@ -92,7 +92,7 @@ export const ProcessingStatusDashboard: React.FC<ProcessingStatusDashboardProps>
               onClick={onBackToDashboard}
             >
               <ArrowLeft className="w-5 h-5" />
-              Back to Dashboard
+              Back to Home
             </Button>
           )}
         </div>
@@ -150,7 +150,7 @@ export const ProcessingStatusDashboard: React.FC<ProcessingStatusDashboardProps>
         <div className="flex items-center justify-center mb-4">
           {getStatusIcon()}
         </div>
-        <h3 className="text-2xl font-semibold mb-2">Processing Status</h3>
+        <h3 className="text-2xl font-semibold mb-2">Order Processing Status</h3>
         <p className="text-muted-foreground mb-4">{getStatusDescription()}</p>
         <div className="flex justify-center">
           {getStatusBadge()}
@@ -313,7 +313,7 @@ export const ProcessingStatusDashboard: React.FC<ProcessingStatusDashboardProps>
               onClick={onBackToDashboard}
             >
               <ArrowLeft className="w-5 h-5" />
-              Back to Dashboard
+              Back to Home
             </Button>
           )}
         </div>

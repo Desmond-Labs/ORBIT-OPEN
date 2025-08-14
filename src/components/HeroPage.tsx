@@ -96,7 +96,7 @@ export const HeroPage: React.FC<HeroPageProps> = ({
           </div>
 
           {/* Workflow Steps */}
-          <WorkflowSteps />
+          <WorkflowSteps onGetStarted={onGetStarted} />
 
           {/* ORBIT Demo Section */}
           <div className="mb-16">
@@ -115,23 +115,30 @@ export const HeroPage: React.FC<HeroPageProps> = ({
           {/* Pricing Preview */}
           <div className="mb-12">
             <div className="inline-block bg-card/30 backdrop-blur-sm border border-accent/20 rounded-xl p-6">
-              <h3 className="text-lg font-semibold mb-4">Volume-Based Pricing</h3>
+              <h3 className="text-lg font-semibold mb-4">Per-Image Pricing</h3>
+              <p className="text-sm text-muted-foreground mb-6 max-w-md mx-auto">
+                Simple, transparent pricing that scales with your volume. No subscriptions or hidden fees.
+              </p>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                 <div className="text-center">
                   <div className="text-accent font-bold">$3.75</div>
-                  <div className="text-muted-foreground">First 49 images</div>
+                  <div className="text-muted-foreground">per image</div>
+                  <div className="text-xs text-muted-foreground/70">(first 49 images)</div>
                 </div>
                 <div className="text-center">
                   <div className="text-accent font-bold">$3.25</div>
-                  <div className="text-muted-foreground">50-99 images</div>
+                  <div className="text-muted-foreground">per image</div>
+                  <div className="text-xs text-muted-foreground/70">(50-99 images)</div>
                 </div>
                 <div className="text-center">
                   <div className="text-accent font-bold">$2.75</div>
-                  <div className="text-muted-foreground">100-249 images</div>
+                  <div className="text-muted-foreground">per image</div>
+                  <div className="text-xs text-muted-foreground/70">(100-249 images)</div>
                 </div>
                 <div className="text-center">
                   <div className="text-accent font-bold">$2.25</div>
-                  <div className="text-muted-foreground">250+ images</div>
+                  <div className="text-muted-foreground">per image</div>
+                  <div className="text-xs text-muted-foreground/70">(250+ images)</div>
                 </div>
               </div>
             </div>
@@ -154,7 +161,7 @@ export const HeroPage: React.FC<HeroPageProps> = ({
       <footer className="relative z-10 px-6 py-8 border-t border-accent/20">
         <div className="max-w-7xl mx-auto text-center space-y-2">
           <p className="text-sm text-muted-foreground">
-            © 2024 Desmond Labs. ORBIT is a product of Desmond Labs, architecting knowledge ecosystems through AI.
+            © 2025 Desmond Labs. ORBIT is a product of Desmond Labs, architecting knowledge ecosystems through AI.
           </p>
           <div>
             <button 

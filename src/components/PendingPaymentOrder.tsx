@@ -80,7 +80,7 @@ export const PendingPaymentOrder: React.FC<PendingPaymentOrderProps> = ({
                 className="w-full"
               >
                 <ArrowLeft className="w-4 h-4 mr-2" />
-                Back to Dashboard
+                Back to Home
               </Button>
             </div>
           </CardContent>

@@ -66,6 +66,25 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onBack, onAuthenticated }) =
     }
   };
 
+  const validatePassword = (password: string) => {
+    const minLength = password.length >= 8;
+    const hasUpperCase = /[A-Z]/.test(password);
+    const hasLowerCase = /[a-z]/.test(password);
+    const hasNumbers = /\d/.test(password);
+    const hasSpecialChar = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password);
+    
+    return {
+      isValid: minLength && hasUpperCase && hasLowerCase && hasNumbers && hasSpecialChar,
+      requirements: {
+        minLength,
+        hasUpperCase,
+        hasLowerCase,
+        hasNumbers,
+        hasSpecialChar
+      }
+    };
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
@@ -81,6 +100,24 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onBack, onAuthenticated }) =
       }
 
       if (isSignUp) {
+        // Validate password strength
+        const passwordValidation = validatePassword(formData.password);
+        if (!passwordValidation.isValid) {
+          const missingRequirements = [];
+          if (!passwordValidation.requirements.minLength) missingRequirements.push("at least 8 characters");
+          if (!passwordValidation.requirements.hasUpperCase) missingRequirements.push("an uppercase letter");
+          if (!passwordValidation.requirements.hasLowerCase) missingRequirements.push("a lowercase letter");
+          if (!passwordValidation.requirements.hasNumbers) missingRequirements.push("a number");
+          if (!passwordValidation.requirements.hasSpecialChar) missingRequirements.push("a special character");
+          
+          toast({
+            title: "Password too weak",
+            description: `Password must contain ${missingRequirements.join(", ")}.`,
+            variant: "destructive"
+          });
+          return;
+        }
+
         if (formData.password !== formData.confirmPassword) {
           toast({
             title: "Error",
@@ -335,6 +372,38 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onBack, onAuthenticated }) =
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
+                {isSignUp && formData.password && (
+                  <div className="text-xs space-y-1">
+                    <p className="text-muted-foreground">Password must contain:</p>
+                    {(() => {
+                      const validation = validatePassword(formData.password);
+                      return (
+                        <div className="space-y-1">
+                          <div className={`flex items-center gap-1 ${validation.requirements.minLength ? 'text-green-600' : 'text-muted-foreground'}`}>
+                            <span>{validation.requirements.minLength ? '✓' : '○'}</span>
+                            <span>At least 8 characters</span>
+                          </div>
+                          <div className={`flex items-center gap-1 ${validation.requirements.hasUpperCase ? 'text-green-600' : 'text-muted-foreground'}`}>
+                            <span>{validation.requirements.hasUpperCase ? '✓' : '○'}</span>
+                            <span>One uppercase letter (A-Z)</span>
+                          </div>
+                          <div className={`flex items-center gap-1 ${validation.requirements.hasLowerCase ? 'text-green-600' : 'text-muted-foreground'}`}>
+                            <span>{validation.requirements.hasLowerCase ? '✓' : '○'}</span>
+                            <span>One lowercase letter (a-z)</span>
+                          </div>
+                          <div className={`flex items-center gap-1 ${validation.requirements.hasNumbers ? 'text-green-600' : 'text-muted-foreground'}`}>
+                            <span>{validation.requirements.hasNumbers ? '✓' : '○'}</span>
+                            <span>One number (0-9)</span>
+                          </div>
+                          <div className={`flex items-center gap-1 ${validation.requirements.hasSpecialChar ? 'text-green-600' : 'text-muted-foreground'}`}>
+                            <span>{validation.requirements.hasSpecialChar ? '✓' : '○'}</span>
+                            <span>One special character (!@#$%^&*)</span>
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                )}
               </div>
 
               {isSignUp && (

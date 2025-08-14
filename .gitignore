@@ -46,6 +46,8 @@ CLAUDE.md
 # Internal Planning Documents
 PUBLIC_BETA_READINESS.md
 orbit_prompt.md
+ORBIT\ Feedback.pdf
+ORBIT\ Feedback\ from\ HL.docx
 
 # Security - Never commit these files
 *.key

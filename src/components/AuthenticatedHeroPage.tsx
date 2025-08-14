@@ -244,7 +244,7 @@ export const AuthenticatedHeroPage: React.FC<AuthenticatedHeroPageProps> = ({
                   </div>
                   <div className="text-center">
                     <div className="text-2xl font-bold text-accent mb-1">
-                      ${recentOrders.reduce((sum, o) => sum + o.totalCost, 0).toFixed(0)}
+                      ${recentOrders.reduce((sum, o) => sum + o.totalCost, 0).toFixed(2)}
                     </div>
                     <div className="text-muted-foreground">Total Spent</div>
                   </div>
@@ -259,7 +259,7 @@ export const AuthenticatedHeroPage: React.FC<AuthenticatedHeroPageProps> = ({
       <footer className="relative z-10 px-6 py-8 border-t border-accent/20">
         <div className="max-w-7xl mx-auto text-center">
           <p className="text-sm text-muted-foreground">
-            © 2024 Desmond Labs. ORBIT is a product of Desmond Labs, architecting knowledge ecosystems through AI.
+            © 2025 Desmond Labs. ORBIT is a product of Desmond Labs, architecting knowledge ecosystems through AI.
           </p>
         </div>
       </footer>

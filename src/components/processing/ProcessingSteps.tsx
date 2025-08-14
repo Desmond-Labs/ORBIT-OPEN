@@ -29,6 +29,7 @@ export const ProcessingSteps: React.FC<ProcessingStepsProps> = ({ currentStep, p
           const isCompleted = index < currentStepIndex;
           const isProcessing = step === 'processing' && currentStep === 'processing';
           const isProcessingComplete = step === 'processing' && currentStep === 'complete';
+          const isNextStep = index === currentStepIndex + 1;
 
           return (
             <div key={step} className="flex items-center">
@@ -38,6 +39,8 @@ export const ProcessingSteps: React.FC<ProcessingStepsProps> = ({ currentStep, p
                     ? 'bg-primary border-primary shadow-cosmic'
                     : isCompleted || isProcessingComplete
                     ? isProcessingComplete ? 'bg-green-500 border-green-500' : 'bg-accent border-accent'
+                    : isNextStep
+                    ? 'bg-accent/30 border-accent shadow-sm'
                     : 'bg-transparent border-muted-foreground/30'
                 }`}
               >
@@ -50,7 +53,11 @@ export const ProcessingSteps: React.FC<ProcessingStepsProps> = ({ currentStep, p
                     className={`w-5 h-5 ${
                       isProcessing ? 'animate-spin' : ''
                     } ${
-                      isActive || isCompleted || isProcessingComplete ? 'text-foreground' : 'text-muted-foreground'
+                      isActive || isCompleted || isProcessingComplete 
+                        ? 'text-foreground' 
+                        : isNextStep 
+                        ? 'text-accent' 
+                        : 'text-muted-foreground'
                     }`}
                   />
                 )}
@@ -70,7 +77,7 @@ export const ProcessingSteps: React.FC<ProcessingStepsProps> = ({ currentStep, p
         <h2 className="text-2xl font-bold mb-2">{stepConfig[currentStep].title}</h2>
         <p className="text-muted-foreground">
           {currentStep === 'auth' && 'Sign in to access ORBIT image processing'}
-          {currentStep === 'upload' && 'Select your product images to begin analysis'}
+          {currentStep === 'upload' && 'Upload your product images to begin analysis'}
           {currentStep === 'payment' && 'Complete payment to start AI analysis'}
           {currentStep === 'processing' && 'ORBIT is analyzing your images in space...'}
           {currentStep === 'complete' && 'Mission complete! Your enhanced images are ready for download'}
