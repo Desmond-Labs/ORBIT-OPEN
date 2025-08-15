@@ -7,7 +7,7 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instanciate createClient with right options
+  // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "12.2.3 (519615d)"
@@ -741,9 +741,9 @@ export type Database = {
     Functions: {
       calculate_tier_pricing: {
         Args: {
-          user_id_param: string
-          image_count_param: number
           billing_period_start_param?: string
+          image_count_param: number
+          user_id_param: string
         }
         Returns: Json
       }
@@ -752,15 +752,15 @@ export type Database = {
         Returns: number
       }
       deactivate_token: {
-        Args: { token_param: string; reason?: string }
+        Args: { reason?: string; token_param: string }
         Returns: boolean
       }
       generate_order_access_token: {
-        Args: { order_id_param: string; expires_in_hours?: number }
+        Args: { expires_in_hours?: number; order_id_param: string }
         Returns: {
-          token: string
           expires_at: string
           max_uses: number
+          token: string
         }[]
       }
       generate_order_number: {
@@ -772,22 +772,22 @@ export type Database = {
         Returns: boolean
       }
       increment_user_stats: {
-        Args: { user_id: string; images_count: number; amount: number }
+        Args: { amount: number; images_count: number; user_id: string }
         Returns: undefined
       }
       log_token_usage: {
         Args: {
-          token_param: string
           action_param: string
           metadata_param?: Json
+          token_param: string
         }
         Returns: boolean
       }
       set_config: {
         Args: {
+          is_local?: boolean
           setting_name: string
           setting_value: string
-          is_local?: boolean
         }
         Returns: string
       }
@@ -797,22 +797,22 @@ export type Database = {
       }
       submit_feedback: {
         Args: {
-          page_path: string
-          feedback_text: string
           email?: string
+          feedback_text: string
+          page_path: string
           page_url?: string
           user_agent?: string
         }
         Returns: string
       }
       validate_order_token: {
-        Args: { token_param: string; order_id_param: string }
+        Args: { order_id_param: string; token_param: string }
         Returns: {
-          valid: boolean
+          expires_at: string
           order_id: string
           user_id: string
-          expires_at: string
           uses_remaining: number
+          valid: boolean
         }[]
       }
     }
