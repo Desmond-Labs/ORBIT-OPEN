@@ -130,7 +130,7 @@ const Index = () => {
       
       {currentView === 'processing' && (
         <ProcessingPage 
-          onBack={user ? handleBackToHero : () => setCurrentView('hero')} 
+          onBack={user ? handleViewDashboard : () => setCurrentView('hero')} 
         />
       )}
       

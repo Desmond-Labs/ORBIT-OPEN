@@ -344,6 +344,7 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
         onBack={onBack}
         onSignOut={handleSignOut}
         showSignOut={!!user}
+        backButtonText="Back to Dashboard"
       />
 
       {/* Main Content */}
