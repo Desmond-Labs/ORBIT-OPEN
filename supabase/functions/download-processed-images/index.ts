@@ -160,12 +160,13 @@ serve(async (req) => {
           continue;
         }
 
-        // Filter for relevant file types and download each
-        const relevantFiles = folderFiles.filter(file => 
-          file.name.endsWith('.jpg') || 
-          file.name.endsWith('.txt') || 
-          file.name.endsWith('.xmp')
-        );
+        // Filter for relevant file types and download each (case-insensitive)
+        const relevantFiles = folderFiles.filter(file => {
+          const lowerFileName = file.name.toLowerCase();
+          return lowerFileName.endsWith('.jpg') || 
+                 lowerFileName.endsWith('.txt') || 
+                 lowerFileName.endsWith('.xmp');
+        });
 
         console.log(`Found ${relevantFiles.length} relevant files in ${folderPath}`);
 
