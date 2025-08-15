@@ -59,7 +59,7 @@ export const HeroPage: React.FC<HeroPageProps> = ({
           <div className="grid md:grid-cols-3 gap-8 mb-12">
             <div className="relative group">
               <div className="absolute inset-0 bg-gradient-glow rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-              <div className="relative bg-card/50 backdrop-blur-sm border border-accent/20 rounded-xl p-6 cosmic-transition hover:border-accent/40">
+              <div className="relative bg-card/50 backdrop-blur-sm border border-accent/20 rounded-xl p-6 cosmic:border-accent/40">
                 <div className="w-12 h-12 bg-primary/20 rounded-lg flex items-center justify-center mb-4 mx-auto">
                   <Sparkles className="w-6 h-6 text-accent" />
                 </div>
@@ -164,10 +164,7 @@ export const HeroPage: React.FC<HeroPageProps> = ({
             © 2025 Desmond Labs. ORBIT is a product of Desmond Labs, architecting knowledge ecosystems through AI.
           </p>
           <div>
-            <button 
-              onClick={() => window.open('/privacy-policy', '_blank')}
-              className="text-sm text-accent hover:text-accent/80 transition-colors underline"
-            >
+            <button onClick={() => window.open('/privacy-policy', '_blank')} className="text-sm text-accent hover:text-accent/80 transition-colors underline">
               Privacy Policy
             </button>
           </div>
