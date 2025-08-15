@@ -53,25 +53,24 @@ export const WorkflowSteps: React.FC<WorkflowStepsProps> = ({ onGetStarted }) =>
       </div>
 
       {/* Desktop Layout */}
-      <div className="hidden md:flex items-start justify-center max-w-7xl mx-auto">
+      <div className="hidden md:flex items-start justify-center max-w-7xl mx-auto px-4">
         {steps.map((step, index) => {
           const Icon = step.icon;
           const isLast = index === steps.length - 1;
           
           return (
-            <div key={step.id} className="flex items-start flex-1">
+            <div key={step.id} className="flex items-start flex-1 max-w-xs">
               {/* Step */}
-              <div className="relative group flex-1">
-                <div className="absolute inset-0 bg-gradient-glow rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                <div className="relative bg-card/50 backdrop-blur-sm border border-accent/20 rounded-xl p-4 lg:p-6 cosmic-transition hover:border-accent/40 text-center w-[220px] mx-auto min-h-[180px] flex flex-col">
+              <div className="relative flex-1">
+                <div className="relative bg-card/50 backdrop-blur-sm border border-accent/20 rounded-xl p-3 sm:p-4 md:p-5 lg:p-6 text-center w-full mx-auto min-h-[160px] sm:min-h-[170px] md:min-h-[180px] lg:min-h-[190px] flex flex-col">
                   {/* Icon - top aligned */}
-                  <div className="w-12 h-12 bg-gradient-primary rounded-full flex items-center justify-center mb-4 mx-auto">
-                    <Icon className="w-6 h-6 text-background" />
+                  <div className="w-10 h-10 sm:w-11 sm:h-11 md:w-12 md:h-12 bg-gradient-primary rounded-full flex items-center justify-center mb-3 sm:mb-4 mx-auto">
+                    <Icon className="w-5 h-5 sm:w-5.5 sm:h-5.5 md:w-6 md:h-6 text-background" />
                   </div>
                   {/* Step name */}
-                  <h3 className="text-base lg:text-lg font-semibold mb-2">{step.title}</h3>
+                  <h3 className="text-sm sm:text-base md:text-lg font-semibold mb-2">{step.title}</h3>
                   {/* Description */}
-                  <p className="text-muted-foreground text-xs lg:text-sm leading-relaxed flex-grow">
+                  <p className="text-muted-foreground text-xs sm:text-sm leading-relaxed flex-grow">
                     {step.description}
                   </p>
                 </div>
@@ -79,7 +78,7 @@ export const WorkflowSteps: React.FC<WorkflowStepsProps> = ({ onGetStarted }) =>
               
               {/* Connector - aligned with step names */}
               {!isLast && (
-                <div className="w-8 lg:w-16 mx-2 lg:mx-4 flex items-start pt-16">
+                <div className="w-4 sm:w-6 md:w-8 lg:w-12 xl:w-16 mx-1 sm:mx-2 md:mx-3 lg:mx-4 flex items-start pt-12 sm:pt-14 md:pt-16">
                   <div className="h-0.5 bg-gradient-primary opacity-60 w-full" />
                 </div>
               )}
@@ -89,7 +88,7 @@ export const WorkflowSteps: React.FC<WorkflowStepsProps> = ({ onGetStarted }) =>
       </div>
 
       {/* Mobile Layout */}
-      <div className="md:hidden space-y-6 max-w-md mx-auto">
+      <div className="md:hidden space-y-6 max-w-md mx-auto px-4">
         {steps.map((step, index) => {
           const Icon = step.icon;
           const isLast = index === steps.length - 1;
@@ -97,15 +96,14 @@ export const WorkflowSteps: React.FC<WorkflowStepsProps> = ({ onGetStarted }) =>
           return (
             <div key={step.id} className="relative">
               {/* Step */}
-              <div className="relative group">
-                <div className="absolute inset-0 bg-gradient-glow rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                <div className="relative bg-card/50 backdrop-blur-sm border border-accent/20 rounded-xl p-6 cosmic-transition hover:border-accent/40 flex items-center space-x-4">
-                  <div className="w-12 h-12 bg-gradient-primary rounded-full flex items-center justify-center flex-shrink-0">
-                    <Icon className="w-6 h-6 text-background" />
+              <div className="relative">
+                <div className="relative bg-card/50 backdrop-blur-sm border border-accent/20 rounded-xl p-4 sm:p-6 flex items-center space-x-4">
+                  <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-primary rounded-full flex items-center justify-center flex-shrink-0">
+                    <Icon className="w-5 h-5 sm:w-6 sm:h-6 text-background" />
                   </div>
                   <div className="flex-1">
-                    <h3 className="text-lg font-semibold mb-1">{step.title}</h3>
-                    <p className="text-muted-foreground text-sm leading-relaxed">
+                    <h3 className="text-base sm:text-lg font-semibold mb-1">{step.title}</h3>
+                    <p className="text-muted-foreground text-xs sm:text-sm leading-relaxed">
                       {step.description}
                     </p>
                   </div>
