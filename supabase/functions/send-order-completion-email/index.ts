@@ -208,12 +208,12 @@ const handler = async (req: Request): Promise<Response> => {
     }
     
     console.log('📧 Sending email via Resend...');
-    console.log('📧 From: ORBIT <onboarding@resend.dev>');
+    console.log('📧 From: ORBIT <support@update.desmondlabs.com>');
     console.log('📧 To:', finalUserEmail);
     console.log('📧 Subject: 🚀 Your ORBIT order is ready! - ' + orderNumber);
     
     const emailResponse = await resend.emails.send({
-      from: "ORBIT <onboarding@resend.dev>",
+      from: "ORBIT <support@update.desmondlabs.com>",
       to: [finalUserEmail],
       subject: `🚀 Your ORBIT order is ready! - ${orderNumber}`,
       html: `
