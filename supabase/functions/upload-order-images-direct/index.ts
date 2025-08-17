@@ -195,15 +195,15 @@ serve(async (req) => {
           continue;
         }
 
-        // Sanitize filename
-        const sanitizedName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-        const timestamp = Date.now();
-        const fileName = `${timestamp}_${i}_${sanitizedName}`;
+        // Sanitize filename - preserve original name, only replace problematic characters
+        const sanitizedName = file.name.replace(/[^a-zA-Z0-9.\-_() ]/g, '_');
+        const fileName = sanitizedName;
         const filePath = `${folderPath}/${fileName}`;
         
         console.log(`📤 Uploading file directly: ${filePath} (${file.size} bytes)`);
 
-        // Upload file directly to storage bucket (no base64 conversion!)
+        // Upload file directly to storage bucket with original filename
+        // upsert: false prevents overwriting existing files with same name
         const { data: uploadData, error: uploadError } = await supabaseService.storage
           .from("orbit-images")
           .upload(filePath, fileData, {
