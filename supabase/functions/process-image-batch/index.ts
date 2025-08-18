@@ -231,13 +231,14 @@ serve(async (req) => {
           })
           .eq('id', orderId);
 
-        // Call Gemini analysis function
-        const analysisResult = await callGeminiAnalysis({
-          image_path: image.storage_path_original,
-          analysis_type: analysisType,
-          supabase_url: Deno.env.get('SUPABASE_URL'),
-          supabase_key: Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
-        });
+        // TODO: AI analysis will be handled by Claude Code SDK orchestrator
+        console.log('🔄 AI analysis step - will be handled by new orchestrator');
+        
+        // Placeholder analysis result for now
+        const analysisResult = {
+          metadata: { status: 'pending_orchestrator' },
+          raw_text: 'Analysis pending - will be processed by Claude Code SDK orchestrator'
+        };
 
         // Update image with analysis results
         await supabase
@@ -425,35 +426,6 @@ serve(async (req) => {
   }
 });
 
-async function callGeminiAnalysis(parameters: any) {
-  try {
-    const response = await fetch(
-      `${Deno.env.get('SUPABASE_URL')}/functions/v1/orbit-gemini-analysis`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
-          'x-session-id': crypto.randomUUID()
-        },
-        body: JSON.stringify({
-          tool: 'analyze_image',
-          parameters
-        })
-      }
-    );
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Gemini analysis failed');
-    }
-
-    const result = await response.json();
-    return result.result;
-
-  } catch (error) {
-    throw new Error(`Failed to call Gemini analysis: ${error.message}`);
-  }
-}
+// NOTE: callGeminiAnalysis function removed - AI analysis will be handled by Claude Code SDK orchestrator
 
 console.log('ORBIT Batch Processing Edge Function deployed and ready');
