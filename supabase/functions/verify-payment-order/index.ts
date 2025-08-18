@@ -1,11 +1,17 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { SupabaseAuthManager } from '../_shared/auth-verification.ts';
 
-const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+// Initialize enhanced authentication manager
+const authManager = new SupabaseAuthManager({
+  supabaseUrl: Deno.env.get('SUPABASE_URL') || '',
+  legacyServiceRoleKey: Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'),
+  newSecretKey: Deno.env.get('SUPABASE_SECRET_KEY'),
+  allowLegacy: true // Enable backward compatibility during migration
+});
 
-// Create service role client for bypass RLS
-const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+// Create service role client for bypass RLS using enhanced authentication
+const supabaseAdmin = authManager.getSupabaseClient(true);
 
 Deno.serve(async (req: Request) => {
   // Set CORS headers

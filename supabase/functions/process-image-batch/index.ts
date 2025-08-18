@@ -1,6 +1,7 @@
 // ORBIT Batch Image Processing Edge Function
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+import { SupabaseAuthManager } from '../_shared/auth-verification.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -31,22 +32,22 @@ serve(async (req) => {
     console.log('🚀 Request method:', req.method);
     console.log('🚀 Request headers:', Object.fromEntries(req.headers.entries()));
     
-    // Check environment variables
-    const supabaseUrl = Deno.env.get('SUPABASE_URL');
-    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    
-    console.log('🚀 Environment check:', {
-      hasSupabaseUrl: !!supabaseUrl,
-      hasServiceKey: !!serviceKey,
-      serviceKeyLength: serviceKey?.length || 0
+    // Initialize enhanced authentication manager
+    const authManager = new SupabaseAuthManager({
+      supabaseUrl: Deno.env.get('SUPABASE_URL') || '',
+      legacyServiceRoleKey: Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'),
+      newSecretKey: Deno.env.get('SUPABASE_SECRET_KEY'),
+      allowLegacy: true // Enable backward compatibility during migration
     });
     
-    if (!supabaseUrl || !serviceKey) {
-      throw new Error('Missing required environment variables');
-    }
+    // Get authenticated Supabase client with new key system
+    const supabase = authManager.getSupabaseClient();
     
-    // Initialize Supabase with service role for full access
-    const supabase = createClient(supabaseUrl, serviceKey);
+    console.log('🚀 Enhanced authentication initialized:', {
+      hasSupabaseUrl: !!Deno.env.get('SUPABASE_URL'),
+      authSystemReady: true,
+      keyFormat: authManager.getKeyFormat()
+    });
 
     // No user authentication needed for webhook-triggered processing
     // The order validation below provides sufficient security
@@ -342,7 +343,7 @@ serve(async (req) => {
             orderId: orderId
           },
           headers: {
-            Authorization: `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`
+            Authorization: `Bearer ${authManager.getServiceToken()}`
           }
         });
 

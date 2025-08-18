@@ -34,3 +34,19 @@ verify_jwt = true
 
 [functions.verify-payment-order]
 verify_jwt = false
+
+# Remote MCP Servers - Phase 2 Implementation
+[functions.mcp-ai-analysis]
+verify_jwt = true
+
+[functions.mcp-metadata]
+verify_jwt = true
+
+[functions.mcp-storage]
+verify_jwt = true
+
+[functions.test-mcp-deployment]
+verify_jwt = false
+
+[functions.test-new-auth]
+verify_jwt = false

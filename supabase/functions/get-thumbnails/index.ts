@@ -1,6 +1,7 @@
 
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.50.3";
+import { SupabaseAuthManager } from '../_shared/auth-verification.ts';
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -15,11 +16,16 @@ serve(async (req) => {
   }
 
   try {
-    // Use SERVICE_ROLE_KEY for storage access
-    const supabaseClient = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
-    );
+    // Initialize enhanced authentication manager
+    const authManager = new SupabaseAuthManager({
+      supabaseUrl: Deno.env.get('SUPABASE_URL') || '',
+      legacyServiceRoleKey: Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'),
+      newSecretKey: Deno.env.get('SUPABASE_SECRET_KEY'),
+      allowLegacy: true // Enable backward compatibility during migration
+    });
+    
+    // Use service role client for storage access
+    const supabaseClient = authManager.getSupabaseClient(true);
 
     // Get authenticated user from the Authorization header
     const authHeader = req.headers.get("Authorization");

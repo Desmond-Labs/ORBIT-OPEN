@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0/+esm";
+import { SupabaseAuthManager } from '../_shared/auth-verification.ts';
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -50,16 +51,19 @@ serve(async (req) => {
   }
 
   try {
-    const supabaseClient = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_ANON_KEY") ?? ""
-    );
-
-    const supabaseService = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
-      { auth: { persistSession: false } }
-    );
+    // Initialize enhanced authentication manager
+    const authManager = new SupabaseAuthManager({
+      supabaseUrl: Deno.env.get('SUPABASE_URL') || '',
+      legacyAnonKey: Deno.env.get('SUPABASE_ANON_KEY'),
+      newPublishableKey: Deno.env.get('SUPABASE_PUBLISHABLE_KEY'),
+      legacyServiceRoleKey: Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'),
+      newSecretKey: Deno.env.get('SUPABASE_SECRET_KEY'),
+      allowLegacy: true // Enable backward compatibility during migration
+    });
+    
+    // Create clients using enhanced authentication
+    const supabaseClient = authManager.getSupabaseClient(false); // User client
+    const supabaseService = authManager.getSupabaseClient(true); // Service client
 
     // Get authenticated user
     const authHeader = req.headers.get("Authorization") || req.headers.get("authorization");

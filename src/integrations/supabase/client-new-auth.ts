@@ -2,13 +2,14 @@
  * Enhanced Supabase Client Configuration
  * Supports new Supabase API key format with backward compatibility
  * 
- * Updated to use new authentication system while maintaining legacy support
+ * MIGRATION: This file demonstrates the new configuration approach.
+ * Once new API keys are available, replace the main client.ts with this configuration.
  */
 
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
-// Configuration for enhanced authentication system
+// Configuration for new API key system
 const getSupabaseConfig = () => {
   // During transition period, prefer environment variables but fall back to hardcoded values
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "https://ufdcvxmizlzlnyyqpfck.supabase.co";
@@ -39,13 +40,11 @@ const getSupabaseConfig = () => {
 const config = getSupabaseConfig();
 
 export const SUPABASE_URL = config.url;
-export const SUPABASE_ANON_KEY = config.key; // Maintained for backward compatibility
+export const SUPABASE_KEY = config.key;
 export const SUPABASE_KEY_FORMAT = config.keyFormat;
 
-// Import the supabase client like this:
-// import { supabase } from "@/integrations/supabase/client";
-
-export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, {
+// Enhanced Supabase client with new key format support
+export const supabaseNew = createClient<Database>(SUPABASE_URL, SUPABASE_KEY, {
   auth: {
     storage: localStorage,
     persistSession: true,
@@ -53,9 +52,10 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, 
   }
 });
 
-// Utility functions for migration support
+// Utility to check if we're using the new key format
 export const isUsingNewKeyFormat = () => SUPABASE_KEY_FORMAT === 'new_publishable';
 
+// Migration status information
 export const getMigrationStatus = () => ({
   keyFormat: SUPABASE_KEY_FORMAT,
   migrationReady: isUsingNewKeyFormat(),
@@ -64,7 +64,7 @@ export const getMigrationStatus = () => ({
   timestamp: new Date().toISOString()
 });
 
-// Log migration status in development
+// Log migration status on load
 if (import.meta.env.DEV) {
   console.log('📊 Supabase Migration Status:', getMigrationStatus());
 }

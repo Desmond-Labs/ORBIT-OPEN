@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://cdn.skypack.dev/stripe@13.11.0?dts";
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0/+esm";
+import { SupabaseAuthManager } from '../_shared/auth-verification.ts';
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -17,11 +18,15 @@ serve(async (req) => {
       apiVersion: "2023-10-16",
     });
 
-    const supabaseClient = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
-      { auth: { persistSession: false } }
-    );
+    // Initialize enhanced authentication manager
+    const authManager = new SupabaseAuthManager({
+      supabaseUrl: Deno.env.get('SUPABASE_URL') || '',
+      legacyServiceRoleKey: Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'),
+      newSecretKey: Deno.env.get('SUPABASE_SECRET_KEY'),
+      allowLegacy: true // Enable backward compatibility during migration
+    });
+    
+    const supabaseClient = authManager.getSupabaseClient(true);
 
     const signature = req.headers.get("stripe-signature");
     const webhookSecret = Deno.env.get("STRIPE_WEBHOOK_SECRET");

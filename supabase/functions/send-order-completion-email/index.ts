@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.50.3';
 import { Resend } from "npm:resend@2.0.0";
+import { SupabaseAuthManager } from '../_shared/auth-verification.ts';
 
 const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
 
@@ -73,11 +74,16 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error('RESEND_API_KEY environment variable is not set');
     }
 
-    // Create Supabase client
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
+    // Initialize enhanced authentication manager
+    const authManager = new SupabaseAuthManager({
+      supabaseUrl: Deno.env.get('SUPABASE_URL') || '',
+      legacyServiceRoleKey: Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'),
+      newSecretKey: Deno.env.get('SUPABASE_SECRET_KEY'),
+      allowLegacy: true // Enable backward compatibility during migration
+    });
+    
+    // Create Supabase client using enhanced authentication
+    const supabase = authManager.getSupabaseClient(true);
 
     // Get order details from database
     const { data: order, error: orderError } = await supabase
