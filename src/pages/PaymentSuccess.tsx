@@ -247,8 +247,8 @@ const PaymentSuccess: React.FC = () => {
         if (order.payment_status === 'completed') {
           setStatus('success');
           
-          // Files were uploaded during payment process - trigger processing as backup
-          await triggerProcessingIfNeeded(order);
+          // Clean up localStorage (processing is now manual)
+          await cleanupAfterPayment(order);
           
           // Auto-redirect to processing after 1 second
           setTimeout(() => {
@@ -278,12 +278,12 @@ const PaymentSuccess: React.FC = () => {
         
         toast({
           title: "Payment Successful!",
-          description: "Your payment has been processed. Your images are being analyzed...",
+          description: "Your payment has been processed. Processing will begin manually.",
           variant: "default"
         });
 
-        // Files were uploaded during payment - trigger processing as backup
-        await triggerProcessingIfNeeded(order);
+        // Clean up localStorage (processing is now manual)
+        await cleanupAfterPayment(order);
 
         // Auto-redirect to processing after 1 second
         setTimeout(() => {
@@ -323,9 +323,9 @@ const PaymentSuccess: React.FC = () => {
     }
   }, [sessionId, navigate, toast, user, retryCount]);
 
-  const triggerProcessingIfNeeded = async (order: any) => {
+  const cleanupAfterPayment = async (order: any) => {
     try {
-      console.log('🚀 Triggering image processing as backup safety check for order:', order.id);
+      console.log('🧹 Cleaning up after payment completion for order:', order.id);
       
       // Clean up any old localStorage data
       localStorage.removeItem('orbit_pending_order_id');
@@ -333,36 +333,13 @@ const PaymentSuccess: React.FC = () => {
       localStorage.removeItem('orbit_files_uploaded');
       delete (window as any).orbitTempFiles;
       
-      // Trigger processing (defensive programming - webhook should have already done this)
-      const { data: processingData, error: processingError } = await supabase.functions.invoke('process-image-batch', {
-        body: {
-          orderId: order.id,
-          analysisType: 'product'
-        }
-      });
-
-      if (processingError) {
-        console.log('ℹ️ Processing trigger failed (likely already running):', processingError);
-      } else {
-        console.log('✅ Processing triggered successfully:', processingData);
-      }
+      // NOTE: Processing is now manual only - no automatic trigger
+      // The process-image-batch function will be called manually when ready
       
-      // Show success message
-      toast({
-        title: "Order Complete!",
-        description: "Your images are being processed",
-        variant: "default"
-      });
+      console.log('✅ Payment cleanup completed');
 
     } catch (error: any) {
-      console.log('ℹ️ Processing trigger error (likely already running):', error.message);
-      
-      // Still show success - processing failure doesn't mean payment failed
-      toast({
-        title: "Payment Successful!",
-        description: "Your order is being processed",
-        variant: "default"
-      });
+      console.log('ℹ️ Cleanup error (non-critical):', error.message);
     }
   };
 
@@ -417,7 +394,7 @@ const PaymentSuccess: React.FC = () => {
                 <CheckCircle className="w-16 h-16 text-success mx-auto mb-4" />
                 <h1 className="text-2xl font-bold mb-2">Payment Successful!</h1>
                 <p className="text-muted-foreground mb-6">
-                  Your payment has been processed successfully. You will be redirected to the processing page shortly.
+                  Your payment has been processed successfully. Your images are uploaded and ready for processing.
                 </p>
                 {orderData && (
                   <div className="bg-secondary/50 rounded-lg p-4 mb-6">
