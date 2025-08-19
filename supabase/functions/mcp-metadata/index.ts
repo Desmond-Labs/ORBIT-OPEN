@@ -1,12 +1,14 @@
 /**
  * Remote Metadata Processing MCP Server - Edge Function Implementation  
  * Replicates functionality of local orbit-metadata-mcp server
- * Using ORBIT MCP infrastructure from Phase 1
+ * Using direct secret key authentication.
  */
 
-import { createORBITMCPServer, securityPathProtection } from '../_shared/mcp-server.ts';
+import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { MCPServiceToolDefinition, MCPToolResult, MCPRequestContext } from '../_shared/mcp-types.ts';
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+
+const MCP_METADATA_SECRET = Deno.env.get('sb_secret_key');
 
 // ORBIT Schema Types
 type SchemaType = 'lifestyle' | 'product' | 'orbit';
@@ -913,21 +915,54 @@ const metadataTools: MCPServiceToolDefinition[] = [
   }
 ];
 
-// Auth configuration for new API key system
-const authConfig = {
-  allowLegacy: true, // Support legacy keys during transition
-  requireAuth: true
-};
+serve(async (req) => {
+  // Security Check: Immediately handle CORS preflight requests
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type' } });
+  }
 
-// Create and export the MCP server with new auth system
-const server = createORBITMCPServer('mcp-metadata', metadataTools, authConfig);
+  try {
+    // 2. Check for the Authorization header
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      throw new Error('Missing authorization header');
+    }
 
-// Edge Function handler
-Deno.serve(async (req) => {
-  // Apply security path protection with new auth system
-  await securityPathProtection(req, authConfig);
-  
-  return await server.handleRequest(req);
+    // 3. Extract the key provided by the client
+    const providedKey = authHeader.replace('Bearer ', '');
+
+    // 4. Compare the provided key with the expected secret key
+    if (providedKey !== MCP_METADATA_SECRET) {
+      throw new Error('Invalid authorization key');
+    }
+
+    // --- Authorization successful ---
+    // If the code reaches this point, the request is secure.
+    console.log('✅ Request authorized. Proceeding with function logic.');
+
+    // Now, you can safely execute the rest of your function's code
+    const { tool, params } = await req.json();
+
+    // Find the tool and call its handler
+    const toolDef = metadataTools.find(t => t.name === tool);
+    if (!toolDef) {
+        throw new Error(`Tool not found: ${tool}`);
+    }
+
+    const result = await toolDef.handler(params, {} as any); // context is not used in the handlers
+
+    return new Response(JSON.stringify(result), {
+      headers: { 'Content-Type': 'application/json' },
+      status: 200,
+    });
+
+  } catch (err) {
+    // If any security check fails, return a 401 Unauthorized error
+    return new Response(JSON.stringify({ error: err.message }), {
+      headers: { 'Content-Type': 'application/json' },
+      status: 401,
+    });
+  }
 });
 
 console.log('🚀 ORBIT Metadata Processing MCP Server deployed as Edge Function');

@@ -267,20 +267,12 @@ serve(async (req) => {
           const mcpResponse = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/mcp-ai-analysis`, {
             method: 'POST',
             headers: {
-              'Authorization': `Bearer ${authManager.getServiceToken()}`,
+              'Authorization': `Bearer ${Deno.env.get('sb_secret_key')}`,
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-              jsonrpc: '2.0',
-              method: 'tools/call',
-              params: {
-                name: 'analyze_image',
-                arguments: {
-                  image_path: storagePath,
-                  analysis_type: analysisType
-                }
-              },
-              id: `analysis-${image.id}`
+              image_path: storagePath,
+              analysis_type: analysisType
             })
           });
 
@@ -292,31 +284,7 @@ serve(async (req) => {
             throw new Error(`MCP AI analysis failed: ${mcpResponse.status} - ${errorText}`);
           }
 
-          const mcpResult = await mcpResponse.json();
-          console.log('📊 MCP Result structure:', {
-            hasResult: !!mcpResult.result,
-            hasError: !!mcpResult.error,
-            resultKeys: mcpResult.result ? Object.keys(mcpResult.result) : []
-          });
-
-          if (mcpResult.error) {
-            console.error('❌ MCP returned error:', mcpResult.error);
-            throw new Error(`MCP AI analysis error: ${mcpResult.error.message}`);
-          }
-
-          if (!mcpResult.result || !mcpResult.result.content) {
-            console.error('❌ Invalid MCP response format:', mcpResult);
-            throw new Error('Invalid MCP response format - missing result.content');
-          }
-
-          // Parse the MCP response content
-          const mcpContent = mcpResult.result.content[0];
-          if (!mcpContent || mcpContent.type !== 'text') {
-            console.error('❌ Invalid MCP content format:', mcpContent);
-            throw new Error('Invalid MCP content format');
-          }
-
-          const geminiAnalysis = JSON.parse(mcpContent.text);
+          const geminiAnalysis = await mcpResponse.json();
           console.log('✅ Successfully parsed Gemini analysis:', {
             analysisType: geminiAnalysis.analysis_type,
             confidence: geminiAnalysis.confidence,
@@ -325,7 +293,7 @@ serve(async (req) => {
 
           analysisResult = {
             metadata: geminiAnalysis.metadata || geminiAnalysis,
-            raw_text: mcpContent.text,
+            raw_text: JSON.stringify(geminiAnalysis),
             processing_time_ms: geminiAnalysis.processing_time_ms || 0,
             analysis_type: geminiAnalysis.analysis_type,
             confidence: geminiAnalysis.confidence

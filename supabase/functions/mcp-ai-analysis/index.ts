@@ -1,12 +1,14 @@
 /**
  * Remote AI Image Analysis MCP Server - Edge Function Implementation
  * Replicates functionality of local ai-image-analysis-mcp server
- * Using ORBIT MCP infrastructure from Phase 1
+ * Using direct secret key authentication.
  */
 
-import { createORBITMCPServer, securityPathProtection } from '../_shared/mcp-server.ts';
-import { MCPServiceToolDefinition, MCPToolResult, MCPRequestContext } from '../_shared/mcp-types.ts';
+import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from 'npm:@google/generative-ai';
+
+// 1. Get the expected secret key from your function's environment variables
+const MCP_AI_ANALYSIS_SECRET = Deno.env.get('sb_secret_key');
 
 // Security configuration matching local server
 const SECURITY_CONFIG = {
@@ -35,37 +37,6 @@ interface AnalysisResult {
   };
   source: 'file' | 'url' | 'base64';
   source_url?: string;
-}
-
-interface UploadResult {
-  success: boolean;
-  file_path: string;
-  file_size: number;
-  content_type: string;
-  upload_time: number;
-}
-
-interface SecurityStatusResponse {
-  security_config: typeof SECURITY_CONFIG;
-  rate_limit_status: {
-    active_limits: number;
-    current_window: number;
-  };
-  audit_log: {
-    total_entries: number;
-    recent_entries: Array<{
-      timestamp: string;
-      tool: string;
-      success: boolean;
-      error: string;
-    }>;
-  };
-  server_info: {
-    name: string;
-    version: string;
-    uptime: number;
-    node_version?: string;
-  };
 }
 
 /**
@@ -369,7 +340,7 @@ async function analyzeImageWithGemini(
 
     // Initialize Gemini AI
     const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ 
+    const model = genAI.getGenerativeModel ({
       model: "gemini-2.0-flash-exp",
       generationConfig: {
         temperature: 0.1,
@@ -489,229 +460,48 @@ async function analyzeImageWithGemini(
   }
 }
 
-/**
- * Create Supabase client for file operations
- */
-function createSupabaseClient(url: string, key: string) {
-  // This would use the Supabase client if needed for uploads
-  // For now, return a mock implementation
-  return {
-    storage: {
-      from: (bucket: string) => ({
-        upload: async (path: string, data: any) => {
-          // Mock implementation - in real usage would upload to Supabase
-          return {
-            data: { path: `${bucket}/${path}` },
-            error: null
-          };
-        }
-      })
-    }
-  };
-}
-
-// Tool definitions matching local server functionality
-const aiAnalysisTools: MCPServiceToolDefinition[] = [
-  {
-    name: 'analyze_image',
-    schema: {
-      name: 'analyze_image',
-      description: 'Securely analyze an image using Google Gemini AI with automatic type detection and security validations',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          image_path: { 
-            type: 'string', 
-            description: 'Absolute path to the image file (jpg, png, webp only)',
-            maxLength: 500
-          },
-          image_url: {
-            type: 'string',
-            description: 'URL to fetch the image from (https/http only)',
-            format: 'uri',
-            maxLength: 2000
-          },
-          analysis_type: { 
-            type: 'string', 
-            enum: ['lifestyle', 'product'], 
-            description: 'Force specific analysis type (optional)' 
-          }
-        },
-        required: [],
-        additionalProperties: false,
-        oneOf: [
-          { required: ['image_path'] },
-          { required: ['image_url'] }
-        ]
-      }
-    },
-    handler: async (params, context) => {
-      const { image_path, image_url, analysis_type } = params;
-      
-      // Input validation
-      if (!image_path && !image_url) {
-        throw new Error('Either image_path or image_url parameter is required');
-      }
-      
-      if (image_path && image_url) {
-        throw new Error('Cannot specify both image_path and image_url parameters');
-      }
-      
-      const result = await analyzeImageWithGemini(image_path, analysis_type, image_url);
-      
-      return [
-        {
-          type: 'text',
-          text: JSON.stringify({
-            ...result,
-            request_id: crypto.randomUUID(),
-            processing_time: Date.now()
-          }, null, 2)
-        }
-      ];
-    }
-  },
-  
-  {
-    name: 'upload_to_supabase',
-    schema: {
-      name: 'upload_to_supabase',
-      description: 'Upload image or analysis results to Supabase Storage with security validation',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          image_data: { 
-            type: 'string', 
-            description: 'Base64 encoded image data',
-            maxLength: 20000000
-          },
-          bucket: { 
-            type: 'string', 
-            description: 'Supabase bucket name',
-            maxLength: 100
-          },
-          path: { 
-            type: 'string', 
-            description: 'Storage path within bucket',
-            maxLength: 300
-          },
-          supabase_url: { 
-            type: 'string', 
-            description: 'Supabase project URL',
-            format: 'uri'
-          },
-          supabase_key: { 
-            type: 'string', 
-            description: 'Supabase service role key',
-            minLength: 20
-          },
-          metadata: { 
-            type: 'object', 
-            description: 'Additional metadata to store with the file (optional)'
-          }
-        },
-        required: ['image_data', 'bucket', 'path', 'supabase_url', 'supabase_key'],
-        additionalProperties: false
-      }
-    },
-    handler: async (params, context) => {
-      const { image_data, bucket, path, supabase_url, supabase_key, metadata } = params;
-      
-      // Input validation
-      if (!image_data || typeof image_data !== 'string') {
-        throw new Error('Invalid image_data parameter');
-      }
-      
-      // Create Supabase client (mock for now)
-      const supabase = createSupabaseClient(supabase_url, supabase_key);
-      
-      // Convert base64 to buffer
-      const imageBuffer = Uint8Array.from(atob(image_data), c => c.charCodeAt(0));
-      
-      // Upload to Supabase
-      const { data, error } = await supabase.storage
-        .from(bucket)
-        .upload(path, imageBuffer);
-      
-      if (error) {
-        throw new Error(`Upload failed: ${error.message || 'Unknown error'}`);
-      }
-      
-      const result: UploadResult = {
-        success: true,
-        file_path: data.path,
-        file_size: imageBuffer.length,
-        content_type: 'image/jpeg', // Default assumption
-        upload_time: Date.now()
-      };
-      
-      return [
-        {
-          type: 'text',
-          text: JSON.stringify({
-            ...result,
-            request_id: crypto.randomUUID(),
-            processing_time: Date.now()
-          }, null, 2)
-        }
-      ];
-    }
-  },
-  
-  {
-    name: 'get_security_status',
-    schema: {
-      name: 'get_security_status',
-      description: 'Get current security configuration and audit information',
-      inputSchema: {
-        type: 'object',
-        properties: {},
-        additionalProperties: false
-      }
-    },
-    handler: async (params, context) => {
-      const securityStatus: SecurityStatusResponse = {
-        security_config: SECURITY_CONFIG,
-        rate_limit_status: {
-          active_limits: 0, // Would track actual limits in production
-          current_window: SECURITY_CONFIG.RATE_LIMIT_WINDOW
-        },
-        audit_log: {
-          total_entries: 0,
-          recent_entries: []
-        },
-        server_info: {
-          name: 'orbit-gemini-image-analysis',
-          version: '2.0.0',
-          uptime: 0 // Edge functions don't have persistent uptime
-        }
-      };
-      
-      return [
-        {
-          type: 'text',
-          text: JSON.stringify(securityStatus, null, 2)
-        }
-      ];
-    }
+serve(async (req) => {
+  // Security Check: Immediately handle CORS preflight requests
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type' } });
   }
-];
 
-// Auth configuration for new API key system
-const authConfig = {
-  allowLegacy: true, // Support legacy keys during transition
-  requireAuth: true
-};
+  try {
+    // 2. Check for the Authorization header
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      throw new Error('Missing authorization header');
+    }
 
-// Create and export the MCP server with new auth system
-const server = createORBITMCPServer('mcp-ai-analysis', aiAnalysisTools, authConfig);
+    // 3. Extract the key provided by the client
+    const providedKey = authHeader.replace('Bearer ', '');
 
-// Edge Function handler
-Deno.serve(async (req) => {
-  // Apply security path protection with new auth system
-  await securityPathProtection(req, authConfig);
-  
-  return await server.handleRequest(req);
+    // 4. Compare the provided key with the expected secret key
+    if (providedKey !== MCP_AI_ANALYSIS_SECRET) {
+      throw new Error('Invalid authorization key');
+    }
+
+    // --- Authorization successful ---
+    // If the code reaches this point, the request is secure.
+    console.log('✅ Request authorized. Proceeding with function logic.');
+
+    // Now, you can safely execute the rest of your function's code
+    const { image_path, image_url, analysis_type } = await req.json();
+    
+    const result = await analyzeImageWithGemini(image_path, analysis_type, image_url);
+
+    return new Response(JSON.stringify(result), {
+      headers: { 'Content-Type': 'application/json' },
+      status: 200,
+    });
+
+  } catch (err) {
+    // If any security check fails, return a 401 Unauthorized error
+    return new Response(JSON.stringify({ error: err.message }), {
+      headers: { 'Content-Type': 'application/json' },
+      status: 401,
+    });
+  }
 });
 
 console.log('🚀 ORBIT AI Analysis MCP Server deployed as Edge Function');
