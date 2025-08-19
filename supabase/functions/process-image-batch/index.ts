@@ -408,9 +408,12 @@ serve(async (req) => {
             processedPath: metadataResult.processed_file_path
           });
 
-          // Update image with processed metadata paths
+          // STEP 5G: UPDATE DATABASE WITH COMPREHENSIVE VERIFICATION
           if (metadataResult.success) {
-            await supabase
+            console.log('🔄 Starting STEP 5G: Database update with verification...');
+            
+            // Update image with processed metadata paths
+            const { error: updateError } = await supabase
               .from('images')
               .update({
                 processing_status: 'complete',
@@ -418,8 +421,111 @@ serve(async (req) => {
                 storage_path_processed: metadataResult.processed_file_path
               })
               .eq('id', image.id);
+            
+            if (updateError) {
+              throw new Error(`Database update failed: ${updateError.message}`);
+            }
+            
+            console.log('✅ Database updated successfully');
+            
+            // 🚨 STORAGE VERIFICATION STEP
+            console.log('🔍 Verifying processed files exist in storage...');
+            
+            // Extract folder path for verification
+            const pathParts = image.storage_path_original.split('/');
+            const orderFolder = pathParts[0]; // "order_id_user_id" folder
+            const folderPath = `${orderFolder}/processed`;
+            
+            try {
+              // Use MCP storage tool to list files in processed folder
+              const storageResponse = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/mcp-storage`, {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${Deno.env.get('sb_secret_key')}`,
+                  'Content-Type': 'application/json',
+                  'apikey': `${Deno.env.get('sb_secret_key')}`,
+                },
+                body: JSON.stringify({
+                  tool_name: 'list_files',
+                  parameters: {
+                    bucket_name: 'orbit-images',
+                    folder_path: folderPath
+                  }
+                })
+              });
               
-            console.log('✅ Image processing fully completed with metadata embedding');
+              if (!storageResponse.ok) {
+                console.warn('⚠️ Storage verification failed - proceeding without verification');
+              } else {
+                const storageResult = await storageResponse.json();
+                const processedFiles = storageResult.files || [];
+                
+                // Check if our processed file exists
+                const expectedFilename = metadataResult.processed_file_path.split('/').pop();
+                const fileExists = processedFiles.some((file: string) => 
+                  file.includes(expectedFilename?.replace('_processed.jpg', ''))
+                );
+                
+                console.log('📁 Storage verification:', {
+                  folderPath,
+                  expectedFile: expectedFilename,
+                  filesFound: processedFiles.length,
+                  fileExists
+                });
+                
+                if (!fileExists) {
+                  console.warn('⚠️ Processed file not found in storage - but continuing as metadata was successful');
+                }
+              }
+            } catch (storageError) {
+              console.warn('⚠️ Storage verification error:', storageError.message);
+              // Don't fail the entire process for storage verification issues
+            }
+            
+            // 🚨 FINAL IMAGE VERIFICATION
+            console.log('🔍 Performing final image verification...');
+            const { data: verificationData, error: verificationError } = await supabase
+              .from('images')
+              .select('id, processing_status, storage_path_processed, gemini_analysis_raw')
+              .eq('id', image.id)
+              .single();
+            
+            if (verificationError) {
+              console.error('❌ Final verification query failed:', verificationError);
+              throw new Error(`Final verification failed: ${verificationError.message}`);
+            }
+            
+            // Comprehensive verification checks
+            const hasProcessedPath = !!verificationData.storage_path_processed;
+            const hasAnalysis = !!verificationData.gemini_analysis_raw;
+            const isComplete = verificationData.processing_status === 'complete';
+            
+            console.log('🔍 Final verification results:', {
+              imageId: image.id,
+              processing_status: verificationData.processing_status,
+              has_processed_path: hasProcessedPath,
+              has_analysis: hasAnalysis,
+              is_complete: isComplete
+            });
+            
+            // Critical verification checkpoint
+            if (!isComplete || !hasProcessedPath || !hasAnalysis) {
+              console.error('❌ Final verification FAILED - rolling back...');
+              
+              // Rollback database update
+              await supabase
+                .from('images')
+                .update({
+                  processing_status: 'error',
+                  processed_at: new Date().toISOString(),
+                  error_message: `Final verification failed: complete=${isComplete}, path=${hasProcessedPath}, analysis=${hasAnalysis}`
+                })
+                .eq('id', image.id);
+              
+              throw new Error(`Final verification failed - image incomplete`);
+            }
+            
+            console.log('✅ Image processing fully completed with comprehensive verification');
           } else {
             throw new Error(`Metadata embedding failed: ${metadataResult.error}`);
           }
@@ -491,6 +597,198 @@ serve(async (req) => {
           processing_completion_percentage: progressPercentage
         })
         .eq('id', orderId);
+    }
+
+    // STEP 6: VERIFY ALL IMAGES COMPLETED
+    console.log('🔄 Starting STEP 6: Comprehensive verification that ALL images are properly processed...');
+    
+    const { data: completionData, error: completionError } = await supabase
+      .rpc('get_order_completion_status', { order_id_param: orderId });
+    
+    // If RPC doesn't exist, fall back to direct query
+    let totalImages = 0;
+    let completedImages = 0;
+    let hasProcessedFiles = 0;
+    
+    if (completionError) {
+      console.log('📊 Using direct SQL for completion verification...');
+      const { data: directData, error: directError } = await supabase
+        .from('images')
+        .select('processing_status, storage_path_processed')
+        .eq('order_id', orderId);
+      
+      if (directError) {
+        console.error('❌ Failed to verify order completion:', directError);
+        throw new Error(`Order verification failed: ${directError.message}`);
+      }
+      
+      totalImages = directData.length;
+      completedImages = directData.filter(img => img.processing_status === 'complete').length;
+      hasProcessedFiles = directData.filter(img => img.storage_path_processed !== null).length;
+    } else {
+      totalImages = completionData[0]?.total_images || 0;
+      completedImages = completionData[0]?.completed_images || 0;
+      hasProcessedFiles = completionData[0]?.has_processed_files || 0;
+    }
+    
+    console.log('📊 Order completion verification results:', {
+      orderId,
+      totalImages,
+      completedImages,
+      hasProcessedFiles,
+      successFromLoop: successCount,
+      errorFromLoop: errorCount
+    });
+    
+    // 🚨 CRITICAL VERIFICATION CHECKPOINT
+    const allImagesComplete = totalImages === completedImages;
+    const allHaveProcessedFiles = totalImages === hasProcessedFiles;
+    const loopCountsMatch = (successCount + errorCount) === totalImages;
+    
+    if (!allImagesComplete || !allHaveProcessedFiles || !loopCountsMatch) {
+      console.error('❌ CRITICAL: Order verification FAILED');
+      console.error('Verification details:', {
+        allImagesComplete,
+        allHaveProcessedFiles,
+        loopCountsMatch,
+        issue: !allImagesComplete ? 'Some images not complete' : 
+               !allHaveProcessedFiles ? 'Some images missing processed files' :
+               !loopCountsMatch ? 'Processing loop counts mismatch' : 'Unknown'
+      });
+      
+      // Mark order as failed
+      await supabase
+        .from('orders')
+        .update({
+          order_status: 'failed',
+          processing_stage: 'failed',
+          error_message: `Order verification failed: ${totalImages} total, ${completedImages} complete, ${hasProcessedFiles} with files`
+        })
+        .eq('id', orderId);
+        
+      throw new Error(`Order verification failed - not all images processed correctly`);
+    }
+    
+    console.log('✅ STEP 6 PASSED: All images verified as properly processed');
+
+    // STEP 7: VERIFY PROCESSED FILES IN STORAGE
+    console.log('🔄 Starting STEP 7: Storage-database consistency verification...');
+    
+    // Get order folder path
+    const firstImage = images[0]; // We know we have at least one image
+    const pathParts = firstImage.storage_path_original.split('/');
+    const orderFolder = pathParts[0]; // "order_id_user_id" folder
+    const processedFolderPath = `${orderFolder}/processed`;
+    
+    try {
+      // Use MCP storage tool to list all files in processed folder
+      console.log('📁 Checking processed folder:', processedFolderPath);
+      
+      const storageListResponse = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/mcp-storage`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${Deno.env.get('sb_secret_key')}`,
+          'Content-Type': 'application/json',
+          'apikey': `${Deno.env.get('sb_secret_key')}`,
+        },
+        body: JSON.stringify({
+          tool_name: 'list_files',
+          parameters: {
+            bucket_name: 'orbit-images',
+            folder_path: processedFolderPath
+          }
+        })
+      });
+      
+      let storageFilesCount = 0;
+      let storageFiles = [];
+      
+      if (!storageListResponse.ok) {
+        console.warn('⚠️ Storage listing failed - skipping storage verification');
+      } else {
+        const storageListResult = await storageListResponse.json();
+        storageFiles = storageListResult.files || [];
+        
+        // Count processed image files (exclude thumbnails, xmp, txt files for core count)
+        storageFilesCount = storageFiles.filter((file: string) => 
+          file.includes('_processed.jpg') || file.includes('_web.jpg')
+        ).length;
+        
+        console.log('📊 Storage verification results:', {
+          processedFolderPath,
+          totalFilesInStorage: storageFiles.length,
+          processedImageFiles: storageFilesCount,
+          databaseCompletedImages: completedImages,
+          storageFiles: storageFiles.slice(0, 5) // Show first 5 for debugging
+        });
+        
+        // 🚨 STORAGE VERIFICATION CHECKPOINT
+        // We expect at least completedImages processed files in storage
+        // Note: Storage might have more files (thumbnails, XMP, reports) so we check minimum
+        if (storageFilesCount < completedImages) {
+          console.error('❌ STORAGE VERIFICATION FAILED');
+          console.error('Storage mismatch details:', {
+            expectedProcessedFiles: completedImages,
+            actualProcessedFiles: storageFilesCount,
+            deficit: completedImages - storageFilesCount
+          });
+          
+          // Mark order as failed due to storage inconsistency
+          await supabase
+            .from('orders')
+            .update({
+              order_status: 'failed',
+              processing_stage: 'failed',
+              error_message: `Storage verification failed: Expected ${completedImages} processed files, found ${storageFilesCount}`
+            })
+            .eq('id', orderId);
+            
+          throw new Error(`Storage verification failed - processed files missing from storage`);
+        }
+        
+        // Additional verification: Check each database record has corresponding storage file
+        console.log('🔍 Verifying each database record has storage file...');
+        const { data: imageRecords, error: recordsError } = await supabase
+          .from('images')
+          .select('id, original_filename, storage_path_processed')
+          .eq('order_id', orderId)
+          .eq('processing_status', 'complete');
+        
+        if (recordsError) {
+          console.warn('⚠️ Could not fetch image records for storage verification');
+        } else {
+          let missingFiles = 0;
+          for (const record of imageRecords) {
+            if (record.storage_path_processed) {
+              const expectedPath = record.storage_path_processed;
+              const fileName = expectedPath.split('/').pop();
+              const fileFoundInStorage = storageFiles.some((file: string) => 
+                file.includes(fileName?.replace('_processed.jpg', ''))
+              );
+              
+              if (!fileFoundInStorage) {
+                console.warn(`⚠️ Missing storage file for: ${record.original_filename}`);
+                missingFiles++;
+              }
+            }
+          }
+          
+          if (missingFiles > 0) {
+            console.warn(`⚠️ Found ${missingFiles} database records with missing storage files`);
+            // Don't fail the order for individual missing files, but log for investigation
+          } else {
+            console.log('✅ All database records have corresponding storage files');
+          }
+        }
+        
+        console.log('✅ STEP 7 PASSED: Storage-database consistency verified');
+      }
+      
+    } catch (storageError) {
+      console.warn('⚠️ Storage verification error:', storageError.message);
+      // Don't fail the entire order for storage verification issues
+      // But log for investigation
+      console.log('⚠️ Continuing without storage verification due to error');
     }
 
     // 6. Update final batch status

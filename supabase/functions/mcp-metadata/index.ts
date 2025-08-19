@@ -1,176 +1,88 @@
 /**
- * Remote Metadata Processing MCP Server - Edge Function Implementation
- * Handles XMP embedding, report generation, and metadata validation
- * Using proven sb_secret_key authentication pattern
+ * Remote Metadata Processing MCP Server - Enhanced Modular Implementation
+ * Professional XMP embedding, report generation, and metadata validation
+ * Using modular architecture with ORBIT enhanced processing capabilities
+ * 
+ * Features:
+ * - Real XMP embedding into JPEG files (not just file copying)
+ * - Professional report generation with rich formatting
+ * - Multiple output formats (processed images, thumbnails, reports)
+ * - Batch storage operations with error handling
+ * - Enhanced ORBIT schema compliance
  */
 
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 
+// Import modular architecture components
+import { ORBITXMPGenerator, createXMPGenerator, type ORBITMetadata } from '../_shared/metadata/xmp-generator.ts';
+import { ORBITImageProcessor, createImageProcessor, type ProcessedImageResult } from '../_shared/metadata/image-processor.ts';
+import { ORBITReportGenerator, createReportGenerator, type ReportContent, type AnalysisMetadata } from '../_shared/metadata/report-generator.ts';
+import { ORBITStorageManager, createStorageManager, type BatchUploadResult } from '../_shared/metadata/storage-manager.ts';
+
 // Authentication using proven pattern from mcp-ai-analysis
 const MY_FUNCTION_SECRET = Deno.env.get('sb_secret_key');
 
-// Metadata processing interfaces
+// Enhanced metadata processing interfaces
 interface ProcessingResult {
   success: boolean;
   processed_file_path?: string;
   xmp_file_path?: string;
   report_file_path?: string;
+  technical_summary_path?: string;
+  marketing_brief_path?: string;
+  thumbnail_paths?: string[];
+  web_optimized_path?: string;
+  total_files_uploaded: number;
   file_size?: number;
   processing_time_ms: number;
+  upload_results?: BatchUploadResult;
   error?: string;
 }
 
 /**
- * Generate XMP packet for ORBIT metadata
+ * Initialize modular components for enhanced processing
  */
-function generateXMPPacket(analysisResult: any, imageFilename: string): string {
-  const timestamp = new Date().toISOString();
-  const metadata = analysisResult.metadata || {};
-  
-  // Build XMP packet with ORBIT namespace
-  const xmpPacket = `<?xml version="1.0" encoding="UTF-8"?>
-<x:xmpmeta xmlns:x="adobe:ns:meta/" x:xmptk="ORBIT Image Forge 1.0">
-  <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
-    <rdf:Description rdf:about=""
-      xmlns:orbit="http://orbit.ai/metadata/1.0/"
-      xmlns:dc="http://purl.org/dc/elements/1.1/"
-      xmlns:xmp="http://ns.adobe.com/xap/1.0/">
-      
-      <!-- Basic Image Info -->
-      <dc:title>${imageFilename}</dc:title>
-      <xmp:CreateDate>${timestamp}</xmp:CreateDate>
-      <xmp:CreatorTool>ORBIT Image Forge AI Analysis</xmp:CreatorTool>
-      
-      <!-- ORBIT AI Analysis Results -->
-      <orbit:analysisType>${analysisResult.analysis_type || 'unknown'}</orbit:analysisType>
-      <orbit:confidence>${analysisResult.confidence || 0}</orbit:confidence>
-      <orbit:processingTime>${analysisResult.processing_time_ms || 0}</orbit:processingTime>
-      
-      <!-- Scene Analysis -->
-      ${metadata.scene_overview ? `
-      <orbit:sceneSetting>${metadata.scene_overview.setting || ''}</orbit:sceneSetting>
-      <orbit:timeOfDay>${metadata.scene_overview.time_of_day || ''}</orbit:timeOfDay>
-      <orbit:primaryActivity>${metadata.scene_overview.primary_activity || ''}</orbit:primaryActivity>
-      ` : ''}
-      
-      <!-- Human Elements -->
-      ${metadata.human_elements ? `
-      <orbit:numberOfPeople>${metadata.human_elements.number_of_people || 0}</orbit:numberOfPeople>
-      <orbit:emotionalStates>
-        <rdf:Bag>
-          ${(metadata.human_elements.emotional_states || []).map((state: string) => 
-            `<rdf:li>${state}</rdf:li>`
-          ).join('\n          ')}
-        </rdf:Bag>
-      </orbit:emotionalStates>
-      ` : ''}
-      
-      <!-- Marketing Potential -->
-      ${metadata.marketing_potential ? `
-      <orbit:targetDemographic>${metadata.marketing_potential.target_demographic || ''}</orbit:targetDemographic>
-      <orbit:emotionalHooks>
-        <rdf:Bag>
-          ${(metadata.marketing_potential.emotional_hooks || []).map((hook: string) => 
-            `<rdf:li>${hook}</rdf:li>`
-          ).join('\n          ')}
-        </rdf:Bag>
-      </orbit:emotionalHooks>
-      ` : ''}
-      
-      <!-- Complete Analysis JSON -->
-      <orbit:fullAnalysis>${JSON.stringify(metadata).replace(/</g, '&lt;').replace(/>/g, '&gt;')}</orbit:fullAnalysis>
-      
-    </rdf:Description>
-  </rdf:RDF>
-</x:xmpmeta>`;
+function initializeProcessingModules() {
+  const xmpGenerator = createXMPGenerator({
+    includeFullAnalysis: true,
+    includeTimestamp: true,
+    compressionLevel: 'standard'
+  });
 
-  return xmpPacket;
+  const imageProcessor = createImageProcessor({
+    enableThumbnails: true,
+    thumbnailSizes: [150, 300, 600],
+    webOptimized: true,
+    compressionQuality: 85,
+    outputFormats: ['jpg']
+  });
+
+  const reportGenerator = createReportGenerator({
+    includeRawData: false,
+    includeTechnicalDetails: true,
+    includeMarketingInsights: true,
+    format: 'text',
+    templateStyle: 'professional'
+  });
+
+  return { xmpGenerator, imageProcessor, reportGenerator };
 }
 
 /**
- * Generate human-readable metadata report
- */
-function generateMetadataReport(analysisResult: any, imageFilename: string): string {
-  const metadata = analysisResult.metadata || {};
-  const timestamp = new Date().toISOString();
-  
-  let report = `ORBIT IMAGE ANALYSIS REPORT
-Generated: ${timestamp}
-Image: ${imageFilename}
-Analysis Type: ${analysisResult.analysis_type || 'Unknown'}
-Confidence: ${(analysisResult.confidence * 100 || 0).toFixed(1)}%
-
-========================================
-
-`;
-
-  // Scene Overview
-  if (metadata.scene_overview) {
-    report += `SCENE ANALYSIS
-Setting: ${metadata.scene_overview.setting || 'Not specified'}
-Time of Day: ${metadata.scene_overview.time_of_day || 'Not specified'}
-Primary Activity: ${metadata.scene_overview.primary_activity || 'Not specified'}
-
-`;
-  }
-
-  // Human Elements
-  if (metadata.human_elements) {
-    report += `HUMAN ELEMENTS
-Number of People: ${metadata.human_elements.number_of_people || 0}
-Demographics: ${(metadata.human_elements.demographics || []).join(', ') || 'Not specified'}
-Emotional States: ${(metadata.human_elements.emotional_states || []).join(', ') || 'Not specified'}
-Social Dynamics: ${metadata.human_elements.social_dynamics || 'Not specified'}
-
-`;
-  }
-
-  // Key Objects
-  if (metadata.key_objects) {
-    report += `KEY OBJECTS
-Food & Beverage: ${(metadata.key_objects.food_and_beverage || []).join(', ') || 'None identified'}
-Technology: ${(metadata.key_objects.technology || []).join(', ') || 'None identified'}
-Furniture: ${(metadata.key_objects.furniture || []).join(', ') || 'None identified'}
-
-`;
-  }
-
-  // Marketing Potential
-  if (metadata.marketing_potential) {
-    report += `MARKETING INSIGHTS
-Target Demographic: ${metadata.marketing_potential.target_demographic || 'Not specified'}
-Emotional Hooks: ${(metadata.marketing_potential.emotional_hooks || []).join(', ') || 'None identified'}
-Brand Opportunities: ${(metadata.marketing_potential.brand_alignment_opportunities || []).join(', ') || 'None identified'}
-
-`;
-  }
-
-  // Technical Details
-  report += `TECHNICAL DETAILS
-Processing Time: ${analysisResult.processing_time_ms || 0}ms
-File Hash: ${analysisResult.integrity_info?.file_hash || 'Not available'}
-File Size: ${analysisResult.integrity_info?.file_size || 'Not available'} bytes
-MIME Type: ${analysisResult.integrity_info?.mime_type || 'Not available'}
-
-`;
-
-  report += `========================================
-Generated by ORBIT Image Forge
-https://orbit-image-forge.ai
-`;
-
-  return report;
-}
-
-/**
- * Process metadata for image - creates processed image with XMP, standalone XMP file, and report
+ * Enhanced metadata processing with modular architecture
+ * Features real XMP embedding, professional reports, and batch uploads
  */
 async function processImageMetadata(imagePath: string, analysisResult: any): Promise<ProcessingResult> {
   const startTime = Date.now();
   
   try {
-    // Get Supabase client for storage operations
+    console.log('🚀 Starting enhanced metadata processing for:', imagePath);
+    
+    // Initialize modular components
+    const { xmpGenerator, imageProcessor, reportGenerator } = initializeProcessingModules();
+    
+    // Get Supabase configuration
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     
@@ -178,106 +90,164 @@ async function processImageMetadata(imagePath: string, analysisResult: any): Pro
       throw new Error('Missing Supabase configuration for storage access');
     }
     
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    // Initialize storage manager
+    const storageManager = createStorageManager({
+      supabaseUrl,
+      supabaseKey,
+      enableSignedUrls: true,
+      enablePublicUrls: false
+    });
+    
+    console.log('📦 Storage manager initialized');
     
     // Download original image from storage
-    const bucketName = 'orbit-images';
-    const { data: fileData, error: downloadError } = await supabase.storage
-      .from(bucketName)
-      .download(imagePath);
-      
-    if (downloadError) {
-      throw new Error(`Failed to download image: ${downloadError.message}`);
+    const originalImageData = await storageManager.downloadFile(imagePath);
+    if (!originalImageData) {
+      throw new Error('Failed to download original image from storage');
     }
     
-    if (!fileData) {
-      throw new Error('No image data received from storage');
-    }
+    console.log('📥 Downloaded original image:', {
+      path: imagePath,
+      size: originalImageData.length
+    });
     
-    // Generate metadata content
+    // Prepare enhanced metadata structure
     const filename = imagePath.split('/').pop() || 'unknown.jpg';
-    const xmpPacket = generateXMPPacket(analysisResult, filename);
-    const metadataReport = generateMetadataReport(analysisResult, filename);
-    
-    console.log('📝 Generated metadata for:', filename);
-    console.log('📝 XMP packet length:', xmpPacket.length, 'bytes');
-    console.log('📝 Report length:', metadataReport.length, 'bytes');
-    
-    // Create processed file paths
     const pathParts = imagePath.split('/');
-    const orderFolder = pathParts[0]; // "order_id_user_id" folder
-    const originalFilename = pathParts[pathParts.length - 1];
-    const baseFilename = originalFilename.replace(/\.[^/.]+$/, ''); // Remove extension
+    const orderFolder = pathParts[0];
+    const baseFilename = filename.replace(/\.[^/.]+$/, '');
     
-    const processedImagePath = `${orderFolder}/processed/${baseFilename}_processed.jpg`;
-    const xmpFilePath = `${orderFolder}/processed/${baseFilename}_metadata.xmp`;
-    const reportFilePath = `${orderFolder}/processed/${baseFilename}_report.txt`;
+    // Transform analysis result to ORBIT metadata format
+    const orbitMetadata: ORBITMetadata = {
+      analysis_type: analysisResult.analysis_type || 'lifestyle',
+      confidence: analysisResult.confidence || 0,
+      processing_time_ms: analysisResult.processing_time_ms || 0,
+      metadata: analysisResult.metadata || analysisResult,
+      integrity_info: {
+        file_hash: 'calculated_on_processing',
+        file_size: originalImageData.length,
+        mime_type: 'image/jpeg'
+      }
+    };
     
-    // Upload processed image (for now, just copy the original - in production would embed XMP)
-    const { error: uploadError } = await supabase.storage
-      .from(bucketName)
-      .upload(processedImagePath, fileData, {
-        cacheControl: '3600',
-        upsert: true,
-        contentType: 'image/jpeg'
-      });
+    // Transform to report format
+    const reportMetadata: AnalysisMetadata = {
+      analysis_type: orbitMetadata.analysis_type,
+      confidence: orbitMetadata.confidence,
+      processing_time_ms: orbitMetadata.processing_time_ms,
+      metadata: orbitMetadata.metadata,
+      integrity_info: orbitMetadata.integrity_info
+    };
     
-    if (uploadError) {
-      throw new Error(`Failed to upload processed image: ${uploadError.message}`);
+    console.log('🔄 Generating enhanced XMP packet...');
+    
+    // STEP 1: Generate enhanced XMP packet with ORBIT schema
+    const xmpPacket = xmpGenerator.generateXMPPacket(orbitMetadata, filename);
+    console.log('✅ Enhanced XMP packet generated:', {
+      length: xmpPacket.length,
+      analysisType: orbitMetadata.analysis_type,
+      confidence: orbitMetadata.confidence
+    });
+    
+    // STEP 2: Embed XMP into image with real processing
+    console.log('🔄 Embedding XMP metadata into image...');
+    const imageProcessingResult: ProcessedImageResult = await imageProcessor.embedXMPIntoImage(originalImageData, xmpPacket);
+    
+    if (!imageProcessingResult.success) {
+      throw new Error(`XMP embedding failed: ${imageProcessingResult.error}`);
     }
     
-    // Upload XMP file
-    const { error: xmpUploadError } = await supabase.storage
-      .from(bucketName)
-      .upload(xmpFilePath, new Blob([xmpPacket], { type: 'application/xml' }), {
-        cacheControl: '3600',
-        upsert: true,
-        contentType: 'application/xml'
-      });
+    console.log('✅ XMP embedding completed:', {
+      originalSize: originalImageData.length,
+      processedSize: imageProcessingResult.processed_image_size,
+      thumbnailCount: Object.keys(imageProcessingResult.thumbnail_data || {}).length,
+      hasWebOptimized: !!imageProcessingResult.web_optimized_data,
+      processingTime: imageProcessingResult.processing_time_ms
+    });
     
-    if (xmpUploadError) {
-      throw new Error(`Failed to upload XMP file: ${xmpUploadError.message}`);
+    // STEP 3: Generate comprehensive reports
+    console.log('🔄 Generating professional reports...');
+    const reportContent: ReportContent = reportGenerator.generateComprehensiveReport(reportMetadata, filename);
+    
+    console.log('✅ Professional reports generated:', {
+      mainReportSize: reportContent.metadata_report.length,
+      hasTechnicalSummary: !!reportContent.technical_summary,
+      hasMarketingBrief: !!reportContent.marketing_brief,
+      generationTime: reportContent.generation_time_ms
+    });
+    
+    // STEP 4: Batch upload all generated files
+    console.log('🔄 Uploading processed files to storage...');
+    const uploadResults: BatchUploadResult = await storageManager.uploadMetadataResults(
+      orderFolder,
+      baseFilename,
+      {
+        processedImage: imageProcessingResult.processed_image_data,
+        thumbnails: imageProcessingResult.thumbnail_data,
+        webOptimized: imageProcessingResult.web_optimized_data,
+        xmpPacket: xmpPacket,
+        metadataReport: reportContent.metadata_report,
+        technicalSummary: reportContent.technical_summary,
+        marketingBrief: reportContent.marketing_brief,
+        rawDataExport: reportContent.raw_data_export
+      }
+    );
+    
+    if (!uploadResults.success) {
+      throw new Error(`Batch upload failed: ${uploadResults.error}`);
     }
     
-    // Upload report file
-    const { error: reportUploadError } = await supabase.storage
-      .from(bucketName)
-      .upload(reportFilePath, new Blob([metadataReport], { type: 'text/plain' }), {
-        cacheControl: '3600',
-        upsert: true,
-        contentType: 'text/plain'
-      });
+    console.log('✅ Batch upload completed:', {
+      totalFiles: uploadResults.uploaded_files.length,
+      failedUploads: uploadResults.failed_uploads.length,
+      totalSize: uploadResults.total_size,
+      uploadTime: uploadResults.upload_time_ms
+    });
     
-    if (reportUploadError) {
-      throw new Error(`Failed to upload report file: ${reportUploadError.message}`);
-    }
+    // Extract file paths from upload results
+    const filePaths = {
+      processed: uploadResults.uploaded_files.find(f => f.path.includes('_processed.jpg'))?.path,
+      xmp: uploadResults.uploaded_files.find(f => f.path.includes('_metadata.xmp'))?.path,
+      report: uploadResults.uploaded_files.find(f => f.path.includes('_report.txt'))?.path,
+      technical: uploadResults.uploaded_files.find(f => f.path.includes('_technical.txt'))?.path,
+      marketing: uploadResults.uploaded_files.find(f => f.path.includes('_marketing.txt'))?.path,
+      thumbnails: uploadResults.uploaded_files.filter(f => f.path.includes('/thumbnails/')).map(f => f.path),
+      webOptimized: uploadResults.uploaded_files.find(f => f.path.includes('_web.jpg'))?.path
+    };
     
-    const processingTime = Date.now() - startTime;
-    const fileSize = (await fileData.arrayBuffer()).byteLength;
+    const totalProcessingTime = Date.now() - startTime;
     
-    console.log('✅ Successfully processed metadata:', {
-      processedImagePath,
-      xmpFilePath,
-      reportFilePath,
-      processingTime,
-      fileSize
+    console.log('🎉 Enhanced metadata processing completed successfully:', {
+      totalProcessingTime,
+      imageProcessingTime: imageProcessingResult.processing_time_ms,
+      reportGenerationTime: reportContent.generation_time_ms,
+      uploadTime: uploadResults.upload_time_ms,
+      totalFilesGenerated: uploadResults.uploaded_files.length
     });
     
     return {
       success: true,
-      processed_file_path: processedImagePath,
-      xmp_file_path: xmpFilePath,
-      report_file_path: reportFilePath,
-      file_size: fileSize,
-      processing_time_ms: processingTime
+      processed_file_path: filePaths.processed,
+      xmp_file_path: filePaths.xmp,
+      report_file_path: filePaths.report,
+      technical_summary_path: filePaths.technical,
+      marketing_brief_path: filePaths.marketing,
+      thumbnail_paths: filePaths.thumbnails,
+      web_optimized_path: filePaths.webOptimized,
+      total_files_uploaded: uploadResults.uploaded_files.length,
+      file_size: uploadResults.total_size,
+      processing_time_ms: totalProcessingTime,
+      upload_results: uploadResults
     };
     
   } catch (error) {
     const processingTime = Date.now() - startTime;
-    console.error('❌ Metadata processing failed:', error);
+    console.error('❌ Enhanced metadata processing failed:', error);
+    console.error('❌ Error stack:', error.stack);
     
     return {
       success: false,
+      total_files_uploaded: 0,
       processing_time_ms: processingTime,
       error: error.message
     };
@@ -346,4 +316,6 @@ serve(async (req) => {
   }
 });
 
-console.log('🚀 ORBIT Metadata Processing MCP Server deployed and ready');
+console.log('🚀 ORBIT Enhanced Metadata Processing MCP Server deployed and ready');
+console.log('✨ Features: Real XMP Embedding • Professional Reports • Modular Architecture');
+console.log('🔧 Modules: XMP Generator • Image Processor • Report Generator • Storage Manager');
