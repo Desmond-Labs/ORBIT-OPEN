@@ -11,6 +11,7 @@ const corsHeaders = {
 interface ProcessBatchRequest {
   orderId: string;
   analysisType?: 'product' | 'lifestyle';
+  manualTest?: boolean;
 }
 
 interface ImageFile {
@@ -49,18 +50,37 @@ serve(async (req) => {
       keyFormat: authManager.getKeyFormat()
     });
 
+    // Parse request to check for manual test flag
+    let requestBody;
+    try {
+      requestBody = await req.json();
+    } catch (error) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          message: 'Invalid JSON in request body',
+          error: error.message
+        }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
+
     // 🚫 SAFETY GUARD: Disable all automatic processing
     // This prevents any automatic triggers while maintaining manual processing capability
     const DISABLE_AUTO_PROCESSING = true; // Set to false to re-enable automatic processing
     
-    if (DISABLE_AUTO_PROCESSING) {
+    if (DISABLE_AUTO_PROCESSING && !requestBody.manualTest) {
       console.log('🚫 AUTOMATIC PROCESSING DISABLED - Manual processing only');
       console.log('🚫 To enable automatic processing, set DISABLE_AUTO_PROCESSING to false');
+      console.log('🚫 To test manually, add "manualTest": true to your request');
       
       return new Response(
         JSON.stringify({
           success: false,
-          message: 'Automatic processing is disabled. Processing must be triggered manually.',
+          message: 'Automatic processing is disabled. Add "manualTest": true to test manually.',
           orderId: 'N/A',
           status: 'disabled'
         }),
@@ -71,11 +91,15 @@ serve(async (req) => {
       );
     }
 
+    if (requestBody.manualTest) {
+      console.log('🧪 MANUAL TEST MODE ACTIVATED - Processing will proceed');
+    }
+
     // No user authentication needed for webhook-triggered processing
     // The order validation below provides sufficient security
-    console.log('🚀 Starting batch image processing (webhook-triggered)');
+    console.log('🚀 Starting batch image processing');
 
-    const { orderId, analysisType = 'product' }: ProcessBatchRequest = await req.json();
+    const { orderId, analysisType = 'product', manualTest = false }: ProcessBatchRequest = requestBody;
 
     if (!orderId) {
       throw new Error('Order ID is required');
@@ -263,15 +287,16 @@ serve(async (req) => {
         
         let analysisResult;
         try {
-          // Call remote MCP AI analysis server with service authentication
+          // Call remote MCP AI analysis server with sb_secret_key authentication
           const mcpResponse = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/mcp-ai-analysis`, {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${Deno.env.get('sb_secret_key')}`,
               'Content-Type': 'application/json',
+              'apikey': `${Deno.env.get('sb_secret_key')}`,
             },
             body: JSON.stringify({
-              image_path: storagePath,
+              image_path: image.storage_path_original, // Use direct path, MCP server handles orbit-images bucket
               analysis_type: analysisType
             })
           });
@@ -317,18 +342,103 @@ serve(async (req) => {
           console.log('⚠️ Continuing with error analysis result');
         }
 
-        // Update image with analysis results
+        // STEP 5C: STORE ANALYSIS WITH VERIFICATION
+        console.log('💾 Storing AI analysis results in database...');
         await supabase
           .from('images')
           .update({
-            processing_status: 'complete',
-            processed_at: new Date().toISOString(),
-            ai_analysis: analysisResult.metadata,
             gemini_analysis_raw: analysisResult.raw_text,
+            processing_status: 'prcoessing',
+            ai_analysis: analysisResult.metadata,
             analysis_type: analysisType,
             processing_duration_ms: analysisResult.processing_time_ms
           })
           .eq('id', image.id);
+
+        // 🚨 VERIFICATION CHECKPOINT: Verify the JSON was stored correctly
+        console.log('🔍 Verifying analysis data was stored correctly...');
+        const { data: verificationData, error: verificationError } = await supabase
+          .from('images')
+          .select('gemini_analysis_raw, ai_analysis, analysis_type')
+          .eq('id', image.id)
+          .single();
+
+        if (verificationError || !verificationData?.gemini_analysis_raw || !verificationData?.ai_analysis) {
+          console.error('❌ Analysis storage verification failed:', verificationError);
+          throw new Error(`Failed to store analysis data: ${verificationError?.message || 'Missing analysis data'}`);
+        }
+
+        console.log('✅ Analysis data verified successfully in database');
+
+        // STEP 5D: EMBED METADATA INTO IMAGE
+        console.log('🔄 Starting metadata embedding process...');
+        
+        try {
+          const metadataResponse = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/mcp-metadata`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${Deno.env.get('sb_secret_key')}`,
+              'Content-Type': 'application/json',
+              'apikey': `${Deno.env.get('sb_secret_key')}`,
+            },
+            body: JSON.stringify({
+              tool_name: 'process_image_metadata',
+              parameters: {
+                image_path: image.storage_path_original,
+                analysis_result: {
+                  analysis_type: analysisResult.analysis_type,
+                  confidence: analysisResult.confidence,
+                  processing_time_ms: analysisResult.processing_time_ms,
+                  metadata: analysisResult.metadata
+                }
+              }
+            })
+          });
+
+          if (!metadataResponse.ok) {
+            const errorText = await metadataResponse.text();
+            console.error('❌ Metadata processing failed:', metadataResponse.status, errorText);
+            throw new Error(`Metadata processing failed: ${metadataResponse.status} - ${errorText}`);
+          }
+
+          const metadataResult = await metadataResponse.json();
+          console.log('✅ Metadata embedding completed:', {
+            success: metadataResult.success,
+            processingTime: metadataResult.processing_time_ms,
+            processedPath: metadataResult.processed_file_path
+          });
+
+          // Update image with processed metadata paths
+          if (metadataResult.success) {
+            await supabase
+              .from('images')
+              .update({
+                processing_status: 'complete',
+                processed_at: new Date().toISOString(),
+                storage_path_processed: metadataResult.processed_file_path
+              })
+              .eq('id', image.id);
+              
+            console.log('✅ Image processing fully completed with metadata embedding');
+          } else {
+            throw new Error(`Metadata embedding failed: ${metadataResult.error}`);
+          }
+
+        } catch (metadataError) {
+          console.error('🚨 Metadata embedding error:', metadataError);
+          
+          // Still mark as complete but with metadata error
+          await supabase
+            .from('images')
+            .update({
+              processing_status: 'complete',
+              processed_at: new Date().toISOString(),
+              error_message: `Metadata embedding failed: ${metadataError.message}`
+            })
+            .eq('id', image.id);
+            
+          console.log('⚠️ Marked as complete despite metadata error');
+        }
 
         processedResults.push({
           image_id: image.id,

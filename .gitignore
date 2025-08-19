@@ -61,3 +61,8 @@ ORBIT\ Feedback\ from\ HL.docx
 *.backup
 *.bak
 *.orig
+
+# Test output and script
+test_process_batch_output
+test-process-batch.sh
+test-process-batch.sh

@@ -6,7 +6,7 @@ project_id = "ufdcvxmizlzlnyyqpfck"
 verify_jwt = true
 
 [functions.process-image-batch]
-verify_jwt = true
+verify_jwt = false
 
 [functions.create-payment-intent]
 verify_jwt = true
@@ -37,10 +37,10 @@ verify_jwt = false
 
 # Remote MCP Servers - Phase 2 Implementation
 [functions.mcp-ai-analysis]
-verify_jwt = true
+verify_jwt = false
 
 [functions.mcp-metadata]
-verify_jwt = true
+verify_jwt = false
 
 [functions.mcp-storage]
 verify_jwt = true

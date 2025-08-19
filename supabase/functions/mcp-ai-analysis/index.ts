@@ -8,7 +8,7 @@ import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from 'npm:@google/generative-ai';
 
 // 1. Get the expected secret key from your function's environment variables
-const MCP_AI_ANALYSIS_SECRET = Deno.env.get('sb_secret_key');
+const MY_FUNCTION_SECRET = Deno.env.get('sb_secret_key');
 
 // Security configuration matching local server
 const SECURITY_CONFIG = {
@@ -264,10 +264,21 @@ async function analyzeImageWithGemini(
       console.log('📁 Processing Supabase Storage path:', imagePath);
       
       try {
-        // Parse the storage path (format: "bucket/path/to/file.ext" or "bucket-name/folder/file.ext")
-        const pathParts = imagePath.split('/');
-        const bucketName = pathParts[0];
-        const filePath = pathParts.slice(1).join('/');
+        // Handle Supabase Storage file path - support both formats:
+        // 1. "bucket/path/to/file.ext" (full path including bucket)
+        // 2. "path/to/file.ext" (path within orbit-images bucket)
+        let bucketName: string;
+        let filePath: string;
+
+        if (imagePath.startsWith('orbit-images/')) {
+          const pathParts = imagePath.split('/');
+          bucketName = pathParts[0];
+          filePath = pathParts.slice(1).join('/');
+        } else {
+          // Most common: Path within orbit-images bucket
+          bucketName = 'orbit-images';
+          filePath = imagePath;
+        }
         
         console.log('🪣 Bucket:', bucketName, 'File:', filePath);
         
@@ -300,22 +311,14 @@ async function analyzeImageWithGemini(
         const uint8Array = new Uint8Array(arrayBuffer);
         
         // Use FileReader API to avoid stack overflow with large files
-        const base64String = await new Promise<string>((resolve, reject) => {
-          try {
-            // For Deno environment, we'll use btoa with chunking
-            const chunkSize = 1024 * 1024; // 1MB chunks
-            let result = '';
-            
-            for (let i = 0; i < uint8Array.length; i += chunkSize) {
-              const chunk = uint8Array.slice(i, i + chunkSize);
-              const chunkString = String.fromCharCode(...chunk);
-              result += btoa(chunkString);
-            }
-            
-            resolve(result);
-          } catch (error) {
-            reject(error);
-          }
+        const base64String = await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onload = () => {
+            const dataUrl = reader.result as string;
+            const base64 = dataUrl.split(',')[1]; // Remove data:mime;base64, prefix
+            resolve(base64);
+          };
+          reader.readAsDataURL(fileData);
         });
         
         source = 'file';
@@ -477,7 +480,7 @@ serve(async (req) => {
     const providedKey = authHeader.replace('Bearer ', '');
 
     // 4. Compare the provided key with the expected secret key
-    if (providedKey !== MCP_AI_ANALYSIS_SECRET) {
+    if (providedKey !== MY_FUNCTION_SECRET) {
       throw new Error('Invalid authorization key');
     }
 
