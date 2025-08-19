@@ -55,9 +55,9 @@ serve(async (req) => {
     const authManager = new SupabaseAuthManager({
       supabaseUrl: Deno.env.get('SUPABASE_URL') || '',
       legacyAnonKey: Deno.env.get('SUPABASE_ANON_KEY'),
-      newPublishableKey: Deno.env.get('SUPABASE_PUBLISHABLE_KEY'),
+      newPublishableKey: Deno.env.get('sb_publishable_key'),
       legacyServiceRoleKey: Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'),
-      newSecretKey: Deno.env.get('SUPABASE_SECRET_KEY'),
+      newSecretKey: Deno.env.get('sb_secret_key'),
       allowLegacy: true // Enable backward compatibility during migration
     });
     

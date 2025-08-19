@@ -289,9 +289,80 @@ async function analyzeImageWithGemini(
       source = 'url';
       fileSize = size;
     } else if (imagePath) {
-      // For Edge Functions, we'd need to handle file paths differently
-      // This would typically be a Supabase Storage path
-      throw new Error('File path processing not implemented in Edge Function environment');
+      // Handle Supabase Storage file path
+      console.log('📁 Processing Supabase Storage path:', imagePath);
+      
+      try {
+        // Parse the storage path (format: "bucket/path/to/file.ext" or "bucket-name/folder/file.ext")
+        const pathParts = imagePath.split('/');
+        const bucketName = pathParts[0];
+        const filePath = pathParts.slice(1).join('/');
+        
+        console.log('🪣 Bucket:', bucketName, 'File:', filePath);
+        
+        // Create Supabase client for storage access
+        const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm');
+        const supabaseUrl = Deno.env.get('SUPABASE_URL');
+        const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+        
+        if (!supabaseUrl || !supabaseKey) {
+          throw new Error('Missing Supabase configuration for storage access');
+        }
+        
+        const supabase = createClient(supabaseUrl, supabaseKey);
+        
+        // Download the file from Supabase Storage
+        const { data: fileData, error: downloadError } = await supabase.storage
+          .from(bucketName)
+          .download(filePath);
+          
+        if (downloadError) {
+          throw new Error(`Failed to download file from storage: ${downloadError.message}`);
+        }
+        
+        if (!fileData) {
+          throw new Error('No file data received from storage');
+        }
+        
+        // Convert file to base64 for Gemini
+        const arrayBuffer = await fileData.arrayBuffer();
+        const uint8Array = new Uint8Array(arrayBuffer);
+        
+        // Use FileReader API to avoid stack overflow with large files
+        const base64String = await new Promise<string>((resolve, reject) => {
+          try {
+            // For Deno environment, we'll use btoa with chunking
+            const chunkSize = 1024 * 1024; // 1MB chunks
+            let result = '';
+            
+            for (let i = 0; i < uint8Array.length; i += chunkSize) {
+              const chunk = uint8Array.slice(i, i + chunkSize);
+              const chunkString = String.fromCharCode(...chunk);
+              result += btoa(chunkString);
+            }
+            
+            resolve(result);
+          } catch (error) {
+            reject(error);
+          }
+        });
+        
+        source = 'file';
+        base64Image = base64String; // Set the base64 data for Gemini
+        mimeType = fileData.type || 'image/jpeg';
+        fileSize = arrayBuffer.byteLength;
+        
+        console.log('✅ Successfully processed storage file:', {
+          bucket: bucketName,
+          path: filePath,
+          size: fileSize,
+          mimeType: mimeType
+        });
+        
+      } catch (storageError) {
+        console.error('❌ Storage processing error:', storageError);
+        throw new Error(`Storage file processing failed: ${storageError.message}`);
+      }
     } else {
       throw new Error('No valid image source provided');
     }

@@ -6,7 +6,7 @@ import { SupabaseAuthManager } from '../_shared/auth-verification.ts';
 const authManager = new SupabaseAuthManager({
   supabaseUrl: Deno.env.get('SUPABASE_URL') || '',
   legacyServiceRoleKey: Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'),
-  newSecretKey: Deno.env.get('SUPABASE_SECRET_KEY'),
+  newSecretKey: Deno.env.get('sb_secret_key'),
   allowLegacy: true // Enable backward compatibility during migration
 });
 

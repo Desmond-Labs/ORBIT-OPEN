@@ -62,8 +62,8 @@ export class SupabaseAuthManager {
   constructor(config: Partial<AuthConfig> = {}) {
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const legacyServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    const newSecretKey = Deno.env.get('SUPABASE_SECRET_KEY');
-    const newPublishableKey = Deno.env.get('SUPABASE_PUBLISHABLE_KEY');
+    const newSecretKey = Deno.env.get('sb_secret_key');
+    const newPublishableKey = Deno.env.get('sb_publishable_key');
     
     if (!supabaseUrl) {
       throw new Error('SUPABASE_URL environment variable is required');

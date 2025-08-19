@@ -36,7 +36,7 @@ serve(async (req) => {
     const authManager = new SupabaseAuthManager({
       supabaseUrl: Deno.env.get('SUPABASE_URL') || '',
       legacyServiceRoleKey: Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'),
-      newSecretKey: Deno.env.get('SUPABASE_SECRET_KEY'),
+      newSecretKey: Deno.env.get('sb_secret_key'),
       allowLegacy: true // Enable backward compatibility during migration
     });
     
@@ -254,14 +254,100 @@ serve(async (req) => {
           })
           .eq('id', orderId);
 
-        // TODO: AI analysis will be handled by Claude Code SDK orchestrator
-        console.log('🔄 AI analysis step - will be handled by new orchestrator');
+        // 🚀 REMOTE MCP AI ANALYSIS - Using deployed remote MCP server
+        console.log('🔄 Calling remote MCP AI analysis server for image:', image.storage_path_original);
         
-        // Placeholder analysis result for now
-        const analysisResult = {
-          metadata: { status: 'pending_orchestrator' },
-          raw_text: 'Analysis pending - will be processed by Claude Code SDK orchestrator'
-        };
+        // Format the storage path correctly for MCP server (bucket/path format)
+        const storagePath = `orbit-images/${image.storage_path_original}`;
+        console.log('📁 Formatted storage path for MCP:', storagePath);
+        
+        let analysisResult;
+        try {
+          // Call remote MCP AI analysis server with service authentication
+          const mcpResponse = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/mcp-ai-analysis`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${authManager.getServiceToken()}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              jsonrpc: '2.0',
+              method: 'tools/call',
+              params: {
+                name: 'analyze_image',
+                arguments: {
+                  image_path: storagePath,
+                  analysis_type: analysisType
+                }
+              },
+              id: `analysis-${image.id}`
+            })
+          });
+
+          console.log('📡 MCP Response status:', mcpResponse.status);
+          
+          if (!mcpResponse.ok) {
+            const errorText = await mcpResponse.text();
+            console.error('❌ MCP call failed:', mcpResponse.status, errorText);
+            throw new Error(`MCP AI analysis failed: ${mcpResponse.status} - ${errorText}`);
+          }
+
+          const mcpResult = await mcpResponse.json();
+          console.log('📊 MCP Result structure:', {
+            hasResult: !!mcpResult.result,
+            hasError: !!mcpResult.error,
+            resultKeys: mcpResult.result ? Object.keys(mcpResult.result) : []
+          });
+
+          if (mcpResult.error) {
+            console.error('❌ MCP returned error:', mcpResult.error);
+            throw new Error(`MCP AI analysis error: ${mcpResult.error.message}`);
+          }
+
+          if (!mcpResult.result || !mcpResult.result.content) {
+            console.error('❌ Invalid MCP response format:', mcpResult);
+            throw new Error('Invalid MCP response format - missing result.content');
+          }
+
+          // Parse the MCP response content
+          const mcpContent = mcpResult.result.content[0];
+          if (!mcpContent || mcpContent.type !== 'text') {
+            console.error('❌ Invalid MCP content format:', mcpContent);
+            throw new Error('Invalid MCP content format');
+          }
+
+          const geminiAnalysis = JSON.parse(mcpContent.text);
+          console.log('✅ Successfully parsed Gemini analysis:', {
+            analysisType: geminiAnalysis.analysis_type,
+            confidence: geminiAnalysis.confidence,
+            hasMetadata: !!geminiAnalysis.metadata
+          });
+
+          analysisResult = {
+            metadata: geminiAnalysis.metadata || geminiAnalysis,
+            raw_text: mcpContent.text,
+            processing_time_ms: geminiAnalysis.processing_time_ms || 0,
+            analysis_type: geminiAnalysis.analysis_type,
+            confidence: geminiAnalysis.confidence
+          };
+
+        } catch (mcpError) {
+          console.error('🚨 MCP AI Analysis failed:', mcpError);
+          
+          // Fallback for errors - still mark as processed but with error info
+          analysisResult = {
+            metadata: { 
+              error: mcpError.message,
+              status: 'failed',
+              fallback: true
+            },
+            raw_text: `AI Analysis failed: ${mcpError.message}`,
+            processing_time_ms: 0
+          };
+          
+          // Don't throw here - let the process continue with error metadata
+          console.log('⚠️ Continuing with error analysis result');
+        }
 
         // Update image with analysis results
         await supabase

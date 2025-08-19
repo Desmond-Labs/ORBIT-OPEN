@@ -55,14 +55,14 @@ serve(async (req) => {
     const envInfo = {
       hasSupabaseUrl: !!Deno.env.get('SUPABASE_URL'),
       hasLegacyServiceKey: !!Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'),
-      hasNewSecretKey: !!Deno.env.get('SUPABASE_SECRET_KEY'),
-      hasNewPublishableKey: !!Deno.env.get('SUPABASE_PUBLISHABLE_KEY'),
+      hasNewSecretKey: !!Deno.env.get('sb_secret_key'),
+      hasNewPublishableKey: !!Deno.env.get('sb_publishable_key'),
       legacyKeyFormat: Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ? 
         detectKeyFormat(Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!) : 'none',
-      newSecretKeyFormat: Deno.env.get('SUPABASE_SECRET_KEY') ? 
-        detectKeyFormat(Deno.env.get('SUPABASE_SECRET_KEY')!) : 'none',
-      newPublishableKeyFormat: Deno.env.get('SUPABASE_PUBLISHABLE_KEY') ? 
-        detectKeyFormat(Deno.env.get('SUPABASE_PUBLISHABLE_KEY')!) : 'none'
+      newSecretKeyFormat: Deno.env.get('sb_secret_key') ? 
+        detectKeyFormat(Deno.env.get('sb_secret_key')!) : 'none',
+      newPublishableKeyFormat: Deno.env.get('sb_publishable_key') ? 
+        detectKeyFormat(Deno.env.get('sb_publishable_key')!) : 'none'
     };
 
     // Test response
