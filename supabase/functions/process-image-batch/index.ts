@@ -49,6 +49,28 @@ serve(async (req) => {
       keyFormat: authManager.getKeyFormat()
     });
 
+    // 🚫 SAFETY GUARD: Disable all automatic processing
+    // This prevents any automatic triggers while maintaining manual processing capability
+    const DISABLE_AUTO_PROCESSING = true; // Set to false to re-enable automatic processing
+    
+    if (DISABLE_AUTO_PROCESSING) {
+      console.log('🚫 AUTOMATIC PROCESSING DISABLED - Manual processing only');
+      console.log('🚫 To enable automatic processing, set DISABLE_AUTO_PROCESSING to false');
+      
+      return new Response(
+        JSON.stringify({
+          success: false,
+          message: 'Automatic processing is disabled. Processing must be triggered manually.',
+          orderId: 'N/A',
+          status: 'disabled'
+        }),
+        {
+          status: 423, // 423 Locked - indicates resource is locked/disabled
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
+
     // No user authentication needed for webhook-triggered processing
     // The order validation below provides sufficient security
     console.log('🚀 Starting batch image processing (webhook-triggered)');
