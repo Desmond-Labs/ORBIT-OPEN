@@ -2,10 +2,8 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { ArrowRight, Sparkles, Zap, Download, User, Upload, CreditCard, Clock, Trophy } from 'lucide-react';
 import { OrbitDemo } from '@/components/OrbitDemo';
-
 export const MarketingHeroPage: React.FC = () => {
-  return (
-    <div className="min-h-screen relative overflow-hidden">
+  return <div className="min-h-screen relative overflow-hidden">
       {/* Cosmic Background */}
       <div className="star-field absolute inset-0" />
       
@@ -13,11 +11,11 @@ export const MarketingHeroPage: React.FC = () => {
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="orbital-ring absolute top-1/2 left-1/2 w-96 h-96 -translate-x-1/2 -translate-y-1/2 opacity-20" />
         <div className="orbital-ring absolute top-1/2 left-1/2 w-[600px] h-[600px] -translate-x-1/2 -translate-y-1/2 opacity-10" style={{
-          animationDelay: '-10s'
-        }} />
+        animationDelay: '-10s'
+      }} />
         <div className="orbital-ring absolute top-1/2 left-1/2 w-[800px] h-[800px] -translate-x-1/2 -translate-y-1/2 opacity-5" style={{
-          animationDelay: '-5s'
-        }} />
+        animationDelay: '-5s'
+      }} />
       </div>
 
       {/* Header */}
@@ -40,10 +38,7 @@ export const MarketingHeroPage: React.FC = () => {
         <div className="max-w-4xl mx-auto text-center">
           {/* Hero Headline with Time Savings */}
           <div className="mb-8">
-            <div className="inline-flex items-center gap-2 bg-accent/10 border border-accent/30 rounded-full px-4 py-2 mb-6">
-              <Trophy className="w-4 h-4 text-accent" />
-              <span className="text-sm font-medium text-accent">20x Faster Than Manual Tagging</span>
-            </div>
+            
             <h1 className="text-5xl md:text-7xl font-bold mb-6 leading-tight">
               <span className="gradient-text">Transform</span> Your Images
               <br />
@@ -222,9 +217,15 @@ export const MarketingHeroPage: React.FC = () => {
               {/* Orbital connection lines SVG */}
               <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 400 300">
                 <path d="M80 60 Q150 120 200 150" stroke="url(#gradient1)" strokeWidth="2" fill="none" opacity="0.6" strokeDasharray="5,5" className="animate-pulse" />
-                <path d="M320 60 Q250 120 200 150" stroke="url(#gradient1)" strokeWidth="2" fill="none" opacity="0.6" strokeDasharray="5,5" className="animate-pulse" style={{animationDelay: '0.5s'}} />
-                <path d="M200 150 Q150 180 80 240" stroke="url(#gradient2)" strokeWidth="2" fill="none" opacity="0.6" strokeDasharray="5,5" className="animate-pulse" style={{animationDelay: '1s'}} />
-                <path d="M200 150 Q250 180 320 240" stroke="url(#gradient2)" strokeWidth="2" fill="none" opacity="0.6" strokeDasharray="5,5" className="animate-pulse" style={{animationDelay: '1.5s'}} />
+                <path d="M320 60 Q250 120 200 150" stroke="url(#gradient1)" strokeWidth="2" fill="none" opacity="0.6" strokeDasharray="5,5" className="animate-pulse" style={{
+                animationDelay: '0.5s'
+              }} />
+                <path d="M200 150 Q150 180 80 240" stroke="url(#gradient2)" strokeWidth="2" fill="none" opacity="0.6" strokeDasharray="5,5" className="animate-pulse" style={{
+                animationDelay: '1s'
+              }} />
+                <path d="M200 150 Q250 180 320 240" stroke="url(#gradient2)" strokeWidth="2" fill="none" opacity="0.6" strokeDasharray="5,5" className="animate-pulse" style={{
+                animationDelay: '1.5s'
+              }} />
                 <defs>
                   <linearGradient id="gradient1" x1="0%" y1="0%" x2="100%" y2="0%">
                     <stop offset="0%" stopColor="#4A77C3" stopOpacity="0.2" />
@@ -371,6 +372,5 @@ export const MarketingHeroPage: React.FC = () => {
           </p>
         </div>
       </footer>
-    </div>
-  );
+    </div>;
 };
