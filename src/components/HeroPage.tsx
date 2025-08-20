@@ -37,7 +37,7 @@ export const HeroPage: React.FC<HeroPageProps> = ({
           </div>
         </div>
       </header>
-
+ <WorkflowSteps onGetStarted={onGetStarted} />
       {/* Main Content */}
       <main className="relative z-10 px-6 pt-20 pb-32">
         <div className="max-w-4xl mx-auto text-center">
