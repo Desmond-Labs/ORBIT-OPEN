@@ -10,6 +10,7 @@ import { PaymentWaiting } from "./pages/PaymentWaiting";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import NotFound from "./pages/NotFound";
 import FloatingFeedback from "./components/feedback/FloatingFeedback"; // Added
+import { MarketingHeroPage } from "./components/MarketingHeroPage";
 
 const queryClient = new QueryClient();
 
@@ -21,6 +22,7 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Index />} />
+          <Route path="/marketing" element={<MarketingHeroPage />} />
           <Route path="/payment-waiting" element={<PaymentWaiting />} />
           <Route path="/payment-success" element={<PaymentSuccess />} />
           <Route path="/privacy-policy" element={<PrivacyPolicy />} />
