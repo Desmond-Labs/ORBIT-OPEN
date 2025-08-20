@@ -158,12 +158,12 @@ const PaymentSuccess: React.FC = () => {
                   body: { sessionId: sessionId }
                 });
                 
-                if (serviceRoleOrder && !serviceError) {
+                if (serviceRoleOrder && !serviceError && serviceRoleOrder.id && !serviceRoleOrder.error) {
                   console.log('✅ Found order via service role fallback:', serviceRoleOrder.order_number);
                   order = serviceRoleOrder;
                   orderError = null;
                 } else {
-                  console.log('🔧 Service role fallback failed:', serviceError);
+                  console.log('🔧 Service role fallback failed:', serviceError || serviceRoleOrder?.error);
                 }
               } catch (serviceRoleError) {
                 console.log('🔧 Service role fallback error:', serviceRoleError);
@@ -224,9 +224,11 @@ const PaymentSuccess: React.FC = () => {
                 const { data: serviceRoleOrder, error: serviceError } = await supabase.functions.invoke('verify-payment-order', {
                   body: { sessionId }
                 });
-                if (serviceRoleOrder && !serviceError) {
+                if (serviceRoleOrder && !serviceError && serviceRoleOrder.id && !serviceRoleOrder.error) {
                   console.log('✅ Found order via service role fallback:', serviceRoleOrder.order_number);
                   order = serviceRoleOrder;
+                } else {
+                  console.log('🔧 Service role fallback failed:', serviceError || serviceRoleOrder?.error);
                 }
               } catch (e) {
                 console.log('🔧 Service role fallback error (final):', e);
