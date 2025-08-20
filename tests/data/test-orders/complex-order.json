@@ -1,0 +1,42 @@
+{
+  "description": "Complex test order for Tier 2 orchestration",
+  "orderId": "REPLACE_WITH_COMPLEX_ORDER_ID",
+  "expectedBehavior": {
+    "tier": "tier2",
+    "processingTime": "13-15s",
+    "orchestrationTime": "<500ms",
+    "expectedFiles": [
+      "multiple_processed_images.jpg",
+      "comprehensive_metadata.xmp",
+      "detailed_analysis_report.txt",
+      "thumbnails_150px.jpg",
+      "thumbnails_300px.jpg", 
+      "thumbnails_600px.jpg",
+      "web_optimized.jpg",
+      "technical_summary.txt",
+      "marketing_brief.txt"
+    ]
+  },
+  "testConfiguration": {
+    "imageCount": 5,
+    "totalSizeMB": 25.0,
+    "complexity": "high",
+    "expectedTier": "tier2",
+    "userTier": "enterprise",
+    "hasFailureHistory": true,
+    "isReprocessing": true
+  },
+  "escalationTriggers": [
+    "repeated_failures >= 2",
+    "enterprise_user_any_failure",
+    "high_complexity_score >= 4"
+  ],
+  "validationChecks": [
+    "payment_status = 'completed'",
+    "order_status = 'paid'",
+    "multiple images in storage/original/",
+    "user authentication valid",
+    "escalation triggers activated"
+  ],
+  "notes": "Use for testing Tier 2 Claude Code SDK orchestration, self-healing, and complex workflows."
+}

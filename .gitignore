@@ -33,10 +33,9 @@ dist-ssr
 .env.development
 .env.debug
 
-# Debug and Test Scripts - May contain sensitive data
+# Debug Scripts - May contain sensitive data
 debug*.js
 debug*.sh
-test*.js
 validate*.js
 
 # Claude Code
@@ -62,8 +61,17 @@ ORBIT\ Feedback\ from\ HL.docx
 *.bak
 *.orig
 
-# Test output and script
-test_process_batch_output
-test-process-batch.sh
-test-process-batch.sh
-test-two-tier-architecture.sh
+# Test Output and Sensitive Test Data
+tests/output/**
+tests/data/sensitive/**
+tests/**/*.log
+tests/**/*.backup
+tests/**/*secret*
+tests/**/*key*
+tests/**/*token*
+
+# Test Scripts with Potential Sensitive Data (exclude from repo)
+# Note: Most test scripts are now organized in tests/ and should be committed
+# Only exclude scripts that might contain hardcoded secrets
+*secret-test*
+*private-test*

@@ -365,11 +365,18 @@ curl -X POST "https://<your-project>.supabase.co/functions/v1/smart-router" \
 
 ### **Run Comprehensive Tests**
 ```bash
+# Interactive test runner (recommended)
+./tests/run-tests.sh
+
 # Test complete two-tier architecture
-./test-two-tier-architecture.sh <order-id>
+./tests/scripts/test-two-tier-architecture.sh <order-id>
 
 # Test individual MCP components  
-./test-process-batch.sh <order-id>
+./tests/scripts/test-process-batch.sh <order-id>
+
+# Run specific test suite
+./tests/run-tests.sh <order-id> <test-type>
+# test-type: two-tier, tier1, mcp, email, all, health
 ```
 
 ## 📊 Performance Metrics
@@ -408,8 +415,9 @@ supabase db reset                          # Reset with migrations
 supabase gen types typescript --local      # Generate types
 
 # Testing
-./test-two-tier-architecture.sh           # Full system test
-./test-process-batch.sh                   # Component test
+./tests/run-tests.sh                      # Interactive test runner
+./tests/scripts/test-two-tier-architecture.sh # Full system test
+./tests/scripts/test-process-batch.sh     # Component test
 ./trigger-email.sh <order-id>              # Manual email trigger
 ```
 
@@ -451,8 +459,30 @@ supabase db push
 
 - **[CLAUDE.md](./CLAUDE.md)**: Complete system documentation
 - **[CLAUDE.local.md](./CLAUDE.local.md)**: Local development guide
+- **[tests/README.md](./tests/README.md)**: Comprehensive testing guide
 - **API Documentation**: Available in Supabase dashboard
-- **Architecture Diagrams**: In `/docs` directory
+- **Architecture Diagrams**: In workflow diagram above
+
+## 🧪 Testing Organization
+
+The project includes a comprehensive testing suite in the `tests/` directory:
+
+```
+tests/
+├── README.md                    # Testing documentation
+├── run-tests.sh                 # Interactive test runner
+├── scripts/                     # All test scripts
+├── data/                        # Test data and configurations
+├── output/                      # Test results (gitignored)
+└── supabase/                    # Supabase-specific tests
+```
+
+### **Key Testing Features**
+- **Interactive Test Runner**: Easy-to-use menu system for all tests
+- **Organized Test Scripts**: All tests moved to dedicated directory
+- **Test Data Management**: Sample orders and configurations
+- **Automated Gitignore**: Test outputs and sensitive data excluded
+- **Comprehensive Coverage**: Two-tier system, MCP, email, health checks
 
 ## 🤝 Contributing
 

@@ -1,0 +1,27 @@
+{
+  "description": "Simple test order with single image",
+  "orderId": "43a14341-28e4-4632-962b-322e9d387db6",
+  "expectedBehavior": {
+    "tier": "tier1",
+    "processingTime": "<6s",
+    "expectedFiles": [
+      "processed_image.jpg",
+      "metadata.xmp", 
+      "analysis_report.txt"
+    ]
+  },
+  "testConfiguration": {
+    "imageCount": 1,
+    "totalSizeMB": 1.74,
+    "complexity": "low",
+    "expectedTier": "tier1",
+    "userTier": "premium"
+  },
+  "validationChecks": [
+    "payment_status = 'completed'",
+    "order_status = 'paid'",
+    "images exist in storage/original/",
+    "user authentication valid"
+  ],
+  "notes": "Default test order used in most test scripts. Reliable for Tier 1 testing."
+}
