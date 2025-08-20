@@ -280,21 +280,41 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
       console.log('✅ Payment intent created successfully:', paymentData);
       setOrderId(paymentData.order_id);
       
-      // Upload files immediately (parallel with payment process)
-      console.log('📤 Uploading files immediately for parallel processing');
-      await uploadFilesToStorage(paymentData.order_id);
+      // Handle free-only orders differently
+      if (paymentData.is_free_only) {
+        console.log('🎉 Free-only order - proceeding directly to processing');
+        
+        // Upload files for free orders
+        await uploadFilesToStorage(paymentData.order_id);
+        console.log('✅ Files uploaded successfully for free processing');
+        
+        // Show success message
+        toast({
+          title: "Processing Started",
+          description: paymentData.message || `${paymentData.free_images_used} images are being processed for free!`,
+          variant: "default"
+        });
+        
+        // Go directly to processing step
+        setCurrentStep('processing');
+        setPaymentLoading(false);
+        return;
+      }
       
-      console.log('✅ Files uploaded successfully - images ready for processing');
+      // For paid orders, upload files and navigate to payment
+      console.log('💳 Paid order - uploading files and navigating to payment');
+      await uploadFilesToStorage(paymentData.order_id);
+      console.log('✅ Files uploaded successfully - proceeding to payment');
 
       // Store data for the payment waiting page
       localStorage.setItem('orbit-checkout-url', paymentData.checkout_url);
-      localStorage.setItem('orbit-total-cost', totalCost.toString());
+      localStorage.setItem('orbit-total-cost', paymentData.total_cost?.toString() || totalCost.toString());
       localStorage.setItem('orbit-file-count', uploadedFiles.length.toString());
       localStorage.setItem('orbit-order-id', paymentData.order_id);
       
-      // Navigate directly to payment waiting page (single loading experience)
-      console.log('🚀 Navigating directly to payment waiting page');
-      navigate(`/payment-waiting?checkoutUrl=${encodeURIComponent(paymentData.checkout_url)}&totalCost=${totalCost}&fileCount=${uploadedFiles.length}&orderId=${paymentData.order_id}`);
+      // Navigate to payment waiting page for paid orders
+      console.log('🚀 Navigating to payment waiting page');
+      navigate(`/payment-waiting?checkoutUrl=${encodeURIComponent(paymentData.checkout_url)}&totalCost=${paymentData.total_cost || totalCost}&fileCount=${uploadedFiles.length}&orderId=${paymentData.order_id}`);
 
     } catch (error: any) {
       console.error('❌ Payment error:', error);
@@ -372,6 +392,7 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
                 isProcessing={paymentLoading}
                 onPayment={handlePayment}
                 canInitiatePayment={canInitiatePayment()}
+                user={user}
               />
             )}
 

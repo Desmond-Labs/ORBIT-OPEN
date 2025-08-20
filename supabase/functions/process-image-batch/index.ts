@@ -816,6 +816,41 @@ serve(async (req) => {
       })
       .eq('id', orderId);
 
+    // 7.1. Increment daily usage for free images (only for successfully completed orders)
+    if (finalStatus === 'completed' && order.user_id) {
+      try {
+        console.log('📊 Incrementing daily usage for free images used');
+        
+        // Get order metadata to find free images used
+        const { data: orderData, error: orderError } = await supabase
+          .from('orders')
+          .select('metadata')
+          .eq('id', orderId)
+          .single();
+          
+        if (!orderError && orderData?.metadata?.free_images_used) {
+          const freeImagesUsed = orderData.metadata.free_images_used;
+          console.log(`📊 Found ${freeImagesUsed} free images to increment in daily usage`);
+          
+          const { error: usageError } = await supabase.rpc('increment_daily_usage', {
+            user_id_param: order.user_id,
+            images_count: freeImagesUsed
+          });
+          
+          if (usageError) {
+            console.error('❌ Failed to increment daily usage:', usageError);
+          } else {
+            console.log(`✅ Successfully incremented daily usage by ${freeImagesUsed} images`);
+          }
+        } else {
+          console.log('📊 No free images found in order metadata, skipping daily usage increment');
+        }
+      } catch (error) {
+        console.error('❌ Error incrementing daily usage:', error);
+        // Don't fail the entire process if daily usage update fails
+      }
+    }
+
     // 7.5. Send completion email for both complete and partial success
     if (finalStatus === 'completed' || finalStatus === 'completed_with_errors') {
       try {
