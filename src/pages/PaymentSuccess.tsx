@@ -46,6 +46,12 @@ const PaymentSuccess: React.FC = () => {
       try {
         console.log('🔍 Searching for order with session ID:', sessionId);
         console.log('🔍 User authenticated:', !!user);
+        console.log('🔍 Session ID format analysis:', {
+          sessionId,
+          length: sessionId?.length,
+          startsWithCs: sessionId?.startsWith('cs_'),
+          startsWithPi: sessionId?.startsWith('pi_')
+        });
         
         // Try multiple lookup strategies
         let order = null;
@@ -60,14 +66,24 @@ const PaymentSuccess: React.FC = () => {
           return;
         }
         
+        const query = `stripe_payment_intent_id.eq.${sessionId},stripe_payment_intent_id_actual.eq.${sessionId}`;
+        console.log('🔍 Database query:', { query, sessionId });
+        
         const { data: orderByStripeId, error: stripeError } = await supabase
           .from('orders')
           .select('*')
-          .or(`stripe_payment_intent_id.eq.${sessionId},stripe_payment_intent_id_actual.eq.${sessionId}`)
+          .or(query)
           .maybeSingle();
           
         console.log('🔍 Stripe ID lookup result:', { 
           hasData: !!orderByStripeId, 
+          orderData: orderByStripeId ? { 
+            id: orderByStripeId.id, 
+            order_number: orderByStripeId.order_number,
+            stripe_payment_intent_id: orderByStripeId.stripe_payment_intent_id,
+            stripe_payment_intent_id_actual: orderByStripeId.stripe_payment_intent_id_actual,
+            user_id: orderByStripeId.user_id
+          } : null,
           error: stripeError,
           errorCode: stripeError?.code,
           errorMessage: stripeError?.message 
@@ -158,12 +174,28 @@ const PaymentSuccess: React.FC = () => {
                   body: { sessionId: sessionId }
                 });
                 
+                console.log('🔧 Service role response analysis (early fallback):', {
+                  hasData: !!serviceRoleOrder,
+                  hasError: !!serviceError,
+                  serviceRoleOrder: serviceRoleOrder,
+                  serviceError: serviceError,
+                  orderHasId: serviceRoleOrder?.id ? true : false,
+                  orderHasError: serviceRoleOrder?.error ? true : false
+                });
+                
                 if (serviceRoleOrder && !serviceError && serviceRoleOrder.id && !serviceRoleOrder.error) {
                   console.log('✅ Found order via service role fallback:', serviceRoleOrder.order_number);
                   order = serviceRoleOrder;
                   orderError = null;
                 } else {
-                  console.log('🔧 Service role fallback failed:', serviceError || serviceRoleOrder?.error);
+                  console.log('🔧 Service role fallback failed (early) - detailed analysis:', {
+                    reason: !serviceRoleOrder ? 'No serviceRoleOrder' :
+                            serviceError ? 'Service error present' :
+                            !serviceRoleOrder.id ? 'No order ID' :
+                            serviceRoleOrder.error ? 'Order has error property' : 'Unknown',
+                    serviceError: serviceError,
+                    serviceRoleOrderError: serviceRoleOrder?.error
+                  });
                 }
               } catch (serviceRoleError) {
                 console.log('🔧 Service role fallback error:', serviceRoleError);
@@ -224,11 +256,28 @@ const PaymentSuccess: React.FC = () => {
                 const { data: serviceRoleOrder, error: serviceError } = await supabase.functions.invoke('verify-payment-order', {
                   body: { sessionId }
                 });
+                
+                console.log('🔧 Service role response analysis:', {
+                  hasData: !!serviceRoleOrder,
+                  hasError: !!serviceError,
+                  serviceRoleOrder: serviceRoleOrder,
+                  serviceError: serviceError,
+                  orderHasId: serviceRoleOrder?.id ? true : false,
+                  orderHasError: serviceRoleOrder?.error ? true : false
+                });
+                
                 if (serviceRoleOrder && !serviceError && serviceRoleOrder.id && !serviceRoleOrder.error) {
                   console.log('✅ Found order via service role fallback:', serviceRoleOrder.order_number);
                   order = serviceRoleOrder;
                 } else {
-                  console.log('🔧 Service role fallback failed:', serviceError || serviceRoleOrder?.error);
+                  console.log('🔧 Service role fallback failed - detailed analysis:', {
+                    reason: !serviceRoleOrder ? 'No serviceRoleOrder' :
+                            serviceError ? 'Service error present' :
+                            !serviceRoleOrder.id ? 'No order ID' :
+                            serviceRoleOrder.error ? 'Order has error property' : 'Unknown',
+                    serviceError: serviceError,
+                    serviceRoleOrderError: serviceRoleOrder?.error
+                  });
                 }
               } catch (e) {
                 console.log('🔧 Service role fallback error (final):', e);
