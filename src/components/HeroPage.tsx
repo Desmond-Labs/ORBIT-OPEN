@@ -1,6 +1,7 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { ArrowRight, Sparkles, Zap, Download, User, Upload, CreditCard } from 'lucide-react';
+import { OrbitDemo } from '@/components/OrbitDemo';
 interface HeroPageProps {
   onGetStarted: () => void;
 }
