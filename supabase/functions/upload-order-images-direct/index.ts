@@ -268,14 +268,29 @@ serve(async (req) => {
       }
     }
 
-    // Update order status
+    // Update order status - but preserve "paid" status for free orders
     const successCount = uploadResults.filter(r => r.success).length;
+    
+    // Check if this is a free order
+    const isFreeOrder = order.total_cost === 0 || 
+                        (order.cost_breakdown && order.cost_breakdown.is_free_only === true);
+    
+    let updateData = {
+      updated_at: new Date().toISOString()
+    };
+    
+    // Only update order_status if not a free order
+    if (!isFreeOrder) {
+      updateData.order_status = successCount > 0 ? "processing" : "failed";
+    } else if (successCount === 0) {
+      // Even free orders should be marked as failed if no uploads succeeded
+      updateData.order_status = "failed";
+    }
+    // For free orders with successful uploads, keep existing order_status (should be "paid")
+    
     const { error: updateError } = await supabaseService
       .from("orders")
-      .update({
-        order_status: successCount > 0 ? "processing" : "failed",
-        updated_at: new Date().toISOString()
-      })
+      .update(updateData)
       .eq("id", orderId);
 
     if (updateError) {
