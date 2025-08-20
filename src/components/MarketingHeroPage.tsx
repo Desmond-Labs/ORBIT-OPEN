@@ -351,15 +351,7 @@ export const MarketingHeroPage: React.FC = () => {
           </div>
 
           {/* Final CTA */}
-          <div className="space-y-4">
-            <Button variant="cosmic" size="xl" disabled className="font-semibold opacity-60 cursor-not-allowed">
-              Request Early Access
-              <ArrowRight className="w-5 h-5" />
-            </Button>
-            <p className="text-sm text-muted-foreground">
-              Join the revolution in image processing speed
-            </p>
-          </div>
+          
         </div>
       </main>
 
