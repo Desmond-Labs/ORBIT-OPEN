@@ -199,7 +199,7 @@ serve(async (req) => {
           stripe_payment_intent_id: paymentIntentId,
           stripe_customer_id: customerId,
           payment_status: isFreeOnly ? "completed" : "pending",
-          order_status: isFreeOnly ? "ready_for_processing" : "payment_pending",
+          order_status: isFreeOnly ? "paid" : "payment_pending",
           metadata: {
             free_images_used: freeImagesUsed,
             paid_images: paidImages,

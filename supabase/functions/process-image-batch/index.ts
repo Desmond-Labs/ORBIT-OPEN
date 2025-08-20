@@ -809,7 +809,7 @@ serve(async (req) => {
     await supabase
       .from('orders')
       .update({
-        order_status: finalStatus === 'completed' ? 'completed' : 'completed_with_errors',
+        order_status: 'completed',
         processing_stage: 'completed',
         processing_completion_percentage: 100,
         completed_at: new Date().toISOString()

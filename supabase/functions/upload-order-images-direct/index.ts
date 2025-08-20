@@ -273,7 +273,7 @@ serve(async (req) => {
     const { error: updateError } = await supabaseService
       .from("orders")
       .update({
-        order_status: successCount > 0 ? "images_uploaded" : "upload_failed",
+        order_status: successCount > 0 ? "processing" : "failed",
         updated_at: new Date().toISOString()
       })
       .eq("id", orderId);
