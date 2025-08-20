@@ -1,8 +1,6 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { ArrowRight, Sparkles, Zap, Download } from 'lucide-react';
-import { OrbitDemo } from './OrbitDemo';
-import { WorkflowSteps } from './WorkflowSteps';
+import { ArrowRight, Sparkles, Zap, Download, User, Upload, CreditCard } from 'lucide-react';
 interface HeroPageProps {
   onGetStarted: () => void;
 }
@@ -95,8 +93,179 @@ export const HeroPage: React.FC<HeroPageProps> = ({
             </div>
           </div>
 
-          {/* Workflow Steps */}
-          <WorkflowSteps onGetStarted={onGetStarted} />
+          {/* Cosmic Journey Process */}
+          <div className="mb-16">
+            <div className="text-center mb-12">
+              <h2 className="text-3xl md:text-4xl font-bold mb-4">
+                Your Cosmic <span className="gradient-text">AI Journey</span>
+              </h2>
+              <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+                Experience the ORBIT transformation – where your images enter our cosmic intelligence 
+                and emerge as enriched, metadata-enhanced digital assets.
+              </p>
+            </div>
+
+            {/* Orbital Layout */}
+            <div className="relative max-w-5xl mx-auto h-[600px] hidden md:block">
+              {/* Central AI Processing Core */}
+              <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-20">
+                <div className="relative group">
+                  <div className="absolute inset-0 bg-gradient-to-r from-accent/20 via-primary/30 to-accent/20 rounded-2xl opacity-50 group-hover:opacity-100 transition-all duration-500 animate-pulse" />
+                  <div className="absolute -inset-4 rounded-full border-2 border-accent/30 animate-spin-slow opacity-60" />
+                  <div className="relative bg-gradient-to-br from-[#1A233F] to-[#2A3B5F] border-2 border-accent/40 rounded-2xl p-8 w-72 h-72 flex flex-col items-center justify-center text-center cosmic-transition hover:border-accent/80 hover:scale-105">
+                    <div className="w-20 h-20 bg-gradient-to-r from-accent to-primary rounded-full flex items-center justify-center mb-6">
+                      <Sparkles className="w-10 h-10 text-background" />
+                    </div>
+                    <h3 className="text-2xl font-bold text-accent mb-3">AI Processing</h3>
+                    <p className="text-muted-foreground text-sm leading-relaxed">
+                      Our cosmic intelligence analyzes every pixel, extracting deep insights and embedding rich metadata
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Sign In - Top Left */}
+              <div className="absolute top-16 left-16">
+                <div className="relative group">
+                  <div className="absolute inset-0 bg-gradient-glow rounded-xl opacity-0 group-hover:opacity-50 transition-opacity duration-300" />
+                  <div className="relative bg-gradient-to-br from-[#1A233F]/80 to-[#2A3B5F]/80 backdrop-blur-sm border border-accent/20 rounded-xl p-6 w-56 h-40 flex flex-col items-center cosmic-transition hover:border-accent/40">
+                    <div className="w-12 h-12 bg-primary/80 rounded-full flex items-center justify-center mb-4">
+                      <User className="w-6 h-6 text-background" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-accent mb-2">Sign In</h3>
+                    <p className="text-muted-foreground text-sm text-center">Begin your cosmic journey with secure authentication</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Upload - Top Right */}
+              <div className="absolute top-16 right-16">
+                <div className="relative group">
+                  <div className="absolute inset-0 bg-gradient-glow rounded-xl opacity-0 group-hover:opacity-50 transition-opacity duration-300" />
+                  <div className="relative bg-gradient-to-br from-[#1A233F]/80 to-[#2A3B5F]/80 backdrop-blur-sm border border-accent/20 rounded-xl p-6 w-56 h-40 flex flex-col items-center cosmic-transition hover:border-accent/40">
+                    <div className="w-12 h-12 bg-primary/80 rounded-full flex items-center justify-center mb-4">
+                      <Upload className="w-6 h-6 text-background" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-accent mb-2">Upload Images</h3>
+                    <p className="text-muted-foreground text-sm text-center">Launch your visual assets into our processing orbit</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Payment - Bottom Left */}
+              <div className="absolute bottom-16 left-16">
+                <div className="relative group">
+                  <div className="absolute inset-0 bg-gradient-glow rounded-xl opacity-0 group-hover:opacity-50 transition-opacity duration-300" />
+                  <div className="relative bg-gradient-to-br from-[#1A233F]/80 to-[#2A3B5F]/80 backdrop-blur-sm border border-accent/20 rounded-xl p-6 w-56 h-40 flex flex-col items-center cosmic-transition hover:border-accent/40">
+                    <div className="w-12 h-12 bg-primary/80 rounded-full flex items-center justify-center mb-4">
+                      <CreditCard className="w-6 h-6 text-background" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-accent mb-2">Payment</h3>
+                    <p className="text-muted-foreground text-sm text-center">Transparent pricing for your cosmic transformation</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Download - Bottom Right */}
+              <div className="absolute bottom-16 right-16">
+                <div className="relative group">
+                  <div className="absolute inset-0 bg-gradient-glow rounded-xl opacity-0 group-hover:opacity-50 transition-opacity duration-300" />
+                  <div className="relative bg-gradient-to-br from-[#1A233F]/80 to-[#2A3B5F]/80 backdrop-blur-sm border border-accent/20 rounded-xl p-6 w-56 h-40 flex flex-col items-center cosmic-transition hover:border-accent/40">
+                    <div className="w-12 h-12 bg-primary/80 rounded-full flex items-center justify-center mb-4">
+                      <Download className="w-6 h-6 text-background" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-accent mb-2">Download Ready</h3>
+                    <p className="text-muted-foreground text-sm text-center">Receive your enhanced assets with embedded intelligence</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Orbital Connection Lines */}
+              <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 400 300">
+                <path d="M80 60 Q150 120 200 150" stroke="url(#gradient1)" strokeWidth="2" fill="none" opacity="0.6" strokeDasharray="5,5" className="animate-pulse" />
+                <path d="M320 60 Q250 120 200 150" stroke="url(#gradient1)" strokeWidth="2" fill="none" opacity="0.6" strokeDasharray="5,5" className="animate-pulse" style={{animationDelay: '0.5s'}} />
+                <path d="M200 150 Q150 180 80 240" stroke="url(#gradient2)" strokeWidth="2" fill="none" opacity="0.6" strokeDasharray="5,5" className="animate-pulse" style={{animationDelay: '1s'}} />
+                <path d="M200 150 Q250 180 320 240" stroke="url(#gradient2)" strokeWidth="2" fill="none" opacity="0.6" strokeDasharray="5,5" className="animate-pulse" style={{animationDelay: '1.5s'}} />
+                <defs>
+                  <linearGradient id="gradient1" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stopColor="#4A77C3" stopOpacity="0.2" />
+                    <stop offset="100%" stopColor="#48C9B0" stopOpacity="0.8" />
+                  </linearGradient>
+                  <linearGradient id="gradient2" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stopColor="#48C9B0" stopOpacity="0.8" />
+                    <stop offset="100%" stopColor="#4A77C3" stopOpacity="0.2" />
+                  </linearGradient>
+                </defs>
+              </svg>
+            </div>
+
+            {/* Mobile Layout */}
+            <div className="md:hidden space-y-4 max-w-sm mx-auto px-4">
+              <div className="relative bg-gradient-to-br from-[#1A233F]/80 to-[#2A3B5F]/80 border border-accent/20 rounded-xl p-4 h-24 flex items-center space-x-4">
+                <div className="w-12 h-12 bg-primary/80 rounded-full flex items-center justify-center">
+                  <User className="w-6 h-6 text-background" />
+                </div>
+                <div>
+                  <h3 className="text-base font-semibold text-accent mb-1">Sign In</h3>
+                  <p className="text-muted-foreground text-sm">Begin your cosmic journey</p>
+                </div>
+              </div>
+
+              <div className="flex justify-center my-3">
+                <div className="w-0.5 h-6 bg-gradient-to-b from-primary/80 to-accent/80" />
+              </div>
+
+              <div className="relative bg-gradient-to-br from-[#1A233F]/80 to-[#2A3B5F]/80 border border-accent/20 rounded-xl p-4 h-24 flex items-center space-x-4">
+                <div className="w-12 h-12 bg-primary/80 rounded-full flex items-center justify-center">
+                  <Upload className="w-6 h-6 text-background" />
+                </div>
+                <div>
+                  <h3 className="text-base font-semibold text-accent mb-1">Upload Images</h3>
+                  <p className="text-muted-foreground text-sm">Launch your visual assets</p>
+                </div>
+              </div>
+
+              <div className="flex justify-center my-3">
+                <div className="w-0.5 h-6 bg-gradient-to-b from-primary/80 to-accent/80" />
+              </div>
+
+              <div className="relative bg-gradient-to-br from-[#1A233F] to-[#2A3B5F] border-2 border-accent/40 rounded-xl p-6 text-center">
+                <div className="w-16 h-16 bg-gradient-to-r from-accent to-primary rounded-full flex items-center justify-center mb-4 mx-auto">
+                  <Sparkles className="w-8 h-8 text-background" />
+                </div>
+                <h3 className="text-xl font-bold text-accent mb-2">AI Processing</h3>
+                <p className="text-muted-foreground text-sm">Cosmic intelligence transforms your images</p>
+              </div>
+
+              <div className="flex justify-center my-3">
+                <div className="w-0.5 h-6 bg-gradient-to-b from-accent/80 to-primary/80" />
+              </div>
+
+              <div className="relative bg-gradient-to-br from-[#1A233F]/80 to-[#2A3B5F]/80 border border-accent/20 rounded-xl p-4 h-24 flex items-center space-x-4">
+                <div className="w-12 h-12 bg-primary/80 rounded-full flex items-center justify-center">
+                  <CreditCard className="w-6 h-6 text-background" />
+                </div>
+                <div>
+                  <h3 className="text-base font-semibold text-accent mb-1">Payment</h3>
+                  <p className="text-muted-foreground text-sm">Transparent cosmic pricing</p>
+                </div>
+              </div>
+
+              <div className="flex justify-center my-3">
+                <div className="w-0.5 h-6 bg-gradient-to-b from-primary/80 to-accent/80" />
+              </div>
+
+              <div className="relative bg-gradient-to-br from-[#1A233F]/80 to-[#2A3B5F]/80 border border-accent/20 rounded-xl p-4 h-24 flex items-center space-x-4">
+                <div className="w-12 h-12 bg-primary/80 rounded-full flex items-center justify-center">
+                  <Download className="w-6 h-6 text-background" />
+                </div>
+                <div>
+                  <h3 className="text-base font-semibold text-accent mb-1">Download Ready</h3>
+                  <p className="text-muted-foreground text-sm">Enhanced assets ready</p>
+                </div>
+              </div>
+            </div>
+          </div>
 
           {/* ORBIT Demo Section */}
           <div className="mb-16">
