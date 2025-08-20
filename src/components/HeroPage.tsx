@@ -37,7 +37,15 @@ export const HeroPage: React.FC<HeroPageProps> = ({
           </div>
         </div>
       </header>
- <WorkflowSteps onGetStarted={onGetStarted} />
+ <div className="space-y-4">
+            <Button variant="cosmic" size="xl" onClick={onGetStarted} className="font-semibold">
+              Start Your ORBIT Analysis
+              <ArrowRight className="w-5 h-5" />
+            </Button>
+            <p className="text-sm text-muted-foreground">
+              No subscription required • Pay per batch • Instant processing
+            </p>
+          </div>
       {/* Main Content */}
       <main className="relative z-10 px-6 pt-20 pb-32">
         <div className="max-w-4xl mx-auto text-center">
