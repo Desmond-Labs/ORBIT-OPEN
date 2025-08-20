@@ -52,102 +52,82 @@ serve(async (req) => {
       });
     }
 
-    // Calculate hybrid pricing (free daily + paid excess) using the database function
+    // Calculate tier pricing using the database function
     const { data: pricingData, error: pricingError } = await supabaseClient
-      .rpc('calculate_hybrid_pricing', {
+      .rpc('calculate_tier_pricing', {
         user_id_param: user.id,
-        image_count_param: imageCount  
+        image_count_param: imageCount
       });
 
     if (pricingError) {
-      console.error("Error calculating hybrid pricing:", pricingError);
+      console.error("Error calculating pricing:", pricingError);
       return new Response(JSON.stringify({ error: "Error calculating pricing" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 500,
       });
     }
 
-    console.log("💰 Hybrid pricing breakdown:", pricingData);
-
     const totalCost = pricingData.total_cost;
-    const freeImagesUsed = pricingData.free_images_used;
-    const paidImages = pricingData.paid_images;
-    const isFreeOnly = pricingData.is_free_only;
     const amountInCents = Math.round(totalCost * 100);
 
-    // Only initialize Stripe if payment is needed
-    let stripe: Stripe | null = null;
-    if (!isFreeOnly) {
-      stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
-        apiVersion: "2023-10-16",
-      });
-    }
+    // Initialize Stripe
+    const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
+      apiVersion: "2023-10-16",
+    });
 
-    // Get or create Stripe customer only if needed
-    let customerId = null;
-    if (!isFreeOnly) {
-      const userDataPromise = supabaseClient
+    // Get or create Stripe customer and create Stripe operations in parallel
+    const userDataPromise = supabaseClient
+      .from("orbit_users")
+      .select("stripe_customer_id, email")
+      .eq("id", user.id)
+      .single();
+
+    const { data: userData } = await userDataPromise;
+    let customerId = userData?.stripe_customer_id;
+
+    // Create customer in parallel with other operations if needed
+    const customerPromise = !customerId ? stripe.customers.create({
+      email: userData?.email || user.email,
+      metadata: { user_id: user.id }
+    }) : Promise.resolve(null);
+
+    if (!customerId) {
+      const customer = await customerPromise;
+      customerId = customer!.id;
+
+      // Update user with Stripe customer ID (don't await, run in background)
+      supabaseClient
         .from("orbit_users")
-        .select("stripe_customer_id, email")
+        .update({ stripe_customer_id: customerId })
         .eq("id", user.id)
-        .single();
-
-      const { data: userData } = await userDataPromise;
-      customerId = userData?.stripe_customer_id;
-
-      // Create customer in parallel with other operations if needed
-      if (!customerId && stripe) {
-        const customer = await stripe.customers.create({
-          email: userData?.email || user.email,
-          metadata: { user_id: user.id }
-        });
-        customerId = customer.id;
-
-        // Update user with Stripe customer ID (don't await, run in background)
-        supabaseClient
-          .from("orbit_users")
-          .update({ stripe_customer_id: customerId })
-          .eq("id", user.id)
-          .then(() => console.log('Customer ID updated'));
-      }
+        .then(() => console.log('Customer ID updated'));
     }
 
-    let session = null;
-    let checkoutUrl = null;
-    let paymentIntentId = null;
-
-    // Create checkout session only for paid orders
-    if (!isFreeOnly && totalCost > 0 && stripe) {
-      session = await stripe.checkout.sessions.create({
-        customer: customerId,
-        line_items: [
-          {
-            price_data: {
-              currency: "usd",
-              product_data: {
-                name: `ORBIT Image Analysis - ${imageCount} images`,
-                description: `${freeImagesUsed} free images + ${paidImages} paid images`,
-              },
-              unit_amount: amountInCents,
+    // Create checkout session
+    const session = await stripe.checkout.sessions.create({
+      customer: customerId,
+      line_items: [
+        {
+          price_data: {
+            currency: "usd",
+            product_data: {
+              name: `ORBIT Image Analysis - ${imageCount} images`,
+              description: `AI-powered analysis for ${imageCount} product images`,
             },
-            quantity: 1,
+            unit_amount: amountInCents,
           },
-        ],
-        mode: "payment",
-        success_url: `${Deno.env.get("FRONTEND_URL") || "http://localhost:3000"}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${Deno.env.get("FRONTEND_URL") || "http://localhost:3000"}/`,
-        metadata: {
-          user_id: user.id,
-          image_count: imageCount.toString(),
-          free_images: freeImagesUsed.toString(),
-          paid_images: paidImages.toString(),
-          batch_name: batchName || `Batch ${new Date().toISOString()}`
+          quantity: 1,
         },
-      });
-      
-      checkoutUrl = session.url;
-      paymentIntentId = session.id;
-    }
+      ],
+      mode: "payment",
+      success_url: `${Deno.env.get("FRONTEND_URL") || "http://localhost:3000"}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${Deno.env.get("FRONTEND_URL") || "http://localhost:3000"}/`,
+      metadata: {
+        user_id: user.id,
+        image_count: imageCount.toString(),
+        batch_name: batchName || `Batch ${new Date().toISOString()}`
+      },
+    });
 
     // Create order record using service role client
     const supabaseService = createClient(
@@ -196,16 +176,10 @@ serve(async (req) => {
           base_cost: totalCost,
           total_cost: totalCost,
           cost_breakdown: pricingData,
-          stripe_payment_intent_id: paymentIntentId,
+          stripe_payment_intent_id: session.id,
           stripe_customer_id: customerId,
-          payment_status: isFreeOnly ? "completed" : "pending",
-          order_status: isFreeOnly ? "paid" : "payment_pending",
-          metadata: {
-            free_images_used: freeImagesUsed,
-            paid_images: paidImages,
-            is_free_only: isFreeOnly,
-            daily_limit_applied: true
-          }
+          payment_status: "pending",
+          order_status: "payment_pending"
         })
         .select()
         .single(),
@@ -233,56 +207,20 @@ serve(async (req) => {
         .insert({
           order_id: order.id,
           user_id: user.id,
-          stripe_payment_intent_id: paymentIntentId,
+          stripe_payment_intent_id: session.id,
           amount: totalCost,
-          payment_status: isFreeOnly ? "completed" : "pending",
-          metadata: {
-            free_images_used: freeImagesUsed,
-            paid_images: paidImages,
-            is_free_only: isFreeOnly
-          }
+          payment_status: "pending"
         })
     ]);
 
     // Payment record creation is handled in parallel above
 
-    // If free only, increment daily usage and return success
-    if (isFreeOnly) {
-      await supabaseService.rpc('increment_daily_usage', {
-        user_id_param: user.id,
-        images_count: freeImagesUsed
-      });
-      
-      return new Response(JSON.stringify({
-        success: true,
-        order_id: order.id,
-        batch_id: batch.id,
-        order_number: orderNumber,
-        total_cost: 0,
-        free_images_used: freeImagesUsed,
-        paid_images: 0,
-        is_free_only: true,
-        ready_for_upload: true,
-        message: `🎉 ${freeImagesUsed} images processed for free using your daily limit!`
-      }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 200,
-      });
-    }
-
-    // Return response for paid orders
     return new Response(JSON.stringify({
-      checkout_url: checkoutUrl,
-      session_id: session?.id,
+      checkout_url: session.url,
+      session_id: session.id,
       order_id: order.id,
-      batch_id: batch.id,
-      order_number: orderNumber,
       amount: totalCost,
-      free_images_used: freeImagesUsed,
-      paid_images: paidImages,
-      is_free_only: false,
-      tier_breakdown: pricingData,
-      message: `${freeImagesUsed} images free + ${paidImages} images for $${totalCost}`
+      tier_breakdown: pricingData
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
