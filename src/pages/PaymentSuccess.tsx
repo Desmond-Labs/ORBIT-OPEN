@@ -241,6 +241,13 @@ const PaymentSuccess: React.FC = () => {
           }
         }
         
+        // Add null guard to prevent TypeError when accessing order properties
+        if (!order) {
+          console.log('❌ No order found after all lookup strategies');
+          setStatus('not_found');
+          return;
+        }
+        
         console.log('✅ Order found:', { id: order.id, order_number: order.order_number, payment_status: order.payment_status });
 
         setOrderData(order);
