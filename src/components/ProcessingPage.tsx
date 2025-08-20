@@ -290,14 +290,15 @@ export const ProcessingPage: React.FC<ProcessingPageProps> = ({ onBack }) => {
         
         // Show success message
         toast({
-          title: "Processing Started",
-          description: paymentData.message || `${paymentData.free_images_used} images are being processed for free!`,
+          title: "Processing Started!",
+          description: `${paymentData.free_images_used} images are being processed for free. View progress in your dashboard.`,
           variant: "default"
         });
         
-        // Go directly to processing step
-        setCurrentStep('processing');
+        // Navigate to dashboard to show order status
+        console.log('🚀 Navigating to dashboard for free order tracking');
         setPaymentLoading(false);
+        navigate(`/?view=dashboard&order=${paymentData.order_id}`);
         return;
       }
       
