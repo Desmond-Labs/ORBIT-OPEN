@@ -99,7 +99,7 @@ export const HeroPage: React.FC<HeroPageProps> = ({
               <ArrowRight className="w-5 h-5" />
             </Button>
             <p className="text-sm text-muted-foreground">
-              No subscription required • Pay per batch • Instant processing
+
             </p>
           </div>
 
