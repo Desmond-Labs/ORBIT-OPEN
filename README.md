@@ -1,10 +1,18 @@
 # ORBIT Image Forge
 
+[![MIT License](https://img.shields.io/badge/License-MIT-green.svg)](https://choosealicense.com/licenses/mit/)
+[![React](https://img.shields.io/badge/React-20232A?style=flat&logo=react&logoColor=61DAFB)](https://reactjs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=flat&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Supabase](https://img.shields.io/badge/Supabase-3ECF8E?style=flat&logo=supabase&logoColor=white)](https://supabase.com)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](http://makeapullrequest.com)
+
 ## 🎯 Project Overview
 
-**ORBIT Image Forge** is an AI-powered image processing platform that analyzes lifestyle and product images using Google Gemini AI, then embeds comprehensive metadata directly into image files using XMP standards. The platform features a revolutionary **Two-Tier Processing Architecture** that combines speed with reliability through intelligent routing.
+**ORBIT Image Forge** is an open source AI-powered image processing platform that analyzes lifestyle and product images using Google Gemini AI, then embeds comprehensive metadata directly into image files using industry-standard XMP formats. The platform features a revolutionary **Two-Tier Processing Architecture** that combines speed with reliability through intelligent routing.
 
-**Live Demo**: https://preview--orbit-image-forge.lovable.app
+**🚀 Live Demo**: https://preview--orbit-image-forge.lovable.app  
+**📖 Documentation**: [Complete System Docs](./CLAUDE.md)  
+**🤝 Contributing**: [Developer Guide](./CONTRIBUTING.md)
 
 ## 📊 End-to-End Workflow Diagram
 
@@ -486,11 +494,50 @@ tests/
 
 ## 🤝 Contributing
 
-1. Fork the repository
-2. Create feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit changes (`git commit -m 'Add amazing feature'`)
-4. Push to branch (`git push origin feature/amazing-feature`)
-5. Open Pull Request
+We welcome contributions from developers of all skill levels! ORBIT Image Forge is designed to be contributor-friendly with comprehensive documentation and testing infrastructure.
+
+### Quick Start for Contributors
+
+1. **Fork and Clone**
+   ```bash
+   git clone https://github.com/YOUR_USERNAME/orbit-image-forge.git
+   cd orbit-image-forge
+   ```
+
+2. **Setup Development Environment**
+   ```bash
+   npm install
+   cp .env.example .env
+   # Edit .env with your configuration
+   ```
+
+3. **Start Development**
+   ```bash
+   npm run dev                    # Frontend
+   supabase start                 # Backend (separate terminal)
+   ```
+
+4. **Run Tests**
+   ```bash
+   ./tests/run-tests.sh          # Interactive test runner
+   ```
+
+### Areas We Need Help With
+
+- **🚀 Performance**: Optimize image processing pipeline
+- **📱 Mobile UI**: Improve responsive design
+- **🔧 Features**: New AI models, batch processing, analytics
+- **📚 Documentation**: API docs, tutorials, examples
+- **🧪 Testing**: Increase test coverage
+
+### Development Resources
+
+- **[Contributing Guide](./CONTRIBUTING.md)**: Detailed development setup
+- **[Testing Guide](./tests/README.md)**: Comprehensive test documentation
+- **[Architecture Overview](./CLAUDE.md)**: System design and components
+- **[GitHub Issues](https://github.com/YOUR_USERNAME/orbit-image-forge/issues)**: Bug reports and feature requests
+
+**New to open source?** Look for issues labeled `good-first-issue`!
 
 ## 📄 License
 
