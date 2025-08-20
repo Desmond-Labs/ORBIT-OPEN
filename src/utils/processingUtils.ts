@@ -31,6 +31,21 @@ export const calculateCost = (imageCount: number) => {
   return Number(cost.toFixed(2));
 };
 
+// Hybrid pricing calculation that accounts for daily free limit
+export const calculateHybridCost = (imageCount: number, dailyFreeRemaining: number) => {
+  const freeImages = Math.min(imageCount, dailyFreeRemaining);
+  const paidImages = Math.max(0, imageCount - freeImages);
+  const paidCost = paidImages > 0 ? calculateCost(paidImages) : 0;
+  
+  return {
+    freeImages,
+    paidImages,
+    totalCost: paidCost,
+    isFreeOnly: paidImages === 0,
+    breakdown: `${freeImages} free + ${paidImages} paid = $${paidCost}`
+  };
+};
+
 export const fileToBase64 = (file: File): Promise<string> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();

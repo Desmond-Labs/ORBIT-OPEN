@@ -110,6 +110,48 @@ export type Database = {
           },
         ]
       }
+      contact_submissions: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          message: string
+          metadata: Json
+          page_path: string
+          page_url: string | null
+          resolved: boolean
+          subject: string
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          message: string
+          metadata?: Json
+          page_path: string
+          page_url?: string | null
+          resolved?: boolean
+          subject: string
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          message?: string
+          metadata?: Json
+          page_path?: string
+          page_url?: string | null
+          resolved?: boolean
+          subject?: string
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       feedback_submissions: {
         Row: {
           created_at: string
@@ -387,9 +429,13 @@ export type Database = {
           billing_period_end: string | null
           billing_period_start: string | null
           created_at: string | null
+          daily_analyses_used: number | null
+          daily_analysis_limit: number | null
+          daily_limit_reset_time: string | null
           email: string
           id: string
           images_processed_this_month: number | null
+          last_daily_reset: string | null
           monthly_image_limit: number | null
           monthly_spend_current: number | null
           preferred_payment_method_id: string | null
@@ -405,9 +451,13 @@ export type Database = {
           billing_period_end?: string | null
           billing_period_start?: string | null
           created_at?: string | null
+          daily_analyses_used?: number | null
+          daily_analysis_limit?: number | null
+          daily_limit_reset_time?: string | null
           email: string
           id: string
           images_processed_this_month?: number | null
+          last_daily_reset?: string | null
           monthly_image_limit?: number | null
           monthly_spend_current?: number | null
           preferred_payment_method_id?: string | null
@@ -423,9 +473,13 @@ export type Database = {
           billing_period_end?: string | null
           billing_period_start?: string | null
           created_at?: string | null
+          daily_analyses_used?: number | null
+          daily_analysis_limit?: number | null
+          daily_limit_reset_time?: string | null
           email?: string
           id?: string
           images_processed_this_month?: number | null
+          last_daily_reset?: string | null
           monthly_image_limit?: number | null
           monthly_spend_current?: number | null
           preferred_payment_method_id?: string | null
@@ -739,6 +793,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      calculate_hybrid_pricing: {
+        Args: {
+          billing_period_start_param?: string
+          image_count_param: number
+          user_id_param: string
+        }
+        Returns: Json
+      }
       calculate_tier_pricing: {
         Args: {
           billing_period_start_param?: string
@@ -767,6 +829,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string
       }
+      increment_daily_usage: {
+        Args: { images_count: number; user_id_param: string }
+        Returns: boolean
+      }
       increment_token_usage: {
         Args: { token_param: string }
         Returns: boolean
@@ -783,6 +849,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      reset_daily_limits: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
       set_config: {
         Args: {
           is_local?: boolean
@@ -794,6 +864,17 @@ export type Database = {
       setup_user_buckets: {
         Args: { user_id: string }
         Returns: undefined
+      }
+      submit_contact_message: {
+        Args: {
+          email_param: string
+          message_param: string
+          page_path: string
+          page_url?: string
+          subject_param: string
+          user_agent?: string
+        }
+        Returns: string
       }
       submit_feedback: {
         Args: {
