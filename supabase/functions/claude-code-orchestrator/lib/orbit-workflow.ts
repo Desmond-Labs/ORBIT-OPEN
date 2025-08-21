@@ -11,10 +11,7 @@
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 import { OrbitRequest, OrbitResponse, OrbitPhases, OrbitResults, PhaseStatus, DiscoveryResults, ProcessingResults, ValidationResults } from '../types/orbit-types.ts';
 import { TodoManager } from './todo-manager.ts';
-import { GeminiAnalysisTool } from '../tools/gemini-analysis.ts';
-import { MetadataProcessorTool } from '../tools/metadata-processor.ts';
-import { StorageManagerTool } from '../tools/storage-manager.ts';
-import { ReportGeneratorTool } from '../tools/report-generator.ts';
+import { ClaudeClient } from './claude-client.ts';
 
 export interface WorkflowOptions {
   enableMetrics?: boolean;
@@ -34,10 +31,7 @@ export interface ImageProcessingJob {
 export class OrbitWorkflow {
   private supabase: any;
   private todoManager: TodoManager;
-  private geminiTool: GeminiAnalysisTool;
-  private metadataTool: MetadataProcessorTool;
-  private storageTool: StorageManagerTool;
-  private reportTool: ReportGeneratorTool;
+  private claudeClient: ClaudeClient;
   private options: WorkflowOptions;
   private workflowStartTime: number;
 
@@ -66,17 +60,14 @@ export class OrbitWorkflow {
       enableLogging: this.options.enableLogging
     });
 
-    // Initialize direct tools
-    this.geminiTool = new GeminiAnalysisTool();
-    this.metadataTool = new MetadataProcessorTool();
-    this.storageTool = new StorageManagerTool();
-    this.reportTool = new ReportGeneratorTool();
+    // Initialize REAL Claude API client
+    this.claudeClient = new ClaudeClient();
 
     this.workflowStartTime = Date.now();
 
     if (this.options.enableLogging) {
-      console.log('🌌 ORBIT Workflow Engine initialized with direct tool integration');
-      console.log('⚡ Performance optimization: ~78% faster, ~40% cheaper than HTTP MCP');
+      console.log('🌌 ORBIT Workflow Engine initialized with REAL Claude API integration');
+      console.log('🤖 Using authentic Claude Code patterns with MCP tools');
     }
   }
 
@@ -271,65 +262,81 @@ export class OrbitWorkflow {
     let metadataTime = 0;
     let reportTime = 0;
 
-    // Process each image
+    // Process each image using REAL Claude API orchestration
     for (const imageJob of discoveryResults.imageJobs) {
       try {
         if (this.options.enableLogging) {
-          console.log(`🔄 Processing: ${imageJob.filename}`);
+          console.log(`🔄 Processing: ${imageJob.filename} using REAL Claude API`);
         }
 
-        // Step 1: AI Analysis using direct Gemini tool
-        const analysisResult = await this.geminiTool.analyzeImage(
-          imageJob.imagePath,
-          analysisType
+        // Step 1: Claude API Orchestration for Image Analysis
+        const claudeAnalysisResult = await this.claudeClient.orchestrateWithClaude(
+          discoveryResults.orderId,
+          'image_analysis',
+          {
+            imageJob,
+            analysisType,
+            imagePath: imageJob.imagePath,
+            filename: imageJob.filename
+          }
         );
         
-        if (!analysisResult.success) {
-          throw new Error(`AI analysis failed: ${analysisResult.error}`);
+        if (!claudeAnalysisResult.success) {
+          throw new Error(`Claude API orchestration failed: ${claudeAnalysisResult.error}`);
         }
         
-        analysisTime += analysisResult.processingTime;
+        analysisTime += claudeAnalysisResult.executionTime;
 
-        // Step 2: Metadata Processing using direct tool
+        // Step 2: Claude API Orchestration for Metadata Processing
         this.todoManager.startTask('metadata-1');
-        const metadataResult = await this.metadataTool.embedImageMetadata(
-          imageJob.imagePath,
-          JSON.parse(analysisResult.analysis.result?.content?.[0]?.text || '{}'),
-          `${imageJob.imagePath.replace('/original/', '/processed/')}_processed`
+        const claudeMetadataResult = await this.claudeClient.orchestrateWithClaude(
+          discoveryResults.orderId,
+          'metadata_processing',
+          {
+            imageJob,
+            imagePath: imageJob.imagePath,
+            analysisResult: claudeAnalysisResult.result,
+            outputPath: `${imageJob.imagePath.replace('/original/', '/processed/')}_processed`
+          }
         );
         
-        if (!metadataResult.success) {
-          throw new Error(`Metadata processing failed: ${metadataResult.error}`);
+        if (!claudeMetadataResult.success) {
+          throw new Error(`Claude metadata orchestration failed: ${claudeMetadataResult.error}`);
         }
         
-        metadataTime += metadataResult.processingTime;
+        metadataTime += claudeMetadataResult.executionTime;
         this.todoManager.completeTask('metadata-1');
 
-        // Step 3: Report Generation using direct tool
+        // Step 3: Claude API Orchestration for Report Generation
         this.todoManager.startTask('reports-1');
-        const reportResult = await this.reportTool.generateReport(
-          JSON.parse(analysisResult.analysis.result?.content?.[0]?.text || '{}'),
-          imageJob.imagePath,
-          'detailed'
+        const claudeReportResult = await this.claudeClient.orchestrateWithClaude(
+          discoveryResults.orderId,
+          'report_generation',
+          {
+            imageJob,
+            imagePath: imageJob.imagePath,
+            analysisResult: claudeAnalysisResult.result,
+            metadataResult: claudeMetadataResult.result
+          }
         );
         
-        reportTime += reportResult.processingTime;
+        reportTime += claudeReportResult.executionTime;
         this.todoManager.completeTask('reports-1');
 
         // Update image processing status in database
         await this.updateImageProcessingStatus(imageJob.imageId, 'completed', {
-          analysis: analysisResult,
-          metadata: metadataResult,
-          report: reportResult
+          analysis: claudeAnalysisResult,
+          metadata: claudeMetadataResult,
+          report: claudeReportResult
         });
 
         processedImages.push({
           imageId: imageJob.imageId,
           filename: imageJob.filename,
-          analysisResult,
-          metadataResult,
-          reportResult,
-          totalProcessingTime: analysisResult.processingTime + metadataResult.processingTime + reportResult.processingTime
+          analysisResult: claudeAnalysisResult,
+          metadataResult: claudeMetadataResult,
+          reportResult: claudeReportResult,
+          totalProcessingTime: claudeAnalysisResult.executionTime + claudeMetadataResult.executionTime + claudeReportResult.executionTime
         });
 
         if (this.options.enableLogging) {
@@ -457,17 +464,19 @@ export class OrbitWorkflow {
 
   // Helper methods
   private async validateEnvironment(): Promise<void> {
-    // Health checks for all tools
-    const checks = await Promise.all([
-      this.geminiTool.healthCheck(),
-      this.metadataTool.healthCheck(),
-      this.storageTool.healthCheck(),
-      this.reportTool.healthCheck()
-    ]);
-
-    const allHealthy = checks.every(check => check);
-    if (!allHealthy) {
-      throw new Error('Environment validation failed - one or more tools are not healthy');
+    // Health check for Claude API client
+    const claudeHealthy = await this.claudeClient.healthCheck();
+    
+    if (!claudeHealthy) {
+      throw new Error('Environment validation failed - Claude API client is not healthy');
+    }
+    
+    // Validate required environment variables
+    const requiredEnv = ['CLAUDE_API_KEY', 'SUPABASE_URL', 'sb_secret_key'];
+    const missingEnv = requiredEnv.filter(env => !Deno.env.get(env));
+    
+    if (missingEnv.length > 0) {
+      throw new Error(`Missing required environment variables: ${missingEnv.join(', ')}`);
     }
   }
 
@@ -550,14 +559,15 @@ export class OrbitWorkflow {
   }
 
   private generateToolMetrics(): any {
-    const metrics = this.todoManager.getMetrics();
+    const todoMetrics = this.todoManager.getMetrics();
+    const claudeMetrics = this.claudeClient.getMetrics();
     
     return {
-      directToolIntegration: true,
-      performanceGain: '78% faster than HTTP MCP',
-      costReduction: '40% cheaper than remote MCP',
-      networkDependencies: 'None - all tools integrated directly',
-      todoMetrics: metrics,
+      realClaudeAPIIntegration: true,
+      claudeAPIMetrics: claudeMetrics,
+      authenticClaudeCodePatterns: true,
+      mcpToolsAvailable: 6, // Number of MCP tools defined for Claude
+      todoMetrics: todoMetrics,
       workflowDuration: Date.now() - this.workflowStartTime
     };
   }
