@@ -15,6 +15,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { OrbitRequest, OrbitResponse } from './types/orbit-types.ts';
 import { OrbitWorkflow } from './lib/orbit-workflow.ts';
+import { OrderDiscoveryService } from './lib/order-discovery.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -233,31 +234,73 @@ serve(async (req) => {
     console.log('✅ System authentication validated - proceeding with orchestration');
     
     // Parse request body
-    const requestBody: OrbitRequest = await req.json();
+    const requestBody: any = await req.json();
     
-    // Validate required parameters
-    if (!requestBody.orderId) {
-      console.error('❌ Missing orderId in request');
-      
-      return new Response(JSON.stringify({
-        success: false,
-        orchestrationType: 'claude-code-sdk',
-        error: 'Order ID is required for Claude Code ORBIT orchestration',
-        message: 'Missing required parameter: orderId',
-        timestamp: new Date().toISOString()
-      }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+    // Check if this is a queue processing request
+    if (requestBody.action === 'process_queue') {
+      console.log('🔄 Queue processing request received');
+      return await processOrderQueue(requestBody.options || {});
     }
+    
+    // For single order processing, validate orderId or discover next order
+    let orderId = requestBody.orderId;
+    
+    if (!orderId) {
+      console.log('🔍 No orderId provided - discovering next pending order...');
+      
+      try {
+        const discoveryService = new OrderDiscoveryService();
+        const nextOrder = await discoveryService.findNextOrder();
+        
+        if (!nextOrder) {
+          console.log('✅ No pending orders found - workflow complete');
+          
+          return new Response(JSON.stringify({
+            success: true,
+            orchestrationType: 'claude-code-sdk',
+            message: 'No pending orders found - all orders processed',
+            queueStatus: 'empty',
+            timestamp: new Date().toISOString()
+          }), {
+            status: 200,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+        
+        orderId = nextOrder.id;
+        console.log(`🎯 Discovered next order: ${orderId} (${nextOrder.order_number})`);
+        
+      } catch (discoveryError) {
+        console.error('❌ Order discovery failed:', discoveryError);
+        
+        return new Response(JSON.stringify({
+          success: false,
+          orchestrationType: 'claude-code-sdk',
+          error: 'Order discovery failed',
+          message: `Failed to discover next order: ${discoveryError.message}`,
+          timestamp: new Date().toISOString()
+        }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+    }
+    
+    // Create proper OrbitRequest for single order processing
+    const orbitRequest: OrbitRequest = {
+      orderId,
+      action: requestBody.action || 'process',
+      analysisType: requestBody.analysisType,
+      debugMode: requestBody.debugMode || false
+    };
 
     // Log request details
-    console.log(`🎯 Claude Code orchestrating order: ${requestBody.orderId}`);
+    console.log(`🎯 Claude Code orchestrating order: ${orderId}`);
     console.log(`🔧 Request parameters:`, {
-      orderId: requestBody.orderId,
-      action: requestBody.action || 'process',
-      analysisType: requestBody.analysisType || 'auto-detect',
-      debugMode: requestBody.debugMode || false
+      orderId: orderId,
+      action: orbitRequest.action,
+      analysisType: orbitRequest.analysisType || 'auto-detect',
+      debugMode: orbitRequest.debugMode || false
     });
 
     // Initialize orchestrator (create new instance for each request to ensure clean state)
@@ -265,7 +308,7 @@ serve(async (req) => {
     
     // Execute the complete ORBIT workflow with modular architecture
     console.log('⚡ Executing ORBIT workflow with direct tool integration...');
-    const result = await orchestrator.orchestrate(requestBody);
+    const result = await orchestrator.orchestrate(orbitRequest);
     
     // Log final results
     if (result.success) {
@@ -315,9 +358,175 @@ serve(async (req) => {
   }
 });
 
+/**
+ * Queue processing function - processes multiple orders continuously
+ * This enables automated queue processing for high-throughput scenarios
+ */
+async function processOrderQueue(options: {
+  maxOrdersPerBatch?: number;
+  maxProcessingTime?: number;
+  stopOnError?: boolean;
+} = {}): Promise<Response> {
+  const startTime = Date.now();
+  const queueOptions = {
+    maxOrdersPerBatch: options.maxOrdersPerBatch || 10,
+    maxProcessingTime: options.maxProcessingTime || 300000, // 5 minutes default
+    stopOnError: options.stopOnError || false,
+    ...options
+  };
+
+  console.log('🔄 Starting queue processing...');
+  console.log(`⚙️ Options: maxOrders=${queueOptions.maxOrdersPerBatch}, maxTime=${queueOptions.maxProcessingTime/1000}s`);
+
+  try {
+    const discoveryService = new OrderDiscoveryService();
+    const processedOrders: string[] = [];
+    const failedOrders: Array<{orderId: string; error: string}> = [];
+    let totalProcessingTime = 0;
+
+    // Process orders until queue is empty or limits reached
+    while (processedOrders.length < queueOptions.maxOrdersPerBatch && 
+           totalProcessingTime < queueOptions.maxProcessingTime) {
+      
+      // Find next pending order
+      const pendingOrders = await discoveryService.findPendingOrders({ 
+        maxOrdersPerBatch: 1,
+        prioritizeOlderOrders: true
+      });
+
+      if (pendingOrders.foundOrders.length === 0) {
+        console.log('✅ Queue processing complete - no more pending orders');
+        break;
+      }
+
+      const order = pendingOrders.foundOrders[0];
+      const orderStartTime = Date.now();
+      
+      console.log(`🎯 Processing order ${processedOrders.length + 1}/${queueOptions.maxOrdersPerBatch}: ${order.id} (${order.order_number})`);
+
+      try {
+        // Mark order as processing
+        await discoveryService.markOrderProcessing(order.id);
+
+        // Create orchestrator for this order
+        const queueOrchestrator = new ClaudeCodeOrbitOrchestrator();
+        
+        // Process the order
+        const orderRequest: OrbitRequest = {
+          orderId: order.id,
+          action: 'process',
+          debugMode: false
+        };
+
+        const result = await queueOrchestrator.orchestrate(orderRequest);
+        const orderProcessingTime = Date.now() - orderStartTime;
+        totalProcessingTime += orderProcessingTime;
+
+        if (result.success) {
+          processedOrders.push(order.id);
+          console.log(`✅ Order ${order.id} completed successfully (${orderProcessingTime}ms)`);
+        } else {
+          const errorMsg = result.errors?.join(', ') || 'Unknown error';
+          failedOrders.push({ orderId: order.id, error: errorMsg });
+          console.error(`❌ Order ${order.id} failed: ${errorMsg}`);
+          
+          if (queueOptions.stopOnError) {
+            console.log('🛑 Stopping queue processing due to error');
+            break;
+          }
+        }
+
+      } catch (error) {
+        const orderProcessingTime = Date.now() - orderStartTime;
+        totalProcessingTime += orderProcessingTime;
+        
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        failedOrders.push({ orderId: order.id, error: errorMsg });
+        console.error(`❌ Order ${order.id} processing error: ${errorMsg}`);
+        
+        if (queueOptions.stopOnError) {
+          console.log('🛑 Stopping queue processing due to error');
+          break;
+        }
+      }
+    }
+
+    const totalDuration = Date.now() - startTime;
+    const successCount = processedOrders.length;
+    const failureCount = failedOrders.length;
+    const totalProcessed = successCount + failureCount;
+
+    console.log(`📊 Queue processing summary: ${successCount}/${totalProcessed} successful (${totalDuration}ms)`);
+
+    // Return queue processing results
+    return new Response(JSON.stringify({
+      success: true,
+      orchestrationType: 'claude-code-sdk',
+      action: 'process_queue',
+      message: `Queue processing completed: ${successCount}/${totalProcessed} orders successful`,
+      queueResults: {
+        totalProcessed,
+        successfulOrders: successCount,
+        failedOrders: failureCount,
+        processedOrderIds: processedOrders,
+        failedOrderDetails: failedOrders,
+        totalProcessingTime: totalDuration,
+        averageTimePerOrder: totalProcessed > 0 ? totalDuration / totalProcessed : 0,
+        queueOptions
+      },
+      execution: {
+        todoList: [],
+        totalDuration,
+        phases: {
+          queue_processing: { 
+            status: 'completed', 
+            startTime, 
+            endTime: Date.now(), 
+            duration: totalDuration 
+          }
+        },
+        toolMetrics: {
+          queueProcessing: true,
+          ordersProcessed: totalProcessed,
+          successRate: totalProcessed > 0 ? (successCount / totalProcessed) * 100 : 0,
+          averageOrderTime: totalProcessed > 0 ? totalDuration / totalProcessed : 0
+        }
+      },
+      timestamp: new Date().toISOString()
+    }, null, 2), {
+      status: 200,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+
+  } catch (error) {
+    console.error('❌ Queue processing error:', error);
+    
+    return new Response(JSON.stringify({
+      success: false,
+      orchestrationType: 'claude-code-sdk',
+      action: 'process_queue',
+      error: 'Queue processing failed',
+      message: `Queue processing error: ${error.message}`,
+      execution: {
+        todoList: [],
+        totalDuration: Date.now() - startTime,
+        phases: {},
+        toolMetrics: {
+          queueProcessingError: true,
+          errorMessage: error.message
+        }
+      },
+      timestamp: new Date().toISOString()
+    }, null, 2), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+}
+
 console.log('🤖 CLAUDE CODE ORBIT ORCHESTRATOR READY');
-console.log('✨ Modular Architecture: Workflow Engine + Direct Tool Integration');
+console.log('✨ Enhanced Architecture: Workflow Engine + Production Services + Direct Tool Integration');
 console.log('⚡ Performance: ~78% faster, ~40% cheaper than HTTP MCP calls');
 console.log('🔧 Tools: Gemini Analysis, Metadata Processing, Storage Management, Report Generation');
-console.log('📋 Management: TodoWrite integration with comprehensive progress tracking');
-console.log('🚀 Ready to process ORBIT orders with direct tool integration');
+console.log('📋 Services: Order Discovery, Storage Verification, Error Recovery, Email Notifications, Batch Validation');
+console.log('🚀 Ready to process ORBIT orders - single orders and queue processing available');

@@ -1,17 +1,20 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
-import { SupabaseAuthManager } from '../_shared/auth-verification.ts';
 
-// Initialize enhanced authentication manager
-const authManager = new SupabaseAuthManager({
-  supabaseUrl: Deno.env.get('SUPABASE_URL') || '',
-  legacyServiceRoleKey: Deno.env.get('SERVICE_ROLE_KEY'),
-  newSecretKey: Deno.env.get('sb_secret_key'),
-  allowLegacy: true // Enable backward compatibility during migration
+// Create service role client for bypass RLS
+const supabaseUrl = Deno.env.get('SUPABASE_URL');
+const serviceRoleKey = Deno.env.get('sb_secret_key') || Deno.env.get('SERVICE_ROLE_KEY');
+
+if (!supabaseUrl || !serviceRoleKey) {
+  throw new Error('Missing Supabase configuration');
+}
+
+const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
+  auth: {
+    autoRefreshToken: false,
+    persistSession: false
+  }
 });
-
-// Create service role client for bypass RLS using enhanced authentication
-const supabaseAdmin = authManager.getSupabaseClient(true);
 
 Deno.serve(async (req: Request) => {
   // Set CORS headers
@@ -70,6 +73,46 @@ Deno.serve(async (req: Request) => {
     }
 
     console.log('✅ Service role found order:', order.order_number);
+
+    // 🤖 CLAUDE CODE SDK AGENT TRIGGER
+    // If payment is completed and order is ready for processing, trigger Claude SDK agent
+    if (order.payment_status === 'completed' && 
+        (order.processing_stage === 'initializing' || order.processing_stage === 'pending_payment')) {
+      
+      console.log('🚀 Payment completed - triggering Claude Code SDK agent...');
+      
+      try {
+        const supabaseUrl = Deno.env.get('SUPABASE_URL');
+        const serviceKey = Deno.env.get('sb_secret_key');
+        
+        if (supabaseUrl && serviceKey) {
+          // Trigger Claude Code SDK agent for automated processing
+          const claudeSDKResponse = await fetch(`${supabaseUrl}/functions/v1/claude-sdk-agent`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${serviceKey}`,
+              'Content-Type': 'application/json',
+              'x-source-function': 'verify-payment-order'
+            },
+            body: JSON.stringify({
+              orderId: order.id,
+              action: 'process',
+              analysisType: 'auto',
+              debugMode: false
+            })
+          });
+          
+          if (claudeSDKResponse.ok) {
+            console.log('✅ Claude Code SDK agent triggered successfully');
+          } else {
+            console.warn('⚠️ Claude Code SDK agent trigger failed:', claudeSDKResponse.status);
+          }
+        }
+      } catch (claudeError) {
+        console.error('❌ Error triggering Claude Code SDK agent:', claudeError);
+        // Don't fail the payment verification if Claude SDK trigger fails
+      }
+    }
 
     // Verify the requester owns the order (defense-in-depth)
     const authHeader = req.headers.get('Authorization') || '';

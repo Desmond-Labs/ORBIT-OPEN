@@ -63,3 +63,7 @@ verify_jwt = false
 # Claude Code ORBIT Orchestrator - New Implementation
 [functions.claude-code-orchestrator]
 verify_jwt = false
+
+# Claude Code SDK Agent - Automated workflow execution
+[functions.claude-sdk-agent]
+verify_jwt = false

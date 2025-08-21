@@ -48,7 +48,12 @@ export interface OrbitPhases {
   reporting: PhaseStatus;
 }
 
-export type PhaseStatus = 'pending' | 'in_progress' | 'completed' | 'failed';
+export interface PhaseStatus {
+  status: 'pending' | 'in_progress' | 'completed' | 'failed';
+  startTime: number;
+  endTime: number;
+  duration: number;
+}
 
 // Database Entity Types
 export interface OrbitOrder {
@@ -168,7 +173,7 @@ export interface OrbitResults {
   discovery: DiscoveryResults;
   processing: ProcessingResults;
   validation: ValidationResults;
-  reporting: ReportingResults;
+  reporting?: ReportingResults;
 }
 
 export interface DiscoveryResults {
@@ -178,6 +183,7 @@ export interface DiscoveryResults {
   imageCount: number;
   storageValidated: boolean;
   userPermissions: string;
+  discoveryTime?: number;
 }
 
 export interface ProcessingResults {
@@ -334,3 +340,209 @@ export const MCP_TOOLS: readonly string[] = [
   'storage-manager',
   'report-generator'
 ] as const;
+
+// Production Services Types (Enhancement Phase)
+
+// Order Discovery Service Types
+export interface OrderDiscoveryOptions {
+  maxOrdersPerBatch?: number;
+  prioritizeOlderOrders?: boolean;
+  statusFilter?: string[];
+  userFilter?: string[];
+}
+
+export interface OrderDiscoveryResult {
+  foundOrders: OrbitOrder[];
+  totalOrdersFound: number;
+  queryTime: number;
+  nextBatchAvailable: boolean;
+  discoveryMetrics: {
+    pendingOrders: number;
+    processingOrders: number;
+    completedOrders: number;
+    failedOrders: number;
+  };
+}
+
+export interface ProcessingProgressUpdate {
+  orderId: string;
+  percentage: number;
+  stage: string;
+  updatedAt: string;
+  message?: string;
+}
+
+// Storage Verification Service Types
+export interface StorageVerificationResult {
+  verificationPassed: boolean;
+  orderId: string;
+  userId: string;
+  originalFolderVerification: {
+    verified: boolean;
+    expectedFiles: number;
+    foundFiles: number;
+    missingFiles: string[];
+  };
+  processedFolderVerification: {
+    verified: boolean;
+    expectedFiles: number;
+    foundFiles: number;
+    missingFiles: string[];
+  };
+  storagePatternCompliance: boolean;
+  verificationTime: number;
+  issues: string[];
+  recommendations: string[];
+}
+
+export interface ImageProcessingVerification {
+  imageId: string;
+  filename: string;
+  originalFileExists: boolean;
+  processedFileExists: boolean;
+  metadataEmbedded: boolean;
+  reportGenerated: boolean;
+  isComplete: boolean;
+  issues: string[];
+}
+
+// Error Recovery Service Types
+export type ErrorType = 
+  | 'GEMINI_API_ERROR'
+  | 'STORAGE_ACCESS_ERROR' 
+  | 'METADATA_EMBED_ERROR'
+  | 'DATABASE_ERROR'
+  | 'EMAIL_FUNCTION_ERROR'
+  | 'DEPLOYMENT_SYNC_ERROR'
+  | 'NETWORK_ERROR'
+  | 'TIMEOUT_ERROR'
+  | 'VALIDATION_ERROR'
+  | 'UNKNOWN_ERROR';
+
+export interface ErrorClassification {
+  type: ErrorType;
+  severity: ErrorSeverity;
+  isRetryable: boolean;
+  maxRetries: number;
+  baseDelayMs: number;
+  exponentialBackoff: boolean;
+  description: string;
+}
+
+export interface RetryStrategy {
+  maxRetries: number;
+  baseDelayMs: number;
+  maxDelayMs: number;
+  exponentialBackoff: boolean;
+  jitterEnabled: boolean;
+}
+
+export interface ErrorContext {
+  orderId?: string;
+  imageId?: string;
+  userId?: string;
+  phase?: string;
+  operation?: string;
+  correlationId: string;
+  timestamp: number;
+  metadata?: Record<string, any>;
+}
+
+export interface RecoveryResult {
+  success: boolean;
+  attemptNumber: number;
+  totalRetries: number;
+  finalError?: string;
+  recoveryTime: number;
+  strategy: string;
+}
+
+// Email Notification Service Types
+export interface EmailResult {
+  success: boolean;
+  emailId?: string;
+  deliveryStatus?: 'sent' | 'delivered' | 'failed';
+  error?: string;
+  retryable?: boolean;
+  responseTime: number;
+}
+
+export interface EmailNotificationOptions {
+  orderId: string;
+  retryAttempts?: number;
+  retryDelayMs?: number;
+  timeoutMs?: number;
+  verificationEnabled?: boolean;
+}
+
+export interface EmailStatus {
+  orderId: string;
+  emailSent: boolean;
+  emailId?: string;
+  sentAt?: string;
+  deliveryStatus?: string;
+  lastAttemptAt?: string;
+  attemptCount: number;
+  lastError?: string;
+}
+
+// Batch Processing Validator Types
+export interface BatchValidationResult {
+  isValid: boolean;
+  orderId: string;
+  userId: string;
+  batchId?: string;
+  validationSummary: {
+    totalImages: number;
+    processedImages: number;
+    failedImages: number;
+    pendingImages: number;
+    completionRate: number;
+  };
+  validationChecks: {
+    allImagesProcessed: boolean;
+    storageConsistency: boolean;
+    databaseConsistency: boolean;
+    metadataIntegrity: boolean;
+    analysisCompleteness: boolean;
+    fileIntegrity: boolean;
+  };
+  validationDetails: {
+    processedImagesList: string[];
+    failedImagesList: Array<{
+      imageId: string;
+      filename: string;
+      reason: string;
+      retryable: boolean;
+    }>;
+    storageIssues: string[];
+    databaseIssues: string[];
+    metadataIssues: string[];
+  };
+  recommendations: string[];
+  validationTime: number;
+  canComplete: boolean;
+  blockers: string[];
+}
+
+export interface BatchCompletionReport {
+  orderId: string;
+  completionTime: string;
+  processingDuration: number;
+  totalImages: number;
+  successfulImages: number;
+  failedImages: number;
+  filesGenerated: number;
+  storageUsed: number;
+  avgProcessingTimePerImage: number;
+  qualityScore: number;
+  recommendations: string[];
+}
+
+// Enhanced Workflow Options
+export interface WorkflowOptions {
+  enableMetrics?: boolean;
+  enableLogging?: boolean;
+  enableRecovery?: boolean;
+  maxRetries?: number;
+}
