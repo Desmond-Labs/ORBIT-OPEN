@@ -59,3 +59,7 @@ verify_jwt = false
 
 [functions.claude-tier2-orchestrator]
 verify_jwt = false
+
+# Claude Code ORBIT Orchestrator - New Implementation
+[functions.claude-code-orchestrator]
+verify_jwt = false
