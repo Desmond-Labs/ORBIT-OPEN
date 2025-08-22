@@ -1,7 +1,7 @@
 // ORBIT Claude Code Agent - Core Implementation
 // Modular and independent agent for ORBIT image processing workflow
 
-import { query } from 'npm:@anthropic-ai/claude-code-sdk@1.0.0';
+import { query } from 'npm:@anthropic-ai/claude-code';
 import { ORBITAgentConfigManager } from './orbit-claude-agent-config.ts';
 import { ORBITSupabaseToolkit } from './orbit-claude-supabase-tools.ts';
 import { ORBITMCPServiceIntegration } from './orbit-claude-mcp-integration.ts';

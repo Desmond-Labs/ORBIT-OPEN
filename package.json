@@ -12,9 +12,11 @@
     "llm:start": "cd litellm && chmod +x *.sh && ./start.sh",
     "llm:stop": "cd litellm && ./stop.sh",
     "llm:test": "cd litellm && ./test-models.sh",
-    "llm:logs": "cd litellm && docker-compose logs -f"
+    "llm:logs": "cd litellm && docker-compose logs -f",
+    "agent:run": "vite-node src/agents/orbit-claude-agent.ts"
   },
   "dependencies": {
+    "@anthropic-ai/claude-code": "^1.0.86",
     "@hookform/resolvers": "^3.9.0",
     "@marsidev/react-turnstile": "^1.1.0",
     "@radix-ui/react-accordion": "^1.2.0",
@@ -87,6 +89,7 @@
     "tailwindcss": "^3.4.11",
     "typescript": "^5.5.3",
     "typescript-eslint": "^8.0.1",
-    "vite": "^5.4.1"
+    "vite": "^5.4.1",
+    "vite-node": "^3.2.4"
   }
 }
