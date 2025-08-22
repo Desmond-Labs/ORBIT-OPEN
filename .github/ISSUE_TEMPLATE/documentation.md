@@ -14,7 +14,7 @@ Describe what documentation is missing, unclear, or incorrect.
 Which files or sections need updates?
 - [ ] README.md
 - [ ] CONTRIBUTING.md
-- [ ] CLAUDE.md (System Documentation)
+- [ ] System Documentation
 - [ ] API Documentation
 - [ ] Setup/Installation Guide
 - [ ] Testing Guide

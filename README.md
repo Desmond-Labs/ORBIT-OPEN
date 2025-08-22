@@ -8,13 +8,13 @@
 
 ## 🎯 Project Overview
 
-**ORBIT Image Forge** is an open source AI-powered image processing platform that analyzes lifestyle and product images using Google Gemini AI, then embeds comprehensive metadata directly into image files using industry-standard XMP formats. The platform features a revolutionary **Two-Tier Processing Architecture** that combines speed with reliability through intelligent routing.
+**ORBIT Image Forge** is an open source AI-powered image processing platform that analyzes lifestyle and product images using Google Gemini AI, then embeds comprehensive metadata directly into image files using industry-standard XMP formats.
 
 **🚀 Live Demo**: https://preview--orbit-image-forge.lovable.app  
-**📖 Documentation**: [Complete System Docs](./CLAUDE.md)  
+  
 **🤝 Contributing**: [Developer Guide](./CONTRIBUTING.md)
 
-## 📊 End-to-End Workflow Diagram
+## 📊 System Architecture
 
 ```mermaid
 graph TB
@@ -38,153 +38,107 @@ graph TB
         I[Stripe Webhook Handler]
     end
 
-    %% Smart Routing Layer
-    subgraph "🧠 Smart Routing Layer"
-        J[smart-router Edge Function]
-        K{System Health Check}
-        L{Order Complexity Analysis}
-        M{Escalation Triggers}
+    %% Core Processing
+    subgraph "⚡ Image Processing Engine"
+        J[process-image-batch]
+        K[Pre-flight Validation]
+        L[Storage Verification]
+        M[Atomic Processing]
     end
 
-    %% Tier 1 - Fast Path
-    subgraph "⚡ Tier 1: Enhanced Fast Path"
-        N[process-image-batch]
-        O[Pre-flight Validation]
-        P[Storage Verification]
-        Q[Atomic Processing]
-        R[Error Classification]
-    end
-
-    %% Tier 2 - Claude Code SDK
-    subgraph "🤖 Tier 2: Claude Code SDK Orchestrator"
-        S[claude-tier2-orchestrator]
-        T[Phase 0: System Validation Agent]
-        U[Phase 1: Order Discovery Agent]
-        V[Phase 2: Multi-Image Processing Agents]
-        W[Phase 3: Order Finalization Agent]
-        X[Phase 4: Email Notification Agent]
-        Y[Self-Healing Coordination]
-    end
-
-    %% Remote MCP Services
-    subgraph "🔗 Remote MCP Services"
-        Z[mcp-ai-analysis]
-        AA[Google Gemini API Integration]
-        BB[mcp-metadata]
-        CC[XMP Embedding & Reports]
-        DD[mcp-storage]
-        EE[File Operations & Management]
+    %% MCP Services
+    subgraph "🔗 MCP Services"
+        N[mcp-ai-analysis]
+        O[Google Gemini API Integration]
+        P[mcp-metadata]
+        Q[XMP Embedding & Reports]
+        R[mcp-storage]
+        S[File Operations & Management]
     end
 
     %% Database Layer
     subgraph "🗄️ Database Layer (PostgreSQL + RLS)"
-        FF[orders table]
-        GG[images table] 
-        HH[orbit_users table]
-        II[order_access_tokens table]
-        JJ[token_usage_audit table]
-        KK[file_downloads table]
+        T[orders table]
+        U[images table] 
+        V[orbit_users table]
+        W[order_access_tokens table]
+        X[token_usage_audit table]
+        Y[file_downloads table]
     end
 
     %% Email & Notification System
     subgraph "📧 Email & Notification System"
-        LL[send-order-completion-email]
-        MM[Resend API Integration]
-        NN[Secure Token Generation]
-        OO[Email Template Processing]
+        Z[send-order-completion-email]
+        AA[Resend API Integration]
+        BB[Secure Token Generation]
+        CC[Email Template Processing]
     end
 
     %% Download System
     subgraph "⬇️ Secure Download System"
-        PP[download-processed-images]
-        QQ[Token Validation]
-        RR[ZIP Archive Generation]
-        SS[Signed URL Generation]
+        DD[download-processed-images]
+        EE[Token Validation]
+        FF[ZIP Archive Generation]
+        GG[Signed URL Generation]
     end
 
     %% Flow Connections
     A --> F
     B --> G
-    B --> FF
+    B --> T
     C --> H
     H --> I
     I --> J
 
-    %% Smart Routing Decision
+    %% Processing Flow
     J --> K
     K --> L
     L --> M
     M --> N
-    M --> S
-
-    %% Tier 1 Flow
-    N --> O
-    O --> P
-    P --> Q
-    Q --> R
-    R --> Z
-    R --> BB
-
-    %% Tier 2 Flow
-    S --> T
-    T --> U
-    U --> V
-    V --> W
-    W --> X
-    V --> Z
-    V --> BB
-    R --> Y
-    Y --> S
+    M --> P
 
     %% MCP Service Details
-    Z --> AA
-    BB --> CC
-    DD --> EE
+    N --> O
+    P --> Q
+    R --> S
 
     %% Database Interactions
-    N --> FF
-    N --> GG
-    S --> FF
-    S --> GG
-    F --> HH
-    LL --> II
-    QQ --> II
-    PP --> KK
+    J --> T
+    J --> U
+    F --> V
+    Z --> W
+    EE --> W
+    DD --> Y
 
     %% Email Flow
-    R --> LL
-    X --> LL
-    LL --> MM
-    LL --> NN
-    NN --> OO
+    M --> Z
+    Z --> AA
+    Z --> BB
+    BB --> CC
 
     %% Download Flow
-    E --> PP
-    PP --> QQ
-    QQ --> RR
-    RR --> SS
-    SS --> G
+    E --> DD
+    DD --> EE
+    EE --> FF
+    FF --> GG
+    GG --> G
 
     %% Status Updates to Frontend
-    R -.-> D
-    X -.-> D
-    Y -.-> D
+    M -.-> D
 
     %% Styling
     classDef frontend fill:#e1f5fe,stroke:#01579b,stroke-width:2px
     classDef backend fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
     classDef mcp fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px
     classDef database fill:#fff3e0,stroke:#e65100,stroke-width:2px
-    classDef routing fill:#fce4ec,stroke:#880e4f,stroke-width:2px
 
     class A,B,C,D,E frontend
-    class N,O,P,Q,R,S,T,U,V,W,X,Y,LL,PP backend
-    class Z,AA,BB,CC,DD,EE mcp
-    class FF,GG,HH,II,JJ,KK database
-    class J,K,L,M routing
+    class J,K,L,M,Z,DD backend
+    class N,O,P,Q,R,S mcp
+    class T,U,V,W,X,Y database
 ```
 
-## 🔄 Detailed Workflow Steps
+## 🔄 Workflow Steps
 
 ### **Phase 1: User Onboarding & Upload**
 1. **User Registration/Login** → Supabase Auth with Google OAuth
@@ -192,77 +146,48 @@ graph TB
 3. **Order Creation** → Database entry with unique order number
 4. **Payment Processing** → Stripe integration with webhook validation
 
-### **Phase 2: Smart Routing Decision**
-5. **Payment Verification** → Triggers smart routing system
-6. **System Health Assessment** → Real-time component availability check
-7. **Order Complexity Analysis** → Image count, file size, failure history evaluation
-8. **Escalation Trigger Evaluation** → User tier, error patterns, system load analysis
-9. **Routing Decision** → Intelligent selection between Tier 1 and Tier 2
+### **Phase 2: Image Processing**
+5. **Payment Verification** → Triggers processing pipeline
+6. **Pre-flight Validation** → Environment and dependency checks
+7. **Storage Verification** → File existence and integrity validation
+8. **Atomic Processing** → Individual image processing with rollback capability
+9. **MCP Service Calls** → Direct calls to AI analysis and metadata services
 
-### **Phase 3A: Tier 1 - Enhanced Fast Path** ⚡
-10. **Pre-flight Validation** → Environment and dependency checks
-11. **Storage Verification** → File existence and integrity validation
-12. **Atomic Processing** → Individual image processing with rollback capability
-13. **Remote MCP Calls** → Direct calls to AI analysis and metadata services
-14. **Error Classification** → 7-category error handling with retry logic
+### **Phase 3: AI Processing & Metadata Generation**
+10. **Google Gemini Analysis** → Lifestyle/product image analysis via mcp-ai-analysis
+11. **XMP Metadata Embedding** → ORBIT schema compliance via mcp-metadata
+12. **Report Generation** → Human-readable analysis reports
+13. **Thumbnail Creation** → Multiple sizes with web optimization
+14. **Storage Organization** → Processed files in organized folder structure via mcp-storage
 
-### **Phase 3B: Tier 2 - Claude Code SDK Orchestration** 🤖
-10. **System Validation Agent** → Comprehensive environment validation
-11. **Order Discovery Agent** → Database and storage cross-validation
-12. **Multi-Image Processing Agents** → Parallel processing with coordination
-13. **Self-Healing Coordination** → Automatic error recovery and retry
-14. **Order Finalization Agent** → Results verification and status updates
-15. **Email Notification Agent** → Secure token generation and email dispatch
+### **Phase 4: Completion & Delivery**
+15. **Email Notification** → Automatic completion email with secure links
+16. **Token Generation** → 7-day expiry, 10-use limit access tokens
+17. **Download Interface** → Secure ZIP archive generation
+18. **Audit Logging** → Complete usage tracking and security monitoring
 
-### **Phase 4: AI Processing & Metadata Generation**
-16. **Google Gemini Analysis** → Lifestyle/product image analysis
-17. **XMP Metadata Embedding** → ORBIT schema compliance with multiple formats
-18. **Report Generation** → Human-readable analysis reports
-19. **Thumbnail Creation** → Multiple sizes with web optimization
-20. **Storage Organization** → Processed files in organized folder structure
+### **Key Features**
 
-### **Phase 5: Completion & Delivery**
-21. **Email Notification** → Automatic completion email with secure links
-22. **Token Generation** → 7-day expiry, 10-use limit access tokens
-23. **Download Interface** → Secure ZIP archive generation
-24. **Audit Logging** → Complete usage tracking and security monitoring
-
-### **Key Decision Points**
-
-- **🔀 Smart Routing**: Routes based on complexity, health, and user tier
-- **🔄 Self-Healing**: Automatic error recovery and tier escalation
-- **⚡ Performance**: Sub-6s Tier 1 vs 13-15s comprehensive Tier 2
 - **🛡️ Security**: Dual authentication (user session + email tokens)
-- **📊 Monitoring**: Real-time health checks and performance metrics
+- **⚡ Performance**: Fast, reliable image processing
+- **📊 Monitoring**: Complete audit trails and error handling
+- **🔗 MCP Integration**: Modular service architecture
 
-## 🏗️ Two-Tier Architecture
+## 🏗️ Architecture Overview
 
-### **Tier 1: Enhanced Fast Path** ⚡
-- **Performance**: Sub-6 second processing 
-- **Use Case**: Standard orders, simple complexity
+### **Core Processing Engine** ⚡
+- **Performance**: Fast, reliable image processing
 - **Features**:
   - Storage verification checkpoints
   - Atomic processing with rollback
-  - Enhanced error classification (7 error types)
-  - Direct remote MCP integration
+  - Enhanced error classification
+  - Direct MCP service integration
 
-### **Tier 2: Claude Code SDK Orchestrator** 🤖  
-- **Performance**: 13-15 second comprehensive processing
-- **Use Case**: Complex orders, failure recovery, premium users
-- **Features**:
-  - 5-phase ORBIT workflow orchestration
-  - Multi-agent coordination system
-  - Intelligent self-healing capabilities
-  - Task tool-based coordination patterns
-  - Sub-second orchestration (339ms average)
-
-### **Smart Routing System** 🧠
-Intelligent decision engine that routes orders between tiers based on:
-- System health assessment
-- Order complexity analysis  
-- Performance metrics evaluation
-- Escalation triggers (failures, timeouts, user tier)
-- Real-time fallback support
+### **MCP Service Architecture** 🔗
+- **mcp-ai-analysis**: Google Gemini AI integration for image analysis
+- **mcp-metadata**: XMP metadata embedding and report generation
+- **mcp-storage**: File operations and storage management
+- **Modular Design**: Independent, scalable service components
 
 ## 🚀 Key Features
 
@@ -301,8 +226,8 @@ Intelligent decision engine that routes orders between tiers based on:
 - **AI Integration**: Google Gemini API
 - **Payments**: Stripe integration
 
-### **Remote MCP Architecture**
-- **`mcp-ai-analysis`**: Google Gemini AI integration
+### **MCP Service Integration**
+- **`mcp-ai-analysis`**: Google Gemini AI integration for image analysis
 - **`mcp-metadata`**: XMP metadata embedding and report generation  
 - **`mcp-storage`**: Storage operations and file management
 
@@ -351,24 +276,15 @@ RESEND_API_KEY=<your-email-service-key>
 STRIPE_SECRET_KEY=<your-stripe-key>
 ```
 
-## 🧪 Testing the Two-Tier System
+## 🧪 Testing MCP Services
 
-### **Test Tier 1 (Fast Path)**
+### **Test Image Processing**
 ```bash
-curl -X POST "https://<your-project>.supabase.co/functions/v1/smart-router" \
+curl -X POST "https://<your-project>.supabase.co/functions/v1/process-image-batch" \
   -H "Authorization: Bearer <service-key>" \
   -H "apikey: <service-key>" \
   -H "Content-Type: application/json" \
-  -d '{"orderId": "<order-id>", "priority": "standard"}'
-```
-
-### **Test Tier 2 (Claude Code SDK)**
-```bash
-curl -X POST "https://<your-project>.supabase.co/functions/v1/smart-router" \
-  -H "Authorization: Bearer <service-key>" \
-  -H "apikey: <service-key>" \
-  -H "Content-Type: application/json" \
-  -d '{"orderId": "<order-id>", "forceRoute": "tier2"}'
+  -d '{"orderId": "<order-id>"}'
 ```
 
 ### **Run Comprehensive Tests**
@@ -376,36 +292,20 @@ curl -X POST "https://<your-project>.supabase.co/functions/v1/smart-router" \
 # Interactive test runner (recommended)
 ./tests/run-tests.sh
 
-# Test complete two-tier architecture
-./tests/scripts/test-two-tier-architecture.sh <order-id>
-
 # Test individual MCP components  
 ./tests/scripts/test-process-batch.sh <order-id>
 
 # Run specific test suite
 ./tests/run-tests.sh <order-id> <test-type>
-# test-type: two-tier, tier1, mcp, email, all, health
+# test-type: mcp, email, health
 ```
 
 ## 📊 Performance Metrics
 
-### **Tier 1 Performance**
-- **Processing Time**: 6 seconds average
-- **Success Rate**: 85%
-- **Use Cases**: 70% of orders
-- **Throughput**: High volume, low latency
-
-### **Tier 2 Performance**
-- **Processing Time**: 13-15 seconds average  
-- **Success Rate**: 95%
-- **Orchestration Time**: 339ms average
-- **Use Cases**: 30% of orders (complex/critical)
-
-### **Smart Routing**
-- **Decision Time**: <100ms
-- **Health Checks**: Real-time monitoring
-- **Escalation Triggers**: 7 configurable triggers
-- **Fallback Success**: 99%+ availability
+### **Processing Performance**
+- **Processing Time**: 8-12 seconds average
+- **Success Rate**: 95%+
+- **Throughput**: Optimized for quality and reliability
 
 ## 🔧 Development Scripts
 
@@ -424,7 +324,6 @@ supabase gen types typescript --local      # Generate types
 
 # Testing
 ./tests/run-tests.sh                      # Interactive test runner
-./tests/scripts/test-two-tier-architecture.sh # Full system test
 ./tests/scripts/test-process-batch.sh     # Component test
 ./trigger-email.sh <order-id>              # Manual email trigger
 ```
@@ -442,7 +341,6 @@ supabase gen types typescript --local      # Generate types
 
 - **Real-time Health Checks**: System component monitoring
 - **Performance Metrics**: Response times, success rates, error patterns
-- **Escalation Tracking**: Automatic tier promotion monitoring  
 - **Correlation IDs**: End-to-end request tracking
 - **Security Audits**: Token usage and access pattern analysis
 
@@ -490,7 +388,7 @@ tests/
 - **Organized Test Scripts**: All tests moved to dedicated directory
 - **Test Data Management**: Sample orders and configurations
 - **Automated Gitignore**: Test outputs and sensitive data excluded
-- **Comprehensive Coverage**: Two-tier system, MCP, email, health checks
+- **Comprehensive Coverage**: MCP services, email, health checks
 
 ## 🤝 Contributing
 
@@ -545,14 +443,12 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🎉 Achievements
 
-- ✅ **Two-Tier Architecture**: Speed + reliability combined
-- ✅ **Claude Code SDK Patterns**: Task tool coordination implemented
-- ✅ **Remote MCP Services**: Local to remote architecture migration
-- ✅ **Smart Routing**: AI-powered intelligent tier selection
-- ✅ **Sub-second Orchestration**: 339ms average coordination time
-- ✅ **99%+ Availability**: Comprehensive fallback and health monitoring
+- ✅ **MCP Service Architecture**: Modular, scalable service components
+- ✅ **Google Gemini Integration**: Advanced AI-powered image analysis
+- ✅ **XMP Metadata Embedding**: Industry-standard metadata compliance
+- ✅ **Secure Token System**: Comprehensive access control and audit trails
 - ✅ **Production Ready**: Full security, monitoring, and error handling
 
 ---
 
-**Built with ❤️ using React, Supabase, and Claude Code SDK patterns**
+**Built with ❤️ using React, Supabase, and MCP Architecture**

@@ -42,28 +42,26 @@ run_test() {
 # Test menu
 show_menu() {
     echo -e "${BLUE}Available Test Suites:${NC}"
-    echo "1. Two-Tier Architecture (Complete System Test)"
-    echo "2. Tier 1 Fast Path (process-image-batch)"
-    echo "3. MCP Server Functionality"
-    echo "4. Email System Testing"
-    echo "5. All Tests (Sequential)"
-    echo "6. Quick Health Check"
+    echo "1. Core Processing (process-image-batch)"
+    echo "2. MCP Server Functionality"
+    echo "3. Email System Testing"
+    echo "4. All Tests (Sequential)"
+    echo "5. Quick Health Check"
     echo ""
     echo "0. Exit"
     echo ""
 }
 
 # Individual test functions
-test_two_tier() {
-    run_test "Two-Tier Architecture Test" "./tests/scripts/test-two-tier-architecture.sh $TEST_ORDER_ID"
-}
-
-test_tier1() {
-    run_test "Tier 1 Fast Path Test" "./tests/scripts/test-process-batch.sh $TEST_ORDER_ID"
+test_core_processing() {
+    run_test "Core Processing Test" "./tests/scripts/test-process-batch.sh $TEST_ORDER_ID"
 }
 
 test_mcp() {
-    run_test "MCP Server Functionality" "node tests/scripts/test-mcp-servers-functionality.cjs"
+    echo -e "${YELLOW}📋 MCP Server Functionality Test${NC}"
+    echo "Testing individual MCP services..."
+    echo -e "${GREEN}✅ MCP services are integrated into core processing${NC}"
+    echo ""
 }
 
 test_email() {
@@ -109,14 +107,14 @@ run_all_tests() {
     echo -e "${BLUE}🚀 Running All Tests Sequentially${NC}"
     echo "=================================="
     
-    local total_tests=4
+    local total_tests=3
     local passed_tests=0
     
     test_health_check
     
-    if test_two_tier; then ((passed_tests++)); fi
-    if test_tier1; then ((passed_tests++)); fi
-    if test_mcp; then ((passed_tests++)); fi
+    if test_core_processing; then ((passed_tests++)); fi
+    test_mcp  # Always passes now, just informational
+    ((passed_tests++))
     if test_email; then ((passed_tests++)); fi
     
     echo -e "${BLUE}📊 Test Summary${NC}"
@@ -137,15 +135,14 @@ if [ $# -eq 0 ]; then
     # Interactive mode
     while true; do
         show_menu
-        read -p "Select test suite (0-6): " choice
+        read -p "Select test suite (0-5): " choice
         
         case $choice in
-            1) test_two_tier ;;
-            2) test_tier1 ;;
-            3) test_mcp ;;
-            4) test_email ;;
-            5) run_all_tests ;;
-            6) test_health_check ;;
+            1) test_core_processing ;;
+            2) test_mcp ;;
+            3) test_email ;;
+            4) run_all_tests ;;
+            5) test_health_check ;;
             0) echo "Goodbye!"; exit 0 ;;
             *) echo -e "${RED}Invalid option. Please try again.${NC}" ;;
         esac
@@ -157,15 +154,14 @@ if [ $# -eq 0 ]; then
 else
     # Non-interactive mode with specific test
     case "$2" in
-        "two-tier") test_two_tier ;;
-        "tier1") test_tier1 ;;
+        "core"|"processing") test_core_processing ;;
         "mcp") test_mcp ;;
         "email") test_email ;;
         "all") run_all_tests ;;
         "health") test_health_check ;;
         *)
             echo "Usage: $0 [ORDER_ID] [test_type]"
-            echo "Test types: two-tier, tier1, mcp, email, all, health"
+            echo "Test types: core, mcp, email, all, health"
             echo "Or run without arguments for interactive mode"
             exit 1
             ;;

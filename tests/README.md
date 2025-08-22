@@ -8,11 +8,9 @@ This directory contains all testing utilities, scripts, and test data for the OR
 tests/
 ├── README.md                    # This file - testing documentation
 ├── scripts/                     # Test scripts and utilities
-│   ├── test-process-batch.sh    # Test Tier 1 fast path processing
-│   ├── test-two-tier-architecture.sh # Complete Two-Tier system test
+│   ├── test-process-batch.sh    # Test image processing pipeline
 │   ├── test-email-*.cjs         # Email system validation
-│   ├── test-mcp-*.js/.ts        # MCP server testing
-│   └── test-remote-mcp.js       # Remote MCP integration tests
+│   └── test-mcp-*.js/.ts        # MCP server testing
 ├── data/                        # Test data and fixtures
 ├── output/                      # Test output files and logs
 └── supabase/                    # Supabase-specific tests
@@ -20,21 +18,13 @@ tests/
 
 ## 🧪 Available Test Scripts
 
-### **Two-Tier Architecture Testing**
+### **Image Processing Testing**
 
-#### **Complete System Test**
-```bash
-./tests/scripts/test-two-tier-architecture.sh [ORDER_ID]
-```
-- Tests complete Two-Tier system (Tier 1 + Tier 2 + Smart Routing)
-- Validates system health, performance metrics, escalation triggers
-- Comprehensive success/failure reporting
-
-#### **Tier 1 Fast Path Test**
+#### **Core Processing Test**
 ```bash
 ./tests/scripts/test-process-batch.sh [ORDER_ID]
 ```
-- Tests enhanced Tier 1 fast path processing
+- Tests core image processing pipeline
 - Validates storage verification, atomic processing, error handling
 - Direct MCP server integration testing
 
@@ -60,19 +50,14 @@ node tests/scripts/test-email-tracking-validation.cjs
 
 #### **MCP Functionality Test**
 ```bash
-node tests/scripts/test-mcp-servers-functionality.cjs
+# Test individual MCP services
+curl -X POST "https://your-project.supabase.co/functions/v1/mcp-ai-analysis"
+curl -X POST "https://your-project.supabase.co/functions/v1/mcp-metadata"
+curl -X POST "https://your-project.supabase.co/functions/v1/mcp-storage"
 ```
-- Comprehensive MCP server functionality testing
+- Individual MCP server functionality testing
 - AI analysis, metadata embedding, storage operations
 - Error handling and retry logic validation
-
-#### **Remote MCP Integration**
-```bash
-node tests/scripts/test-remote-mcp.js
-```
-- Tests remote MCP server integration
-- Network connectivity and authentication
-- Performance and reliability testing
 
 ## 🔧 Environment Setup for Testing
 
@@ -108,22 +93,21 @@ For comprehensive testing, ensure your test order has:
 ## 🎯 Testing Scenarios
 
 ### **Happy Path Testing**
-1. **Standard Processing**: Test Tier 1 fast path with simple order
-2. **Complex Processing**: Test Tier 2 orchestration with complex scenarios
-3. **Smart Routing**: Test intelligent routing decisions
-4. **Email Delivery**: Test completion notifications and token access
+1. **Standard Processing**: Test core image processing pipeline
+2. **MCP Integration**: Test AI analysis and metadata embedding
+3. **Email Delivery**: Test completion notifications and token access
+4. **Storage Operations**: Test file organization and access
 
 ### **Edge Case Testing**
-1. **System Overload**: Test escalation triggers
-2. **Partial Failures**: Test error recovery and self-healing
-3. **Network Issues**: Test retry logic and fallback systems
-4. **Security Validation**: Test token validation and access controls
+1. **Partial Failures**: Test error recovery and self-healing
+2. **Network Issues**: Test retry logic and fallback systems
+3. **Security Validation**: Test token validation and access controls
+4. **API Limits**: Test rate limiting and quota management
 
 ### **Performance Testing**
-1. **Tier 1 Speed**: Validate <6 second processing
-2. **Tier 2 Orchestration**: Validate <15 second comprehensive processing
-3. **Smart Routing**: Validate <100ms routing decisions
-4. **System Health**: Validate 99%+ availability
+1. **Processing Speed**: Validate processing time targets
+2. **MCP Response**: Validate service response times
+3. **System Health**: Validate availability and reliability
 
 ## 📊 Test Result Interpretation
 
@@ -174,8 +158,8 @@ supabase sql --execute "SELECT * FROM orders WHERE id = 'ORDER_ID';"
 supabase sql --execute "SELECT * FROM images WHERE order_id = 'ORDER_ID';"
 
 # Check function logs
-supabase functions logs smart-router
-supabase functions logs claude-tier2-orchestrator
+supabase functions logs process-image-batch
+supabase functions logs mcp-ai-analysis
 ```
 
 ## 🛡️ Security Considerations
@@ -189,7 +173,7 @@ supabase functions logs claude-tier2-orchestrator
 ## 📈 Continuous Testing
 
 ### **Automated Testing Schedule**
-- **Daily**: Run Two-Tier architecture test with real order
+- **Daily**: Run core processing test with real order
 - **Weekly**: Complete MCP server functionality validation
 - **Monthly**: Performance benchmarking and optimization
 

@@ -79,10 +79,10 @@ FRONTEND_URL=http://localhost:5173
 
 ## 🏗️ Project Architecture
 
-### Two-Tier Processing System
-- **Tier 1**: Fast Path (6s processing)
-- **Tier 2**: Claude Code SDK Orchestrator (15s with self-healing)
-- **Smart Router**: Intelligent tier selection
+### MCP Service Architecture
+- **mcp-ai-analysis**: Google Gemini AI integration for image analysis
+- **mcp-metadata**: XMP metadata embedding and report generation
+- **mcp-storage**: Storage operations and file management
 
 ### Key Components
 - **Frontend**: React + TypeScript + Tailwind CSS
@@ -134,7 +134,7 @@ FRONTEND_URL=http://localhost:5173
    ./tests/run-tests.sh
    
    # Test specific components
-   ./tests/run-tests.sh order-id tier1
+   ./tests/run-tests.sh order-id mcp
    ```
 
 4. **Commit Changes**
@@ -204,8 +204,6 @@ tests/
 ./tests/run-tests.sh
 
 # Specific test types
-./tests/run-tests.sh order-id two-tier    # Two-tier system
-./tests/run-tests.sh order-id tier1       # Fast path only
 ./tests/run-tests.sh order-id mcp         # MCP servers
 ./tests/run-tests.sh order-id email       # Email system
 ./tests/run-tests.sh order-id health      # Health checks
@@ -220,7 +218,7 @@ tests/
 ## 🎯 Areas We Need Help With
 
 ### High Priority
-- [ ] **Performance Optimization**: Reduce Tier 1 processing time
+- [ ] **Performance Optimization**: Reduce processing time
 - [ ] **Mobile UI**: Responsive design improvements  
 - [ ] **Error Handling**: Enhanced user feedback
 - [ ] **Documentation**: API documentation and examples
@@ -293,7 +291,7 @@ Contributors are recognized in:
 - [Project README](./README.md) - Complete project overview
 - [System Documentation](./CLAUDE.md) - Detailed technical docs  
 - [Testing Guide](./tests/README.md) - Comprehensive testing info
-- [Two-Tier Architecture](./README.md#-two-tier-architecture) - System design
+- [MCP Architecture](./README.md#mcp-service-architecture) - System design
 
 ---
 

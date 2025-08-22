@@ -16,18 +16,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [2.0.0] - 2024-08-20
 
 ### Added
-- **Two-Tier Processing Architecture**: Revolutionary processing system combining speed with reliability
-- **Tier 1 Fast Path**: Sub-6 second processing for standard orders
-- **Tier 2 Claude Code SDK Orchestrator**: 13-15 second comprehensive processing with self-healing
-- **Smart Router**: Intelligent routing system with 7 escalation triggers
+- **Core Processing Pipeline**: Enhanced image processing with MCP service integration
+- **Pre-flight Validation**: Environment and dependency verification
+- **Atomic Processing**: Individual image processing with rollback capability
 - **Comprehensive Test Suite**: Organized testing infrastructure with interactive runner
-- **Enhanced Error Handling**: 7-category error classification with intelligent retry logic
+- **Enhanced Error Handling**: Improved error classification with intelligent retry logic
 - **Performance Monitoring**: Real-time health checks and system assessment
 
 ### Changed
-- **Architecture**: Migrated from single processing path to intelligent two-tier system
+- **Architecture**: Streamlined processing architecture with MCP services
 - **Processing Flow**: Enhanced with pre-flight validation and atomic processing
-- **Error Recovery**: Self-healing capabilities with automatic tier escalation
+- **Error Recovery**: Improved error handling and recovery mechanisms
 - **Documentation**: Complete system documentation with workflow diagrams
 - **Testing**: Organized test files into proper directory structure
 
