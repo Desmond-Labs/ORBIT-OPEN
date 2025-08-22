@@ -2,16 +2,18 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 import { SupabaseAuthManager } from '../_shared/auth-verification.ts';
+import { ORBITAgentIntegration, ProcessImageBatchRequest } from '../_shared/orbit-claude-agent-integration.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-interface ProcessBatchRequest {
+interface ProcessBatchRequest extends ProcessImageBatchRequest {
   orderId: string;
   analysisType?: 'product' | 'lifestyle';
   manualTest?: boolean;
+  useClaudeAgent?: boolean;
 }
 
 interface ImageFile {
@@ -251,7 +253,7 @@ serve(async (req) => {
     const authManager = new SupabaseAuthManager({
       supabaseUrl: Deno.env.get('SUPABASE_URL') || '',
       legacyServiceRoleKey: Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'),
-      newSecretKey: Deno.env.get('sb_secret_key'),
+      newSecretKey: Deno.env.get('SUPABASE_SECRET_KEY') || Deno.env.get('sb_secret_key'),
       allowLegacy: true // Enable backward compatibility during migration
     });
     
@@ -286,11 +288,84 @@ serve(async (req) => {
     // The order validation below provides sufficient security
     console.log('🚀 Starting batch image processing');
 
-    const { orderId, analysisType = 'product', manualTest = false }: ProcessBatchRequest = requestBody;
+    const { orderId, analysisType = 'product', manualTest = false, useClaudeAgent }: ProcessBatchRequest = requestBody;
+
+    // 🤖 ORBIT CLAUDE CODE AGENT INTEGRATION
+    // Check if Claude agent should be used for processing
+    console.log('🤖 Checking Claude Code Agent availability...');
+    
+    try {
+      const agentIntegration = new ORBITAgentIntegration();
+      const configInfo = agentIntegration.getConfigurationInfo();
+      
+      console.log('🤖 Claude Agent Configuration:', configInfo);
+      
+      // Try Claude agent processing if enabled
+      const claudeProcessingResult = await agentIntegration.processOrder({
+        orderId,
+        analysisType,
+        manualTest,
+        useClaudeAgent
+      });
+      
+      console.log('🤖 Claude Agent Processing Result:', {
+        success: claudeProcessingResult.success,
+        agentUsed: claudeProcessingResult.agent_used,
+        processingTime: claudeProcessingResult.processing_time_ms
+      });
+      
+      // If Claude agent was used successfully, return its result
+      if (claudeProcessingResult.agent_used === 'claude' && claudeProcessingResult.success) {
+        console.log('✅ Claude Code Agent successfully processed the order');
+        
+        return new Response(JSON.stringify({
+          success: true,
+          agent_used: 'claude',
+          batch_id: claudeProcessingResult.results.batchId,
+          order_id: orderId,
+          results: claudeProcessingResult.results.results,
+          processed_results: claudeProcessingResult.results.processed_results || [],
+          processing_time_ms: claudeProcessingResult.processing_time_ms,
+          timestamp: new Date().toISOString()
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200,
+        });
+      }
+      
+      // If Claude agent was used but failed, return error if fallback disabled
+      if (claudeProcessingResult.agent_used === 'claude' && !claudeProcessingResult.success) {
+        console.error('❌ Claude Code Agent failed:', claudeProcessingResult.error);
+        
+        const allowFallback = Deno.env.get('CLAUDE_AGENT_ALLOW_FALLBACK') !== 'false';
+        if (!allowFallback) {
+          return new Response(JSON.stringify({
+            success: false,
+            agent_used: 'claude',
+            error: claudeProcessingResult.error,
+            fallback_disabled: true,
+            processing_time_ms: claudeProcessingResult.processing_time_ms,
+            timestamp: new Date().toISOString()
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 500,
+          });
+        } else {
+          console.log('🔄 Claude Agent failed, falling back to legacy processing');
+        }
+      }
+      
+      // Continue with legacy processing if Claude agent was not used or failed with fallback enabled
+      console.log('🏛️ Proceeding with legacy processing');
+      
+    } catch (claudeError) {
+      console.warn('⚠️ Claude Agent integration error (continuing with legacy):', claudeError.message);
+      // Continue with legacy processing on integration errors
+    }
 
     // ✅ AUTOMATIC PROCESSING ENABLED - Enhanced with comprehensive safeguards
     // Pre-flight validation ensures system readiness before processing
-    console.log('🚀 AUTOMATIC PROCESSING ENABLED - Performing pre-flight validation...');
+    console.log('🚀 AUTOMATIC PROCESSING ENABLED (Legacy Mode) - Performing pre-flight validation...');
     
     // PRE-FLIGHT VALIDATION: Critical system checks
     const preflightValidation = {
