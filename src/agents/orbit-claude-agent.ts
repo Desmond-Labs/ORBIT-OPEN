@@ -1,4 +1,4 @@
-'''
+import 'dotenv/config'
 import { query } from '@anthropic-ai/claude-code';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { EventEmitter } from 'events';
@@ -346,4 +346,3 @@ main().catch(error => {
   console.error("Error running workflow processor:", error);
   process.exit(1);
 });
-'''

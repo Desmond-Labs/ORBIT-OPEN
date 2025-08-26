@@ -1,0 +1,696 @@
+
+import 'dotenv/config';
+import { query } from '@anthropic-ai/claude-code';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { EventEmitter } from 'events';
+
+// Logging utility
+class Logger {
+  private static readonly LOG_LEVELS = {
+    DEBUG: 0,
+    INFO: 1,
+    WARN: 2,
+    ERROR: 3
+  };
+
+  private static currentLevel = process.env.LOG_LEVEL ? 
+    Logger.LOG_LEVELS[process.env.LOG_LEVEL as keyof typeof Logger.LOG_LEVELS] || Logger.LOG_LEVELS.INFO 
+    : Logger.LOG_LEVELS.INFO;
+
+  private static startTime = Date.now();
+
+  static debug(...args: any[]) {
+    if (Logger.currentLevel <= Logger.LOG_LEVELS.DEBUG) {
+      console.log(`[${Logger.getTimestamp()}] [DEBUG]`, ...args);
+    }
+  }
+
+  static info(...args: any[]) {
+    if (Logger.currentLevel <= Logger.LOG_LEVELS.INFO) {
+      console.log(`[${Logger.getTimestamp()}] [INFO]`, ...args);
+    }
+  }
+
+  static warn(...args: any[]) {
+    if (Logger.currentLevel <= Logger.LOG_LEVELS.WARN) {
+      console.warn(`[${Logger.getTimestamp()}] [WARN]`, ...args);
+    }
+  }
+
+  static error(...args: any[]) {
+    if (Logger.currentLevel <= Logger.LOG_LEVELS.ERROR) {
+      console.error(`[${Logger.getTimestamp()}] [ERROR]`, ...args);
+    }
+  }
+
+  static performance(label: string, startTime: number) {
+    const duration = Date.now() - startTime;
+    Logger.info(`⏱️  ${label}: ${duration}ms`);
+    return duration;
+  }
+
+  static phase(phase: string, step?: string) {
+    const prefix = step ? `📋 ${phase} - ${step}` : `📋 ${phase}`;
+    Logger.info(`\n${'='.repeat(60)}\n${prefix}\n${'='.repeat(60)}`);
+  }
+
+  static tool(toolName: string, input: any, output?: any, duration?: number) {
+    Logger.debug(`\n🔧 TOOL: ${toolName}`);
+    Logger.debug(`📥 INPUT:`, Logger.truncateObject(input, 500));
+    if (output !== undefined) {
+      Logger.debug(`📤 OUTPUT:`, Logger.truncateObject(output, 1000));
+    }
+    if (duration) {
+      Logger.debug(`⏱️  Duration: ${duration}ms`);
+    }
+  }
+
+  static claude(type: string, content: any, tokenEstimate?: number) {
+    Logger.info(`\n🤖 CLAUDE [${type.toUpperCase()}]`);
+    if (typeof content === 'string') {
+      Logger.info(`💭 ${content.length > 200 ? content.substring(0, 200) + '...' : content}`);
+    } else {
+      Logger.info(`💭`, Logger.truncateObject(content, 200));
+    }
+    if (tokenEstimate) {
+      Logger.info(`🎫 Est. tokens: ${tokenEstimate}`);
+    }
+  }
+
+  static memory() {
+    const used = process.memoryUsage();
+    Logger.debug(`💾 Memory - RSS: ${Math.round(used.rss / 1024 / 1024)}MB, Heap: ${Math.round(used.heapUsed / 1024 / 1024)}MB`);
+  }
+
+  private static getTimestamp(): string {
+    const elapsed = Date.now() - Logger.startTime;
+    const seconds = Math.floor(elapsed / 1000);
+    const ms = elapsed % 1000;
+    return `${seconds.toString().padStart(3, '0')}.${ms.toString().padStart(3, '0')}s`;
+  }
+
+  private static truncateObject(obj: any, maxLength: number): any {
+    const str = typeof obj === 'string' ? obj : JSON.stringify(obj, null, 2);
+    if (str.length > maxLength) {
+      return str.substring(0, maxLength) + `... [truncated ${str.length - maxLength} chars]`;
+    }
+    return obj;
+  }
+
+  static estimateTokens(text: string): number {
+    // Rough estimation: ~4 characters per token
+    return Math.ceil(text.length / 4);
+  }
+}
+
+// Performance timer utility
+class Timer {
+  private startTime: number;
+  private label: string;
+
+  constructor(label: string) {
+    this.label = label;
+    this.startTime = Date.now();
+    Logger.debug(`⏰ Started: ${label}`);
+  }
+
+  end(): number {
+    const duration = Date.now() - this.startTime;
+    Logger.performance(this.label, this.startTime);
+    return duration;
+  }
+}
+
+// Types for our workflow
+interface Order {
+  id: string;
+  user_id: string;
+  order_number: string;
+  batch_id: string;
+  processing_stage: string;
+  payment_status: string;
+}
+
+interface Image {
+  id: string;
+  order_id: string;
+  original_filename: string;
+  storage_path_original: string;
+  storage_path_processed?: string;
+  processing_status: string;
+  gemini_analysis_raw?: string;
+}
+
+interface WorkflowResult {
+  success: boolean;
+  processed_orders: number;
+  failed_orders: string[];
+  error?: string;
+}
+
+// Supabase operations helper
+class SupabaseHelper {
+  private supabase: SupabaseClient;
+  private serviceKey: string;
+
+  constructor(supabase: SupabaseClient, serviceKey: string) {
+    this.supabase = supabase;
+    this.serviceKey = serviceKey;
+  }
+
+  async executeSQL(query: string): Promise<any> {
+    const timer = new Timer('SQL Execution');
+    Logger.tool('supabase_execute_sql', { query: query.length > 100 ? query.substring(0, 100) + '...' : query });
+    
+    try {
+      const { data, error } = await this.supabase.rpc('execute_sql', {
+        query: query,
+      });
+      
+      const duration = timer.end();
+      
+      if (error) {
+        Logger.error('SQL execution failed:', error);
+        throw new Error(`Database error: ${error.message}`);
+      }
+      
+      Logger.tool('supabase_execute_sql', { query: 'executed' }, { rowCount: Array.isArray(data) ? data.length : 'single' }, duration);
+      return data;
+    } catch (error) {
+      timer.end();
+      Logger.error('SQL execution error:', error);
+      throw error;
+    }
+  }
+
+  async listFiles(bucketName: string, folderPath?: string): Promise<any[]> {
+    const timer = new Timer('Storage List Files');
+    Logger.tool('supabase_storage_list_files', { bucketName, folderPath });
+    
+    try {
+      const { data, error } = await this.supabase.storage
+        .from(bucketName)
+        .list(folderPath || '', { limit: 1000 });
+      
+      const duration = timer.end();
+      
+      if (error) {
+        Logger.error('Storage list files failed:', error);
+        throw new Error(`Storage error: ${error.message}`);
+      }
+      
+      const result = data || [];
+      Logger.tool('supabase_storage_list_files', { bucketName, folderPath }, { fileCount: result.length }, duration);
+      return result;
+    } catch (error) {
+      timer.end();
+      Logger.error('Storage list files error:', error);
+      throw error;
+    }
+  }
+
+  async invokeAIAnalysis(image_path: string): Promise<any> {
+    const timer = new Timer('AI Analysis');
+    Logger.tool('invoke_ai_analysis', { image_path });
+    
+    try {
+      const { data, error } = await this.supabase.functions.invoke('mcp-ai-analysis', {
+          body: { image_path },
+          headers: {
+              'Authorization': `Bearer ${this.serviceKey}`
+          }
+      });
+      
+      const duration = timer.end();
+      
+      if (error) {
+          Logger.error('AI analysis function invocation failed:', error);
+          throw new Error(`AI analysis function invocation failed: ${error.message}`);
+      }
+      
+      Logger.tool('invoke_ai_analysis', { image_path }, { 
+        success: true, 
+        dataSize: JSON.stringify(data).length 
+      }, duration);
+      
+      return data;
+    } catch (error) {
+      timer.end();
+      Logger.error('AI analysis error:', error);
+      throw error;
+    }
+  }
+
+  async invokeMetadataProcessing(image_path: string, analysis_result: any): Promise<any> {
+    const timer = new Timer('Metadata Processing');
+    Logger.tool('invoke_metadata_processing', { 
+      image_path, 
+      analysisSize: JSON.stringify(analysis_result).length 
+    });
+    
+    try {
+      const { data, error } = await this.supabase.functions.invoke('mcp-metadata', {
+          body: {
+              tool_name: 'process_image_metadata',
+              parameters: { image_path, analysis_result },
+          },
+          headers: {
+              'Authorization': `Bearer ${this.serviceKey}`
+          }
+      });
+      
+      const duration = timer.end();
+      
+      if (error) {
+          Logger.error('Metadata processing function invocation failed:', error);
+          throw new Error(`Metadata processing function invocation failed: ${error.message}`);
+      }
+      
+      Logger.tool('invoke_metadata_processing', { image_path }, { 
+        success: true, 
+        dataSize: JSON.stringify(data).length 
+      }, duration);
+      
+      return data;
+    } catch (error) {
+      timer.end();
+      Logger.error('Metadata processing error:', error);
+      throw error;
+    }
+  }
+}
+
+// Main ORBIT Workflow Processor Agent
+export class ORBITWorkflowProcessor extends EventEmitter {
+  private supabase: SupabaseClient;
+  private supabaseHelper: SupabaseHelper;
+  private anthropicApiKey: string;
+
+  constructor(
+    anthropicApiKey: string,
+    supabaseUrl: string,
+    supabaseServiceKey: string
+  ) {
+    super();
+    this.anthropicApiKey = anthropicApiKey;
+    this.supabase = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    });
+    this.supabaseHelper = new SupabaseHelper(this.supabase, supabaseServiceKey);
+  }
+
+  async processOrders(): Promise<WorkflowResult> {
+    const workflowTimer = new Timer('Complete ORBIT Workflow');
+    
+    try {
+      Logger.phase('WORKFLOW INITIALIZATION');
+      Logger.info('🚀 Starting ORBIT workflow processor...');
+      Logger.memory();
+      this.emit('workflow:started');
+      
+      // Prepare context with timing
+      const contextTimer = new Timer('Context Preparation');
+      const contextData = await this.prepareWorkflowContext();
+      contextTimer.end();
+      
+      Logger.info('📊 Workflow Context:', contextData);
+      
+      let processedOrders = 0;
+      let failedOrders: string[] = [];
+      let totalTokensUsed = 0;
+
+      Logger.phase('CLAUDE SDK INTERACTION');
+      
+      // Build prompt with token estimation
+      const prompt = this.buildWorkflowPrompt(contextData);
+      const promptTokens = Logger.estimateTokens(prompt);
+      Logger.info(`📝 Prompt prepared: ${prompt.length} chars, ~${promptTokens} tokens`);
+      totalTokensUsed += promptTokens;
+
+      // Set up timeout for Claude query
+      const CLAUDE_TIMEOUT = parseInt(process.env.CLAUDE_TIMEOUT_MS || '300000'); // 5 minutes default
+      Logger.info(`⏰ Claude SDK timeout set to ${CLAUDE_TIMEOUT}ms`);
+
+      const claudeTimer = new Timer('Claude SDK Query');
+      let messageCount = 0;
+      let lastActivity = Date.now();
+
+      // Create a promise that resolves when Claude processing is complete
+      const claudePromise = new Promise(async (resolve, reject) => {
+        try {
+          for await (const message of query({
+            prompt: prompt,
+            // Note: Removing systemPrompt as it's causing TypeScript errors
+            // The system instructions are included in the main prompt instead
+          })) {
+            lastActivity = Date.now();
+            messageCount++;
+            
+            Logger.claude(message.type, message, Logger.estimateTokens(JSON.stringify(message)));
+            
+            if (message.type === 'assistant') {
+              Logger.info(`🤖 Claude response ${messageCount}:`, message);
+              const tokens = Logger.estimateTokens(JSON.stringify(message));
+              totalTokensUsed += tokens;
+            }
+            
+            Logger.memory();
+          }
+          resolve(true);
+        } catch (error) {
+          reject(error);
+        }
+      });
+
+      // Create timeout promise
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => {
+          reject(new Error(`Claude SDK query timeout after ${CLAUDE_TIMEOUT}ms`));
+        }, CLAUDE_TIMEOUT);
+      });
+
+      // Activity monitoring - check if Claude is still responding
+      const activityPromise = new Promise<void>((resolve, reject) => {
+        let checkCount = 0;
+        const maxChecks = 30; // Maximum 30 checks (5 minutes at 10s intervals)
+        
+        const checkActivity = () => {
+          checkCount++;
+          const timeSinceLastActivity = Date.now() - lastActivity;
+          const ACTIVITY_TIMEOUT = 60000; // 1 minute of no activity
+          
+          if (checkCount >= maxChecks) {
+            Logger.debug(`💓 Activity monitoring completed after ${maxChecks} checks`);
+            resolve(); // Stop monitoring after max checks
+            return;
+          }
+          
+          if (timeSinceLastActivity > ACTIVITY_TIMEOUT) {
+            reject(new Error(`No activity from Claude SDK for ${timeSinceLastActivity}ms`));
+          } else {
+            Logger.debug(`💓 Claude activity heartbeat ${checkCount}/${maxChecks} - last activity: ${timeSinceLastActivity}ms ago`);
+            setTimeout(checkActivity, 10000); // Check every 10 seconds
+          }
+        };
+        setTimeout(checkActivity, 10000);
+      });
+
+      // Race between Claude completion, timeout, and activity monitoring
+      await Promise.race([claudePromise, timeoutPromise, activityPromise]);
+      
+      const claudeDuration = claudeTimer.end();
+      
+      Logger.phase('WORKFLOW COMPLETION');
+      Logger.info(`✅ Claude processing completed successfully`);
+      Logger.info(`📈 Total messages processed: ${messageCount}`);
+      Logger.info(`🎫 Total estimated tokens used: ${totalTokensUsed}`);
+      Logger.info(`⏱️  Total Claude time: ${claudeDuration}ms`);
+      
+      const totalDuration = workflowTimer.end();
+      Logger.info(`⏱️  Total workflow time: ${totalDuration}ms`);
+      
+      this.emit('workflow:completed', { processedOrders, failedOrders });
+      return { success: true, processed_orders: processedOrders, failed_orders: failedOrders };
+      
+    } catch (error) {
+      workflowTimer.end();
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      Logger.error('💥 Workflow crashed:', errorMessage);
+      Logger.error('📍 Stack trace:', error instanceof Error ? error.stack : 'No stack trace');
+      this.emit('workflow:error', errorMessage);
+      return { success: false, processed_orders: 0, failed_orders: [], error: errorMessage };
+    }
+  }
+
+  private async prepareWorkflowContext(): Promise<any> {
+    Logger.info('🔧 Preparing workflow context...');
+    
+    try {
+      Logger.debug('Checking pending orders...');
+      const pendingOrders = await this.supabaseHelper.executeSQL(
+        `SELECT COUNT(*) as count FROM orders WHERE processing_stage = 'pending' AND payment_status = 'completed'`
+      );
+      
+      Logger.debug('Testing storage accessibility...');
+      const storageTest = await this.supabaseHelper.listFiles('orbit-images', '');
+      
+      const context = {
+        pending_orders_count: pendingOrders[0]?.count || 0,
+        storage_accessible: storageTest.length >= 0,
+        timestamp: new Date().toISOString(),
+      };
+      
+      Logger.info('✅ Context prepared successfully:', context);
+      return context;
+    } catch (error) {
+      Logger.error('❌ Context preparation failed:', error);
+      const errorContext = { 
+        error: error instanceof Error ? error.message : 'Unknown error',
+        timestamp: new Date().toISOString() 
+      };
+      Logger.warn('⚠️  Using error context:', errorContext);
+      return errorContext;
+    }
+  }
+
+  private buildWorkflowPrompt(context: any): string {
+    Logger.debug('Building workflow prompt with context:', context);
+    
+    const prompt = `
+SYSTEM: You are an ORBIT image processing specialist. You have direct access to a suite of Supabase tools to execute the workflow. Use these tools systematically and verify each step. Be thorough and explain what you're doing at each step.
+
+# ORBIT Image Processing Workflow - Enhanced Version
+
+You are an AI assistant responsible for executing the complete ORBIT image processing workflow. Your task is to automatically process pending orders from start to finish by calling the available tools. For any step requiring SQL, generate the necessary SQL query based on the natural language instruction.
+
+## Workflow Context:
+- Pending Orders: ${context.pending_orders_count || 0}
+- Storage Status: ${context.storage_accessible ? 'Accessible' : 'Error'}
+- Timestamp: ${context.timestamp}
+
+## Available Tools:
+You have direct access to the following tools. Call them with the specified parameters.
+
+- **supabase_execute_sql(query: string)**: Executes a SQL query. You must generate the SQL string for the 'query' parameter.
+- **supabase_storage_list_files(bucket_name: string, folder_path?: string)**: Lists files in storage.
+- **invoke_ai_analysis(image_path: string)**: Calls the remote AI analysis function.
+- **invoke_metadata_processing(image_path: string, analysis_result: object)**: Calls the remote metadata processing function.
+
+## Your Mission:
+Execute the following phases and steps sequentially using the provided tools.
+
+## PHASE 1: ORDER DISCOVERY & PREPARATION
+
+### STEP 1: FIND PENDING ORDERS
+Action: Find the oldest pending order from the 'orders' table that has a 'completed' payment status.
+Tool: supabase_execute_sql
+Instruction: "Generate a SQL query to select the id, user_id, order_number, and batch_id for the oldest order where processing_stage is 'pending' and payment_status is 'completed'."
+
+### STEP 2: START PROCESSING
+Action: Mark the order and its corresponding batch as 'processing'.
+Tool: supabase_execute_sql
+Instruction: "Generate two SQL queries. First, for the order ID from the previous step, update its 'processing_stage' and 'order_status' to 'processing' and set 'processing_started_at' to the current timestamp. Second, do the same for the batch associated with the order, updating its 'status' and 'processing_stage' to 'processing'."
+
+### STEP 3: DISCOVER IMAGES
+Action: Find all images associated with the current order that are pending processing.
+Tool: supabase_execute_sql
+Instruction: "Generate a SQL query to select the id, original_filename, and storage_path_original from the 'images' table for all images where the 'order_id' matches the one from Step 1 and the 'processing_status' is 'pending'."
+
+### STEP 4: VERIFY ORIGINAL FILES EXIST
+Action: Verify all original images exist in storage.
+Tool: supabase_storage_list_files
+Tool Input:
+{
+  "bucket_name": "orbit-images",
+  "folder_path": "{order_id}_{user_id}/original"
+}
+Instruction: "Compare the list of files from storage with the list of images from the database in the previous step. If any are missing, stop and report an error."
+
+## PHASE 2: PER-IMAGE PROCESSING (ATOMIC PIPELINE)
+
+**🔄 FOR EACH IMAGE:**
+
+### STEP 5A: ANALYZE IMAGE WITH GEMINI
+Action: Process the image with the remote Gemini AI analysis function.
+Tool: invoke_ai_analysis
+Tool Input:
+{
+  "image_path": "{storage_path_original}"
+}
+
+### STEP 5B: STORE ANALYSIS WITH VERIFICATION
+Action: Save the full Gemini analysis response to the database.
+Tool: supabase_execute_sql
+Instruction: "Generate a SQL query to update the current image record in the 'images' table. Set the 'gemini_analysis_raw' column to the full JSON result from the AI analysis (ensure the JSON is properly escaped for SQL), and update the 'processing_status' to 'processing'."
+
+### STEP 5C: PROCESS AND EMBED METADATA
+Action: Call the remote metadata processing server.
+Tool: invoke_metadata_processing
+Tool Input:
+{
+  "image_path": "{storage_path_original}",
+  "analysis_result": {COMPLETE_GEMINI_RESPONSE_JSON}
+}
+
+### STEP 5D: UPDATE DATABASE WITH VERIFICATION
+Action: Update the image record with the path to the processed file.
+Tool: supabase_execute_sql
+Instruction: "Generate a SQL query to update the current image record in the 'images' table. Set the 'storage_path_processed' column to the 'processed_file_path' value from the result of the previous step. Set 'processing_status' to 'complete' and 'processed_at' to the current timestamp."
+
+### STEP 5E: VERIFY PROCESSED FILE
+Action: Verify the processed file from the metadata step exists in storage.
+Tool: supabase_storage_list_files
+Instruction: "List the files in the processed folder and confirm the file with the path 'processed_file_path' from step 5C exists."
+
+## PHASE 3 & 4: FINALIZATION AND CLEANUP
+(Continue using the tools as needed to complete the order and trigger emails, generating SQL from natural language instructions.)
+`;
+    
+    Logger.debug(`Built prompt: ${prompt.length} characters`);
+    return prompt;
+  }
+
+  // Event-driven triggers
+  async onOrderCreated(orderId: string) {
+    console.log(`📨 Order created event received: ${orderId}`);
+    this.emit('order:created', orderId);
+    return await this.processOrders();
+  }
+
+  async onPaymentCompleted(orderId: string) {
+    console.log(`💳 Payment completed event received: ${orderId}`);
+    this.emit('payment:completed', orderId);
+    return await this.processOrders();
+  }
+
+  async onBatchReady(batchId: string) {
+    console.log(`📦 Batch ready event received: ${batchId}`);
+    this.emit('batch:ready', batchId);
+    return await this.processOrders();
+  }
+
+  // Manual trigger
+  async triggerWorkflow() {
+    Logger.phase('MANUAL WORKFLOW TRIGGER');
+    Logger.info('🔧 Manual workflow trigger initiated');
+    this.emit('workflow:manual_trigger');
+    return await this.processOrders();
+  }
+
+  // Health check
+  async healthCheck(): Promise<{ status: string; details: any }> {
+    const healthTimer = new Timer('Health Check');
+    Logger.phase('HEALTH CHECK');
+    
+    try {
+      Logger.debug('Testing database connection...');
+      const { data: dbTest } = await this.supabase.from('orders').select('count').limit(1);
+      
+      Logger.debug('Testing storage connection...');
+      const { data: storageTest } = await this.supabase.storage.from('orbit-images').list('', { limit: 1 });
+      
+      const result = {
+        status: 'healthy',
+        details: {
+          database: dbTest ? 'connected' : 'error',
+          storage: storageTest ? 'connected' : 'error',
+        }
+      };
+      
+      healthTimer.end();
+      Logger.info('✅ Health check passed:', result);
+      return result;
+    } catch (error) {
+      healthTimer.end();
+      Logger.error('❌ Health check failed:', error);
+      
+      const result = {
+        status: 'unhealthy',
+        details: { error: error instanceof Error ? error.message : 'Unknown error' },
+      };
+      
+      Logger.error('💔 Health check result:', result);
+      return result;
+    }
+  }
+}
+
+// Usage example and configuration
+export const createORBITProcessor = (config: {
+  anthropicApiKey: string;
+  supabaseUrl: string;
+  supabaseServiceKey: string;
+}) => {
+  const processor = new ORBITWorkflowProcessor(
+    config.anthropicApiKey,
+    config.supabaseUrl,
+    config.supabaseServiceKey
+  );
+
+  processor.on('workflow:started', () => console.log('🚀 ORBIT workflow started'));
+  processor.on('workflow:completed', (result) => console.log('✅ ORBIT workflow completed:', result));
+  processor.on('workflow:error', (error) => console.error('💥 ORBIT workflow error:', error));
+
+  return processor;
+};
+
+// Main execution block
+async function main() {
+  Logger.phase('APPLICATION STARTUP');
+  
+  // Environment validation with detailed logging
+  const requiredEnvVars = ['ANTHROPIC_API_KEY', 'SUPABASE_URL', 'SUPABASE_SERVICE_KEY'];
+  const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
+  
+  if (missingVars.length > 0) {
+    Logger.error("❌ Missing required environment variables:", missingVars);
+    Logger.error("📝 Please set the following environment variables:");
+    missingVars.forEach(varName => Logger.error(`   - ${varName}`));
+    Logger.info("💡 Optional environment variables:");
+    Logger.info("   - LOG_LEVEL (DEBUG|INFO|WARN|ERROR) - default: INFO");
+    Logger.info("   - CLAUDE_TIMEOUT_MS - default: 300000 (5 minutes)");
+    process.exit(1);
+  }
+
+  // Log configuration
+  Logger.info("🔧 Environment Configuration:");
+  Logger.info(`   - LOG_LEVEL: ${process.env.LOG_LEVEL || 'INFO'}`);
+  Logger.info(`   - CLAUDE_TIMEOUT_MS: ${process.env.CLAUDE_TIMEOUT_MS || '300000'}`);
+  Logger.info(`   - SUPABASE_URL: ${process.env.SUPABASE_URL}`);
+  Logger.info(`   - ANTHROPIC_API_KEY: ${process.env.ANTHROPIC_API_KEY ? '[SET]' : '[NOT SET]'}`);
+  Logger.info(`   - SUPABASE_SERVICE_KEY: ${process.env.SUPABASE_SERVICE_KEY ? '[SET]' : '[NOT SET]'}`);
+
+  const processor = createORBITProcessor({
+    anthropicApiKey: process.env.ANTHROPIC_API_KEY,
+    supabaseUrl: process.env.SUPABASE_URL,
+    supabaseServiceKey: process.env.SUPABASE_SERVICE_KEY,
+  });
+
+  // Run health check first
+  Logger.info("🏥 Running health check before starting workflow...");
+  const health = await processor.healthCheck();
+  if (health.status !== 'healthy') {
+    Logger.error("❌ Health check failed, aborting workflow");
+    process.exit(1);
+  }
+
+  Logger.phase('WORKFLOW EXECUTION');
+  Logger.info("🚀 Triggering ORBIT workflow processor...");
+  
+  const totalTimer = new Timer('Total Application Runtime');
+  const result = await processor.triggerWorkflow();
+  totalTimer.end();
+  
+  Logger.phase('APPLICATION SHUTDOWN');
+  Logger.info("✅ Workflow finished:", result);
+  Logger.memory();
+}
+
+main().catch(error => {
+  Logger.error("💥 Fatal error running workflow processor:", error);
+  Logger.error("📍 Stack trace:", error.stack);
+  process.exit(1);
+});
