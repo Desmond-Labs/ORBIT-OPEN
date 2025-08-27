@@ -10,15 +10,14 @@ import type { Database } from './types';
 
 // Configuration for enhanced authentication system
 const getSupabaseConfig = () => {
-  // During transition period, prefer environment variables but fall back to hardcoded values
-  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "https://ufdcvxmizlzlnyyqpfck.supabase.co";
+  // Get URL from environment variables - required for production
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
   
   // New publishable key format (preferred)
   const publishableKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
   
   // Legacy anon key (fallback during transition)
-  const legacyAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVmZGN2eG1pemx6bG55eXFwZmNrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDYyMzM1NzMsImV4cCI6MjA2MTgwOTU3M30.bpYLwFpQxq5tAw4uvRrHPi9WeFmxHnLjQaZraZqa3Bs";
+  const legacyAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
   
   // Use new publishable key if available, otherwise fall back to legacy anon key
   const clientKey = publishableKey || legacyAnonKey;

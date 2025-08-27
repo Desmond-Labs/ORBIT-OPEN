@@ -4,7 +4,7 @@
 # Usage: ./trigger-email.sh [ORDER_ID]
 
 ORDER_ID="${1:-620f0e46-d0ed-4eac-a14e-21f09e681f02}"
-SUPABASE_URL="https://ufdcvxmizlzlnyyqpfck.supabase.co"
+SUPABASE_URL="${SUPABASE_URL:-https://your-project.supabase.co}"
 FUNCTION_URL="${SUPABASE_URL}/functions/v1/send-order-completion-email"
 
 # Load environment variables from .env file if it exists

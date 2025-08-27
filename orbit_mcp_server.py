@@ -24,9 +24,9 @@ logging.basicConfig(
 logger = logging.getLogger("orbit_mcp")
 
 # Configuration from environment
-SUPABASE_URL = os.getenv('SUPABASE_URL', 'https://ufdcvxmizlzlnyyqpfck.supabase.co')
-SUPABASE_SERVICE_KEY = os.getenv('SUPABASE_SERVICE_ROLE_KEY', '')
-SUPABASE_PROJECT_ID = os.getenv('SUPABASE_PROJECT_ID', 'ufdcvxmizlzlnyyqpfck')
+SUPABASE_URL = os.getenv('SUPABASE_URL')
+SUPABASE_SERVICE_KEY = os.getenv('SUPABASE_SERVICE_ROLE_KEY')
+SUPABASE_PROJECT_ID = os.getenv('SUPABASE_PROJECT_ID')
 
 # HTTP client for calling Supabase functions
 http_client = httpx.AsyncClient(

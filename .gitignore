@@ -75,3 +75,18 @@ tests/**/*token*
 # Only exclude scripts that might contain hardcoded secrets
 *secret-test*
 *private-test*
+
+# Supabase specific sensitive files
+supabase/.temp/
+.supabase/
+*.service-role-key
+
+# API Keys and authentication files
+*api-key*
+*service-account*
+*credentials*
+
+# Temporary files that might contain sensitive data
+temp/
+tmp/
+*.tmp

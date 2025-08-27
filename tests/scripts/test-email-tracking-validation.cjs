@@ -26,9 +26,9 @@ const getAuthToken = () => {
 
 // Test configuration
 const TEST_CONFIG = {
-  SUPABASE_URL: process.env.SUPABASE_URL || 'https://ufdcvxmizlzlnyyqpfck.supabase.co',
+  SUPABASE_URL: process.env.SUPABASE_URL || 'https://your-project.supabase.co',
   SUPABASE_SERVICE_KEY: getAuthToken(),
-  FUNCTION_URL: 'https://ufdcvxmizlzlnyyqpfck.supabase.co/functions/v1/send-order-completion-email',
+  FUNCTION_URL: `${process.env.SUPABASE_URL || 'https://your-project.supabase.co'}/functions/v1/send-order-completion-email`,
   TEST_ORDER_ID: '620f0e46-d0ed-4eac-a14e-21f09e681f02', // Original investigation target
   TEST_EMAIL: 'test-validation@example.com'
 };
