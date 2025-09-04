@@ -1,4 +1,4 @@
-# Contributing to ORBIT Image Forge
+# Contributing to ORBIT 
 
 Thank you for your interest in contributing to ORBIT Image Forge! This document provides guidelines for contributing to this AI-powered image processing platform.
 
