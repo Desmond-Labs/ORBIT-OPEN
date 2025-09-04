@@ -1,4 +1,4 @@
-# ORBIT Image Forge
+# ORBIT 
 
 [![MIT License](https://img.shields.io/badge/License-MIT-green.svg)](https://choosealicense.com/licenses/mit/)
 [![React](https://img.shields.io/badge/React-20232A?style=flat&logo=react&logoColor=61DAFB)](https://reactjs.org/)
@@ -8,9 +8,9 @@
 
 ## 🎯 Project Overview
 
-**ORBIT Image Forge** is an open source AI-powered image processing platform that analyzes lifestyle and product images using Google Gemini AI, then embeds comprehensive metadata directly into image files using industry-standard XMP formats.
+**ORBIT** is an open source AI-powered image processing platform that analyzes lifestyle and product images using Google Gemini AI, then embeds comprehensive metadata directly into image files using industry-standard XMP formats.
 
-**🚀 Live Demo**: https://preview--orbit-image-forge.lovable.app  
+**🚀 Live Demo**: https://orbitmeta.app
   
 **🤝 Contributing**: [Developer Guide](./CONTRIBUTING.md)
 
